@@ -193,6 +193,7 @@ class Chat:
                 model="deepseek-chat",
                 messages=self.messages,
                 tools=self.tools,
+                max_tokens=8192
             )
             
             assistant_message = response.choices[0].message

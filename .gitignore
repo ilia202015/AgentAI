@@ -43,3 +43,6 @@ agent_min.log
 # OS
 .DS_Store
 Thumbs.db
+
+chat.txt
+logs.txt
