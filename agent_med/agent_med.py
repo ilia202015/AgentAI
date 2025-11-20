@@ -126,6 +126,104 @@ class Chat:
                     }
                 }
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "user_profile",
+                    "description": "Управление профилем пользователя. Сохраняет имя, предпочтения и инструкции пользователя.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "action": {
+                                "type": "string",
+                                "description": "Действие: get (получить), set (установить), update (обновить), delete (удалить)",
+                                "default": "get"
+                            },
+                            "name": {
+                                "type": "string",
+                                "description": "Имя пользователя"
+                            },
+                            "preferences": {
+                                "type": "object",
+                                "description": "Предпочтения пользователя"
+                            },
+                            "instructions": {
+                                "type": "object", 
+                                "description": "Инструкции пользователя"
+                            }
+                        },
+                        "required": ["action"]
+                    }
+                }
+            },
+        ]
+                    },
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "chat",
+                    "description": self_chat_prompt,
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string", 
+                                "description": "Имя чата"
+                            },
+                            "message": {
+                                "type": "string",
+                                "description": "Сообщение для отправки в чат"
+                            }
+                        },
+                        "required": ["name", "message"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "chat_exec",
+                    "description": self_chat_exec_prompt,
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string", 
+                                "description": "Имя чата"
+                            },
+                            "code": {
+                                "type": "string",
+                                "description": "Сообщение для отправки в чат"
+                            }
+                        },
+                        "required": ["name", "code"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "google_search",
+                    "description": "Выполняет поиск через Google Custom Search API. Возвращает результаты в формате JSON.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "Поисковый запрос"
+                            },
+                            "num_results": {
+                                "type": "integer",
+                                "description": "Количество результатов (по умолчанию 10, максимум 10)",
+                                "default": 10
+                            }
+                        },
+                        "required": ["query"]
+                    }
+                }
+            },
         ]
 
         self.chats = dict()
@@ -134,6 +232,7 @@ class Chat:
             "chat_exec" : ["name", "code"],
             "python" : ["code"],
             "google_search" : ["query", "num_results"],
+            "user_profile" : ["action", "name", "preferences", "instructions"],
         }
 
         self.messages = [
@@ -188,6 +287,127 @@ class Chat:
             
         except Exception as e:
             return f"Ошибка при выполнении поиска: {e}"
+
+    def user_profile_tool(self, action="get", **kwargs):
+        """
+        Управление профилем пользователя
+        
+        Args:
+            action (str): Действие - "get", "set", "update", "delete"
+            **kwargs: Параметры для установки/обновления
+        
+        Returns:
+            str: Результат операции
+        """
+        import json
+        import os
+        
+        profile_file = "agent_med/user_profile.json"
+        
+        # Стандартная структура профиля
+        default_profile = {
+            "name": "",
+            "preferences": {
+                "language": "russian",
+                "output_style": "detailed",
+                "auto_commit": False
+            },
+            "instructions": {
+                "github_commit": "git add . && git commit -m \"feat: description\" && git push origin main",
+                "preferred_tools": ["python", "chat", "google_search", "user_profile"]
+            },
+            "metadata": {
+                "created": "",
+                "last_updated": ""
+            }
+        }
+        
+        try:
+            if action == "get":
+                # Получить профиль
+                if os.path.exists(profile_file):
+                    with open(profile_file, "r", encoding="utf-8") as f:
+                        profile = json.load(f)
+                    return json.dumps(profile, ensure_ascii=False, indent=2)
+                else:
+                    return "Профиль пользователя не найден. Используйте action='set' для создания."
+            
+            elif action == "set":
+                # Установить новый профиль
+                import datetime
+                profile = default_profile.copy()
+                
+                # Обновляем переданные поля
+                for key, value in kwargs.items():
+                    if key in profile:
+                        profile[key] = value
+                    elif "." in key:
+                        # Вложенные поля (например, "preferences.language")
+                        parts = key.split(".")
+                        current = profile
+                        for part in parts[:-1]:
+                            if part not in current:
+                                current[part] = {}
+                            current = current[part]
+                        current[parts[-1]] = value
+                
+                # Устанавливаем метаданные
+                now = datetime.datetime.now().isoformat()
+                profile["metadata"]["created"] = now
+                profile["metadata"]["last_updated"] = now
+                
+                # Сохраняем
+                os.makedirs(os.path.dirname(profile_file), exist_ok=True)
+                with open(profile_file, "w", encoding="utf-8") as f:
+                    json.dump(profile, f, ensure_ascii=False, indent=2)
+                
+                return f"Профиль пользователя создан: {json.dumps(profile, ensure_ascii=False)}"
+            
+            elif action == "update":
+                # Обновить существующий профиль
+                if not os.path.exists(profile_file):
+                    return "Профиль пользователя не найден. Используйте action='set' для создания."
+                
+                with open(profile_file, "r", encoding="utf-8") as f:
+                    profile = json.load(f)
+                
+                import datetime
+                
+                # Обновляем переданные поля
+                for key, value in kwargs.items():
+                    if key in profile:
+                        profile[key] = value
+                    elif "." in key:
+                        parts = key.split(".")
+                        current = profile
+                        for part in parts[:-1]:
+                            if part not in current:
+                                current[part] = {}
+                            current = current[part]
+                        current[parts[-1]] = value
+                
+                # Обновляем метаданные
+                profile["metadata"]["last_updated"] = datetime.datetime.now().isoformat()
+                
+                # Сохраняем
+                with open(profile_file, "w", encoding="utf-8") as f:
+                    json.dump(profile, f, ensure_ascii=False, indent=2)
+                
+                return f"Профиль пользователя обновлен: {json.dumps(profile, ensure_ascii=False)}"
+            
+            elif action == "delete":
+                # Удалить профиль
+                if os.path.exists(profile_file):
+                    os.remove(profile_file)
+                    return "Профиль пользователя удален"
+                else:
+                    return "Профиль пользователя не найден"
+            
+            else:
+                return f"Неизвестное действие: {action}. Доступные действия: get, set, update, delete"
+        
+        except Exception as e:
+            return f"Ошибка при работе с профилем пользователя: {e}"
 
     def validate_python_code(self, code):
         """Валидация Python кода для безопасности"""
@@ -290,6 +510,111 @@ class Chat:
                     "content": full_content
                 }
                 
+                if tool_calls:
+                    assistant_message["tool_calls"] = tool_calls
+                    
+                self.messages.append(assistant_message)
+                
+                logger.info(f"Получен потоковый ответ от модели")
+                
+                # Обрабатываем tool calls
+                if tool_calls:
+                    for tool_call in tool_calls:
+                        tool_name = tool_call["function"]["name"]
+                        try:
+                            tool_args = json.loads(tool_call["function"]["arguments"])
+                        except:
+                            tool_args = {}
+                        
+                        logger.info(f"Вызов инструмента: {tool_name} с аргументами: {tool_args}")
+                        
+                        if tool_name in self.tools_dict.keys():
+                            self.tool_exec(self.tools_dict[tool_name], tool_args, tool_call["id"], tool_name)
+                        else:
+                            self.send({
+                                "role": "tool", 
+                                "tool_call_id": tool_call["id"],
+                                "content": "Такого инструмента не существует"
+                            })
+
+                        
+            except Exception as e:
+                logger.error(f"Ошибка при обработке сообщения: {e}")
+                error_msg = f"Произошла ошибка: {e}"
+                print(f"\n❌ {error_msg}")
+                self.send({"role": "system", "content": error_msg})
+                
+        else:
+            result = ''
+
+            try:
+                response = client.chat.completions.create(
+                    model="deepseek-chat",
+                    messages=self.messages,
+                    tools=self.tools,
+                )
+                
+                assistant_message = response.choices[0].message
+                self.messages.append(assistant_message)
+
+                logger.info(f"Получен ответ от модели")
+                
+                if assistant_message.content:
+                    result = assistant_message.content
+
+                if assistant_message.tool_calls:
+                    for tool_call in assistant_message.tool_calls:
+                        tool_name = tool_call.function.name
+                        tool_args = json.loads(tool_call.function.arguments)
+                        
+                        logger.info(f"Вызов инструмента: {tool_name} с аргументами: {tool_args}")
+                        
+                        if tool_name in self.tools_dict.keys():
+                            self.tool_exec(self.tools_dict[tool_name], tool_args, tool_call.id, tool_name)
+                        else:
+                            result = self.send({
+                                "role": "tool", 
+                                "tool_call_id": tool_call.id,
+                                "content": "Такого инструмента не существует"
+                            })
+                            
+            except Exception as e:
+                logger.error(f"Ошибка при обработке сообщения: {e}")
+                error_msg = f"Произошла ошибка: {e}"
+                print(f"\n❌ {error_msg}")
+                result = self.send({"role": "system", "content": error_msg})
+            return result
+
+
+def main():
+    """Главная функция"""
+    print("🚀 Запуск улучшенного AI-агента с самомодификацией!")
+    print("=" * 60)
+    print("Агент может:")
+    print("• Выполнять Python код")
+    print("• Изменять собственный код во время работы")
+    print("• Добавлять новые инструменты и функции")
+    print("• Адаптироваться к новым задачам")
+    print("=" * 60)
+    
+    chat_agent = Chat()
+    
+    try:
+        while True:
+            user_input = input("\n👤 Вы: ")
+            chat_agent.send({"role": "user", "content": user_input})
+    except KeyboardInterrupt:
+        print("\n👋 Программа завершена пользователем")
+    except EOFError:
+        print("\n👋 Программа завершена (Ctrl+D)")
+    except Exception as e:
+        logger.error(f"Критическая ошибка: {e}")
+        print(f"\n💥 Критическая ошибка: {e}")
+
+
+if __name__ == "__main__":
+    main()
+
                 if tool_calls:
                     assistant_message["tool_calls"] = tool_calls
                     

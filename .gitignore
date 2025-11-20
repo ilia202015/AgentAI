@@ -47,3 +47,6 @@ Thumbs.db
 
 chat.txt
 logs.txt
+
+# User profile data
+agent_med/user_profile.json
