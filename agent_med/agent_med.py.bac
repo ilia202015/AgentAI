@@ -1,12 +1,13 @@
-import os, json, logging, ast, sys, types
+import os, json, logging, ast, sys, types, readline
 from openai import OpenAI
+
 
 # Настройка логирования
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('agent_min.log')
+        logging.FileHandler('agent_med/agent_med.log')
     ]
 )
 logger = logging.getLogger(__name__)
@@ -14,11 +15,14 @@ logger = logging.getLogger(__name__)
 with open("api.key") as f:
     api_key = f.read()
 
-with open("agent_min.py") as f:
+with open("agent_med/agent_med.py") as f:
     self_code = f.read()
 
-with open("system_prompt") as f:
+with open("agent_med/system_prompt") as f:
     self_system_prompt = f.read()
+
+with open("agent_med/python_prompt") as f:
+    self_python_prompt = f.read()
 
 client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
 
@@ -36,7 +40,7 @@ class Chat:
                 "type": "function",
                 "function": {
                     "name": "python",
-                    "description": "Выполнить Python код. Перед выполнением код проходит валидацию, если не успешно возвращается её вердикт вместо результата и выполнения. Результат сохраняется в переменную result, то что ты вывел с помощью print или через stdout (например, при запуске приложения через system) ты не увидешь, но увидет пользователь, чтобы передать себе информацию вместо print(\"...\") используй result += \"...\". Код выполняется в окружении скрипта agent_min.py, реализовано с помощью exec(code, globals(), local_env) (local_env это locals(), но внуртри класса Chat), self - текущий self класса chat, ты можешь переписать любой его метод или изменить любую переменную (например, переписать send (написать def send:\n\t#...; self.send = types.MethodType(send, self))), все переменные окружения сохраняются между запусками.",
+                    "description": self_python_prompt,
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -112,7 +116,7 @@ class Chat:
             })
 
     def send(self, message):
-        """Отправка сообщения и обработка ответа"""
+        """Отправка сообщения с потоковым выводом"""
         self.messages.append(message)
 
         try:
@@ -120,29 +124,68 @@ class Chat:
                 model="deepseek-chat",
                 messages=self.messages,
                 tools=self.tools,
+                stream=True  # Включаем потоковый режим
             )
             
-            assistant_message = response.choices[0].message
-            self.messages.append(assistant_message)
-
-            logger.info(f"Получен ответ от модели")
+            # Собираем полный ответ
+            full_content = ""
+            tool_calls = []
             
-            if assistant_message.content:
-                print(f"\n🤖 Агент: {assistant_message.content}")
-
-            if assistant_message.tool_calls:
-                for tool_call in assistant_message.tool_calls:
-                    tool_name = tool_call.function.name
-                    tool_args = json.loads(tool_call.function.arguments)
+            print("\n🤖 Агент: ", end="", flush=True)
+            
+            for chunk in response:
+                if chunk.choices[0].delta.content is not None:
+                    content = chunk.choices[0].delta.content
+                    full_content += content
+                    print(content, end="", flush=True)
+                
+                # Собираем tool calls если есть
+                if chunk.choices[0].delta.tool_calls:
+                    for tool_call in chunk.choices[0].delta.tool_calls:
+                        if len(tool_calls) <= tool_call.index:
+                            tool_calls.append({
+                                "id": tool_call.id,
+                                "type": "function",
+                                "function": {
+                                    "name": tool_call.function.name,
+                                    "arguments": tool_call.function.arguments or ""
+                                }
+                            })
+                        else:
+                            tool_calls[tool_call.index]["function"]["arguments"] += tool_call.function.arguments or ""
+            
+            print()  # Новая строка после завершения потока
+            
+            # Создаем полное сообщение ассистента
+            assistant_message = {
+                "role": "assistant",
+                "content": full_content
+            }
+            
+            if tool_calls:
+                assistant_message["tool_calls"] = tool_calls
+                
+            self.messages.append(assistant_message)
+            
+            logger.info(f"Получен потоковый ответ от модели")
+            
+            # Обрабатываем tool calls
+            if tool_calls:
+                for tool_call in tool_calls:
+                    tool_name = tool_call["function"]["name"]
+                    try:
+                        tool_args = json.loads(tool_call["function"]["arguments"])
+                    except:
+                        tool_args = {}
                     
                     logger.info(f"Вызов инструмента: {tool_name} с аргументами: {tool_args}")
                     
                     if tool_name in self.tools_dict.keys():
-                        self.tool_exec(self.tools_dict[tool_name], tool_args, tool_call.id, tool_name)
+                        self.tool_exec(self.tools_dict[tool_name], tool_args, tool_call["id"], tool_name)
                     else:
                         self.send({
                             "role": "tool", 
-                            "tool_call_id": tool_call.id,
+                            "tool_call_id": tool_call["id"],
                             "content": "Такого инструмента не существует"
                         })
                         
@@ -169,12 +212,11 @@ def main():
     try:
         while True:
             user_input = input("\n👤 Вы: ")
-            if user_input.lower() in ['exit', 'quit', 'выход']:
-                print("👋 До свидания!")
-                break
             chat_agent.send({"role": "user", "content": user_input})
     except KeyboardInterrupt:
         print("\n👋 Программа завершена пользователем")
+    except EOFError:
+        print("\n👋 Программа завершена (Ctrl+D)")
     except Exception as e:
         logger.error(f"Критическая ошибка: {e}")
         print(f"\n💥 Критическая ошибка: {e}")
