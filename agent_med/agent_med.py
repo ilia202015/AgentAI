@@ -104,6 +104,28 @@ class Chat:
                     }
                 }
             },
+            {
+                "type": "function",
+                "function": {
+                    "name": "google_search",
+                    "description": "Выполняет поиск через Google Custom Search API. Возвращает результаты в формате JSON.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {
+                                "type": "string",
+                                "description": "Поисковый запрос"
+                            },
+                            "num_results": {
+                                "type": "integer",
+                                "description": "Количество результатов (по умолчанию 10, максимум 10)",
+                                "default": 10
+                            }
+                        },
+                        "required": ["query"]
+                    }
+                }
+            },
         ]
 
         self.chats = dict()
@@ -111,6 +133,7 @@ class Chat:
             "chat" : ["name", "message"],
             "chat_exec" : ["name", "code"],
             "python" : ["code"],
+            "google_search" : ["query", "num_results"],
         }
 
         self.messages = [
@@ -126,6 +149,45 @@ class Chat:
         if name not in self.chats.keys():
             self.chats[name] = Chat(output_mode="auto")
         return self.chats[name].python_tool(code)
+
+    def google_search_tool(self, query, num_results=10):
+        """
+        Выполняет поиск через Google Custom Search API
+        
+        Args:
+            query (str): Поисковый запрос
+            num_results (int): Количество результатов (макс 10)
+        
+        Returns:
+            str: JSON строка с результатами поиска
+        """
+        try:
+            # Импортируем внутри функции чтобы избежать проблем с областью видимости
+            import json
+            from googleapiclient.discovery import build
+            
+            # Чтение ключа API из файла
+            with open("agent_med/google.key", "r") as f:
+                api_key = f.read().strip()
+            
+            # Чтение Search Engine ID
+            with open("agent_med/search_engine.id", "r") as f:
+                search_engine_id = f.read().strip()
+            
+            # Создаем сервис
+            service = build("customsearch", "v1", developerKey=api_key)
+            
+            # Выполняем поиск
+            result = service.cse().list(
+                q=query,
+                cx=search_engine_id,
+                num=min(num_results, 10)
+            ).execute()
+            
+            return json.dumps(result, ensure_ascii=False, indent=2)
+            
+        except Exception as e:
+            return f"Ошибка при выполнении поиска: {e}"
 
     def validate_python_code(self, code):
         """Валидация Python кода для безопасности"""
@@ -172,7 +234,7 @@ class Chat:
 
     def tool_exec(self, args, tool_args, tool_id, name):
         if self.check_tool_args(args, tool_args, tool_id):
-            self.python_tool(f"result = self.{name}_tool(*{[tool_args[arg] for arg in args]})")
+            self.python_tool(f"""result = self.{name}_tool(*{[tool_args[arg] for arg in args]})""")
             self.send({
                 "role": "tool", 
                 "tool_call_id": tool_id, 
@@ -255,7 +317,6 @@ class Chat:
                                 "content": "Такого инструмента не существует"
                             })
 
-
                         
             except Exception as e:
                 logger.error(f"Ошибка при обработке сообщения: {e}")
@@ -303,7 +364,6 @@ class Chat:
                 print(f"\n❌ {error_msg}")
                 result = self.send({"role": "system", "content": error_msg})
             return result
-
 
 
 def main():

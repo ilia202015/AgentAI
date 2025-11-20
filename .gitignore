@@ -26,6 +26,7 @@ env/
 ENV/
 
 # API keys and secrets
+*.id
 *.key
 api.key
 github.key
