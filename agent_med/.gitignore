@@ -44,5 +44,4 @@ agent_min.log
 .DS_Store
 Thumbs.db
 
-chat.txt
-logs.txt
+user_profile.json

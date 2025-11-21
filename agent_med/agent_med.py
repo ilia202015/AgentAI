@@ -12,25 +12,31 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-with open("api.key") as f:
-    api_key = f.read()
+with open("agent_med/deepseek.key", 'r', encoding="utf8") as f:
+    deepseek_key = f.read()
 
-with open("agent_med/agent_med.py") as f:
+with open("agent_med/user_profile.json", 'r', encoding="utf8") as f:
+    self_user_profile = f.read()
+
+with open("agent_med/agent_med.py", 'r', encoding="utf8") as f:
     self_code = f.read()
 
-with open("agent_med/system_prompt") as f:
+with open("agent_med/system_prompt", 'r', encoding="utf8") as f:
     self_system_prompt = f.read()
 
-with open("agent_med/python_prompt") as f:
+with open("agent_med/python_prompt", 'r', encoding="utf8") as f:
     self_python_prompt = f.read()
 
-with open("agent_med/chat_prompt") as f:
+with open("agent_med/chat_prompt", 'r', encoding="utf8") as f:
     self_chat_prompt = f.read()
 
-with open("agent_med/chat_exec_prompt") as f:
+with open("agent_med/chat_exec_prompt", 'r', encoding="utf8") as f:
     self_chat_exec_prompt = f.read()
 
-client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+with open("agent_med/user_profile_prompt", 'r', encoding="utf8") as f:
+    self_user_profile_prompt = f.read()
+
+client = OpenAI(api_key=deepseek_key, base_url="https://api.deepseek.com")
 
 class Chat:
     local_env = dict()
@@ -42,7 +48,7 @@ class Chat:
 
         self.local_env["self"] = self
 
-        self.system_prompt = self_system_prompt + self_code + f"Режим вывода: {output_mode}"
+        self.system_prompt = self_system_prompt + self_code + f"Режим вывода: {output_mode}\n" + "Информация о пользователе (user_profile.json):\n" + self_user_profile
 
         self.tools = [
             {
@@ -97,7 +103,7 @@ class Chat:
                             },
                             "code": {
                                 "type": "string",
-                                "description": "Сообщение для отправки в чат"
+                                "description": "Код для выполненич в чате"
                             }
                         },
                         "required": ["name", "code"]
@@ -130,109 +136,40 @@ class Chat:
                 "type": "function",
                 "function": {
                     "name": "user_profile",
-                    "description": "Управление профилем пользователя. Сохраняет имя, предпочтения и инструкции пользователя.",
+                    "description": self_user_profile_prompt,
                     "parameters": {
                         "type": "object",
                         "properties": {
-                            "action": {
-                                "type": "string",
-                                "description": "Действие: get (получить), set (установить), update (обновить), delete (удалить)",
-                                "default": "get"
-                            },
-                            "name": {
-                                "type": "string",
-                                "description": "Имя пользователя"
-                            },
-                            "preferences": {
+                            "data": {
                                 "type": "object",
-                                "description": "Предпочтения пользователя"
+                                "description": "Данные для записи в формате json",
+                                "additionalProperties": True,
                             },
-                            "instructions": {
-                                "type": "object", 
-                                "description": "Инструкции пользователя"
-                            }
                         },
-                        "required": ["action"]
+                        "required": ["data"]
                     }
                 }
-            },
-        ]
-                    },
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "chat",
-                    "description": self_chat_prompt,
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "name": {
-                                "type": "string", 
-                                "description": "Имя чата"
-                            },
-                            "message": {
-                                "type": "string",
-                                "description": "Сообщение для отправки в чат"
-                            }
-                        },
-                        "required": ["name", "message"]
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "chat_exec",
-                    "description": self_chat_exec_prompt,
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "name": {
-                                "type": "string", 
-                                "description": "Имя чата"
-                            },
-                            "code": {
-                                "type": "string",
-                                "description": "Сообщение для отправки в чат"
-                            }
-                        },
-                        "required": ["name", "code"]
-                    }
-                }
-            },
-            {
-                "type": "function",
-                "function": {
-                    "name": "google_search",
-                    "description": "Выполняет поиск через Google Custom Search API. Возвращает результаты в формате JSON.",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "query": {
-                                "type": "string",
-                                "description": "Поисковый запрос"
-                            },
-                            "num_results": {
-                                "type": "integer",
-                                "description": "Количество результатов (по умолчанию 10, максимум 10)",
-                                "default": 10
-                            }
-                        },
-                        "required": ["query"]
-                    }
-                }
-            },
+            }
         ]
 
         self.chats = dict()
-        self.tools_dict = {
+
+        # Обязательные параметры
+        self.tools_dict_required = { 
             "chat" : ["name", "message"],
             "chat_exec" : ["name", "code"],
             "python" : ["code"],
-            "google_search" : ["query", "num_results"],
-            "user_profile" : ["action", "name", "preferences", "instructions"],
+            "google_search" : ["query"],
+            "user_profile" : ["data"],
+        }
+
+        # Дополнительные параметры
+        self.tools_dict_additional  = { 
+            "chat" : [],
+            "chat_exec" : [],
+            "python" : [],
+            "google_search" : ["num_results"],
+            "user_profile" : [],
         }
 
         self.messages = [
@@ -250,16 +187,6 @@ class Chat:
         return self.chats[name].python_tool(code)
 
     def google_search_tool(self, query, num_results=10):
-        """
-        Выполняет поиск через Google Custom Search API
-        
-        Args:
-            query (str): Поисковый запрос
-            num_results (int): Количество результатов (макс 10)
-        
-        Returns:
-            str: JSON строка с результатами поиска
-        """
         try:
             # Импортируем внутри функции чтобы избежать проблем с областью видимости
             import json
@@ -288,126 +215,28 @@ class Chat:
         except Exception as e:
             return f"Ошибка при выполнении поиска: {e}"
 
-    def user_profile_tool(self, action="get", **kwargs):
-        """
-        Управление профилем пользователя
-        
-        Args:
-            action (str): Действие - "get", "set", "update", "delete"
-            **kwargs: Параметры для установки/обновления
-        
-        Returns:
-            str: Результат операции
-        """
-        import json
-        import os
-        
-        profile_file = "agent_med/user_profile.json"
-        
-        # Стандартная структура профиля
-        default_profile = {
-            "name": "",
-            "preferences": {
-                "language": "russian",
-                "output_style": "detailed",
-                "auto_commit": False
-            },
-            "instructions": {
-                "github_commit": "git add . && git commit -m \"feat: description\" && git push origin main",
-                "preferred_tools": ["python", "chat", "google_search", "user_profile"]
-            },
-            "metadata": {
-                "created": "",
-                "last_updated": ""
-            }
-        }
-        
+    def user_profile_tool(self, data):
         try:
-            if action == "get":
-                # Получить профиль
-                if os.path.exists(profile_file):
-                    with open(profile_file, "r", encoding="utf-8") as f:
-                        profile = json.load(f)
-                    return json.dumps(profile, ensure_ascii=False, indent=2)
+            profile_file = "agent_med/user_profile.json"
+            
+            data = json.loads(data)
+            with open(profile_file, 'r', encoding="utf8") as f:
+                user_profile = json.load(f)
+
+            for [key, val] in data.items():
+                if val == "":
+                    if key in user_profile:
+                        user_profile.pop(key)
                 else:
-                    return "Профиль пользователя не найден. Используйте action='set' для создания."
+                    user_profile[key] = val
             
-            elif action == "set":
-                # Установить новый профиль
-                import datetime
-                profile = default_profile.copy()
-                
-                # Обновляем переданные поля
-                for key, value in kwargs.items():
-                    if key in profile:
-                        profile[key] = value
-                    elif "." in key:
-                        # Вложенные поля (например, "preferences.language")
-                        parts = key.split(".")
-                        current = profile
-                        for part in parts[:-1]:
-                            if part not in current:
-                                current[part] = {}
-                            current = current[part]
-                        current[parts[-1]] = value
-                
-                # Устанавливаем метаданные
-                now = datetime.datetime.now().isoformat()
-                profile["metadata"]["created"] = now
-                profile["metadata"]["last_updated"] = now
-                
-                # Сохраняем
-                os.makedirs(os.path.dirname(profile_file), exist_ok=True)
-                with open(profile_file, "w", encoding="utf-8") as f:
-                    json.dump(profile, f, ensure_ascii=False, indent=2)
-                
-                return f"Профиль пользователя создан: {json.dumps(profile, ensure_ascii=False)}"
+            with open(profile_file, 'w', encoding="utf8") as f:
+                    json.dump(user_profile, f, ensure_ascii=False, indent=2)
             
-            elif action == "update":
-                # Обновить существующий профиль
-                if not os.path.exists(profile_file):
-                    return "Профиль пользователя не найден. Используйте action='set' для создания."
-                
-                with open(profile_file, "r", encoding="utf-8") as f:
-                    profile = json.load(f)
-                
-                import datetime
-                
-                # Обновляем переданные поля
-                for key, value in kwargs.items():
-                    if key in profile:
-                        profile[key] = value
-                    elif "." in key:
-                        parts = key.split(".")
-                        current = profile
-                        for part in parts[:-1]:
-                            if part not in current:
-                                current[part] = {}
-                            current = current[part]
-                        current[parts[-1]] = value
-                
-                # Обновляем метаданные
-                profile["metadata"]["last_updated"] = datetime.datetime.now().isoformat()
-                
-                # Сохраняем
-                with open(profile_file, "w", encoding="utf-8") as f:
-                    json.dump(profile, f, ensure_ascii=False, indent=2)
-                
-                return f"Профиль пользователя обновлен: {json.dumps(profile, ensure_ascii=False)}"
-            
-            elif action == "delete":
-                # Удалить профиль
-                if os.path.exists(profile_file):
-                    os.remove(profile_file)
-                    return "Профиль пользователя удален"
-                else:
-                    return "Профиль пользователя не найден"
-            
-            else:
-                return f"Неизвестное действие: {action}. Доступные действия: get, set, update, delete"
-        
+            return "Профиль обновлён успешно"
         except Exception as e:
-            return f"Ошибка при работе с профилем пользователя: {e}"
+            return f"Ошибка: {e}"
+
 
     def validate_python_code(self, code):
         """Валидация Python кода для безопасности"""
@@ -452,14 +281,29 @@ class Chat:
                 return False
         return True
 
-    def tool_exec(self, args, tool_args, tool_id, name):
-        if self.check_tool_args(args, tool_args, tool_id):
-            self.python_tool(f"""result = self.{name}_tool(*{[tool_args[arg] for arg in args]})""")
+    def tool_exec(self, name, tool_args, tool_id):
+        required = self.tools_dict_required[name]
+        additional = self.tools_dict_additional[name]
+
+        for key, val in tool_args.items():
+            if type(val) == str:
+                tool_args[key] = repr(val)
+
+        try:
+            if self.check_tool_args(required, tool_args, tool_id):
+                self.python_tool(f"result = self.{name}_tool(" + ', '.join(str(tool_args[arg]) for arg in required) + (', ' if len(additional) else '') + ', '.join(str(arg) + '=' + str(tool_args[arg]) for arg in additional) + ")")
+                self.send({
+                    "role": "tool", 
+                    "tool_call_id": tool_id, 
+                    "content": self.local_env["result"]
+                })
+        except Exception as e:
+            logger.error(f"Ошибка инструмента: {e}")
             self.send({
-                "role": "tool", 
-                "tool_call_id": tool_id, 
-                "content": self.local_env["result"]
-            })
+                    "role": "tool", 
+                    "tool_call_id": tool_id, 
+                    "content": f"Ошибка инструмента: {e}"
+                })
 
     def send(self, message):
         """Отправка сообщения с потоковым выводом"""
@@ -471,7 +315,7 @@ class Chat:
                     model="deepseek-chat",
                     messages=self.messages,
                     tools=self.tools,
-                    stream=True  # Включаем потоковый режим
+                    stream=True,
                 )
                 
                 # Собираем полный ответ
@@ -528,8 +372,8 @@ class Chat:
                         
                         logger.info(f"Вызов инструмента: {tool_name} с аргументами: {tool_args}")
                         
-                        if tool_name in self.tools_dict.keys():
-                            self.tool_exec(self.tools_dict[tool_name], tool_args, tool_call["id"], tool_name)
+                        if tool_name in self.tools_dict_required:
+                            self.tool_exec(tool_name, tool_args, tool_call["id"])
                         else:
                             self.send({
                                 "role": "tool", 
@@ -569,8 +413,8 @@ class Chat:
                         
                         logger.info(f"Вызов инструмента: {tool_name} с аргументами: {tool_args}")
                         
-                        if tool_name in self.tools_dict.keys():
-                            self.tool_exec(self.tools_dict[tool_name], tool_args, tool_call.id, tool_name)
+                        if tool_name in self.tools_dict_required.keys():
+                            self.tool_exec(tool_name, tool_args, tool_call.id)
                         else:
                             result = self.send({
                                 "role": "tool", 
@@ -596,112 +440,8 @@ def main():
     print("• Добавлять новые инструменты и функции")
     print("• Адаптироваться к новым задачам")
     print("=" * 60)
-    
-    chat_agent = Chat()
-    
-    try:
-        while True:
-            user_input = input("\n👤 Вы: ")
-            chat_agent.send({"role": "user", "content": user_input})
-    except KeyboardInterrupt:
-        print("\n👋 Программа завершена пользователем")
-    except EOFError:
-        print("\n👋 Программа завершена (Ctrl+D)")
-    except Exception as e:
-        logger.error(f"Критическая ошибка: {e}")
-        print(f"\n💥 Критическая ошибка: {e}")
 
-
-if __name__ == "__main__":
-    main()
-
-                if tool_calls:
-                    assistant_message["tool_calls"] = tool_calls
-                    
-                self.messages.append(assistant_message)
-                
-                logger.info(f"Получен потоковый ответ от модели")
-                
-                # Обрабатываем tool calls
-                if tool_calls:
-                    for tool_call in tool_calls:
-                        tool_name = tool_call["function"]["name"]
-                        try:
-                            tool_args = json.loads(tool_call["function"]["arguments"])
-                        except:
-                            tool_args = {}
-                        
-                        logger.info(f"Вызов инструмента: {tool_name} с аргументами: {tool_args}")
-                        
-                        if tool_name in self.tools_dict.keys():
-                            self.tool_exec(self.tools_dict[tool_name], tool_args, tool_call["id"], tool_name)
-                        else:
-                            self.send({
-                                "role": "tool", 
-                                "tool_call_id": tool_call["id"],
-                                "content": "Такого инструмента не существует"
-                            })
-
-                        
-            except Exception as e:
-                logger.error(f"Ошибка при обработке сообщения: {e}")
-                error_msg = f"Произошла ошибка: {e}"
-                print(f"\n❌ {error_msg}")
-                self.send({"role": "system", "content": error_msg})
-                
-        else:
-            result = ''
-
-            try:
-                response = client.chat.completions.create(
-                    model="deepseek-chat",
-                    messages=self.messages,
-                    tools=self.tools,
-                )
-                
-                assistant_message = response.choices[0].message
-                self.messages.append(assistant_message)
-
-                logger.info(f"Получен ответ от модели")
-                
-                if assistant_message.content:
-                    result = assistant_message.content
-
-                if assistant_message.tool_calls:
-                    for tool_call in assistant_message.tool_calls:
-                        tool_name = tool_call.function.name
-                        tool_args = json.loads(tool_call.function.arguments)
-                        
-                        logger.info(f"Вызов инструмента: {tool_name} с аргументами: {tool_args}")
-                        
-                        if tool_name in self.tools_dict.keys():
-                            self.tool_exec(self.tools_dict[tool_name], tool_args, tool_call.id, tool_name)
-                        else:
-                            result = self.send({
-                                "role": "tool", 
-                                "tool_call_id": tool_call.id,
-                                "content": "Такого инструмента не существует"
-                            })
-                            
-            except Exception as e:
-                logger.error(f"Ошибка при обработке сообщения: {e}")
-                error_msg = f"Произошла ошибка: {e}"
-                print(f"\n❌ {error_msg}")
-                result = self.send({"role": "system", "content": error_msg})
-            return result
-
-
-def main():
-    """Главная функция"""
-    print("🚀 Запуск улучшенного AI-агента с самомодификацией!")
-    print("=" * 60)
-    print("Агент может:")
-    print("• Выполнять Python код")
-    print("• Изменять собственный код во время работы")
-    print("• Добавлять новые инструменты и функции")
-    print("• Адаптироваться к новым задачам")
-    print("=" * 60)
-    
+    # Стандартная структура профиля
     chat_agent = Chat()
     
     try:
