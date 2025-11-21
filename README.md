@@ -1,58 +1,58 @@
-# AI Agent with Self-Modification Capabilities
+# AI Агент с возможностью самомодификации
 
-🚀 **Advanced AI Agent with real-time code modification and self-improvement capabilities**
+🚀 **Продвинутый AI агент с возможностью модификации кода в реальном времени и самосовершенствования**
 
-## Overview
+## Обзор
 
-This is an advanced AI agent built with Python that can modify its own code during runtime. The agent features a sophisticated chat system with tools for Python code execution, sub-chat management, and dynamic self-improvement.
+Это продвинутый AI агент, построенный на Python, который может модифицировать свой собственный код во время выполнения. Агент включает в себя сложную систему чатов с инструментами для выполнения Python кода, управления под-чатами и динамического самосовершенствования.
 
-## Key Features
+## Ключевые возможности
 
-- **🔄 Real-time Self-Modification**: The agent can modify its own code, add new tools, and improve its architecture during execution
-- **💬 Multi-Chat System**: Supports creating and managing multiple chat instances with different purposes
-- **🐍 Python Code Execution**: Safe execution of Python code with validation and error handling
-- **🎯 Adaptive Architecture**: Can create specialized tools and optimize performance based on task requirements
-- **📊 Streaming Responses**: Real-time streaming of AI responses for better user experience
+- **🔄 Самомодификация в реальном времени**: Агент может модифицировать свой собственный код, добавлять новые инструменты и улучшать свою архитектуру во время выполнения
+- **💬 Многопользовательская система чатов**: Поддерживает создание и управление множественными экземплярами чатов с разными целями
+- **🐍 Выполнение Python кода**: Безопасное выполнение Python кода с валидацией и обработкой ошибок
+- **🎯 Адаптивная архитектура**: Может создавать специализированные инструменты и оптимизировать производительность в зависимости от требований задачи
+- **📊 Потоковые ответы**: Ответы AI в реальном времени для лучшего пользовательского опыта
 
-## Architecture
+## Архитектура
 
-### Core Components
+### Основные компоненты
 
-- **`Chat` Class**: Main chat handler with tools management and message processing
-- **Tool System**: Extensible framework for adding new capabilities
-- **Code Validation**: Security-focused Python code validation and execution
-- **Streaming API**: Integration with DeepSeek API for real-time responses
+- **Класс `Chat`**: Основной обработчик чатов с управлением инструментами и обработкой сообщений
+- **Система инструментов**: Расширяемая структура для добавления новых возможностей
+- **Валидация кода**: Безопасная валидация и выполнение Python кода с фокусом на безопасность
+- **Потоковый API**: Интеграция с DeepSeek API для ответов в реальном времени
 
-### Available Tools
+### Доступные инструменты
 
-1. **`python`**: Execute Python code safely
-2. **`chat`**: Create and manage sub-chats
-3. **`chat_exec`**: Execute code within specific chat instances
+1. **`python`**: Безопасное выполнение Python кода
+2. **`chat`**: Создание и управление под-чатами
+3. **`chat_exec`**: Выполнение кода в конкретных экземплярах чатов
 
-## Installation
+## Установка
 
-1. Clone the repository:
+1. Клонируйте репозиторий:
 ```bash
-git clone <repository-url>
+git clone <url-репозитория>
 cd agent
 ```
 
-2. Install dependencies:
+2. Установите зависимости:
 ```bash
 pip install openai
 ```
 
-3. Set up API key:
-   - Create `api.key` file with your DeepSeek API key
+3. Настройте API ключ:
+   - Создайте файл `api.key` с вашим DeepSeek API ключом
 
-## Usage
+## Использование
 
-Run the agent:
+Запустите агента:
 ```bash
 python agent_med/agent_med.py
 ```
 
-### Example Interaction
+### Пример взаимодействия
 
 ```
 🚀 Запуск улучшенного AI-агента с самомодификацией!
@@ -64,67 +64,67 @@ python agent_med/agent_med.py
 • Адаптироваться к новым задачам
 ============================================================
 
-👤 Вы: [Your message here]
-🤖 Агент: [Agent response]
+👤 Вы: [Ваше сообщение здесь]
+🤖 Агент: [Ответ агента]
 ```
 
-## Project Structure
+## Структура проекта
 
 ```
 agent/
 ├── agent_med/
-│   ├── agent_med.py      # Main agent code
-│   ├── system_prompt     # System instructions
-│   ├── python_prompt     # Python tool description
-│   ├── chat_prompt       # Chat tool description
-│   ├── chat_exec_prompt  # Chat execution tool description
-│   └── agent_med.log     # Log file
-├── api.key              # API key file
-├── .gitignore           # Git ignore rules
-└── README.md            # This file
+│   ├── agent_med.py      # Основной код агента
+│   ├── system_prompt     # Системные инструкции
+│   ├── python_prompt     # Описание инструмента Python
+│   ├── chat_prompt       # Описание инструмента чатов
+│   ├── chat_exec_prompt  # Описание инструмента выполнения в чатах
+│   └── agent_med.log     # Файл логов
+├── api.key              # Файл с API ключом
+├── .gitignore           # Правила Git ignore
+└── README.md            # Этот файл
 ```
 
-## Configuration
+## Конфигурация
 
-### API Setup
+### Настройка API
 
-Create `api.key` file in the root directory with your DeepSeek API key:
+Создайте файл `api.key` в корневой директории с вашим DeepSeek API ключом:
 ```
-your-deepseek-api-key-here
+ваш-deepseek-api-ключ-здесь
 ```
 
-### Environment
+### Окружение
 
 - Python 3.7+
-- `openai` package
-- DeepSeek API access
+- Пакет `openai`
+- Доступ к DeepSeek API
 
-## Development
+## Разработка
 
-The agent is designed to be extensible. You can:
+Агент разработан для расширяемости. Вы можете:
 
-- Add new tools by extending the `tools` list and creating corresponding methods
-- Modify the chat behavior by overriding methods
-- Create specialized chat instances for different tasks
+- Добавлять новые инструменты, расширяя список `tools` и создавая соответствующие методы
+- Модифицировать поведение чатов, переопределяя методы
+- Создавать специализированные экземпляры чатов для разных задач
 
-## Security
+## Безопасность
 
-- All Python code is validated before execution
-- Restricted access to system operations
-- Safe execution environment with controlled globals/locals
+- Весь Python код проходит валидацию перед выполнением
+- Ограниченный доступ к системным операциям
+- Безопасная среда выполнения с контролируемыми глобальными/локальными переменными
 
-## Contributing
+## Вклад в развитие
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+1. Форкните репозиторий
+2. Создайте ветку для фичи
+3. Внесите свои изменения
+4. Тщательно протестируйте
+5. Отправьте pull request
 
-## License
+## Лицензия
 
-[Add your license here]
+[Добавьте вашу лицензию здесь]
 
 ---
 
-**Note**: This agent is designed for educational and research purposes. Use responsibly and ensure proper security measures when executing code.
+**Примечание**: Этот агент предназначен для образовательных и исследовательских целей. Используйте ответственно и обеспечивайте надлежащие меры безопасности при выполнении кода.

@@ -1,4 +1,4 @@
-import os, json, logging, ast, sys, types, readline
+import os, json, logging, ast, sys, types, readline, datetime
 from openai import OpenAI
 
 
@@ -43,8 +43,9 @@ class Chat:
     result = ''
     
 
-    def __init__(self, output_mode="user"):
+    def __init__(self, output_mode="user", count_tab = 0):
         self.output_mode = output_mode
+        self.count_tab = count_tab
 
         self.local_env["self"] = self
 
@@ -177,13 +178,16 @@ class Chat:
         ]
 
     def chat_tool(self, name, message):
-        if name not in self.chats.keys():
-            self.chats[name] = Chat(output_mode="auto")
+        if name not in self.chats:
+            self.chats[name] = Chat(output_mode="auto", count_tab=self.count_tab + 1)
+            
+        self.print(f"\n🤖 Агент (авто, запрос, чат: {name}): " + message)
+
         return self.chats[name].send({"role": "user", "content": message})
 
     def chat_exec_tool(self, name, code):
         if name not in self.chats.keys():
-            self.chats[name] = Chat(output_mode="auto")
+            self.chats[name] = Chat(output_mode="auto", count_tab=self.count_tab + 1)
         return self.chats[name].python_tool(code)
 
     def google_search_tool(self, query, num_results=10):
@@ -228,7 +232,10 @@ class Chat:
                     if key in user_profile:
                         user_profile.pop(key)
                 else:
-                    user_profile[key] = val
+                    user_profile[key] = {
+                        "data" : val,
+                        "time" : datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    }
             
             with open(profile_file, 'w', encoding="utf8") as f:
                     json.dump(user_profile, f, ensure_ascii=False, indent=2)
@@ -250,7 +257,7 @@ class Chat:
         except Exception as e:
             return False, f"Ошибка валидации: {e}"
 
-    def python_tool(self, code):
+    def python_tool(self, code, no_print=False):
         """Безопасное выполнение Python кода"""
         is_valid, message = self.validate_python_code(code)
         if not is_valid:
@@ -259,12 +266,21 @@ class Chat:
         
         try:
             # Выполняем код
+            
+            if not no_print:
+                print('\t' * self.count_tab + "python:")
+                self.print(code, count_tab=self.count_tab + 1)
 
+            self.local_env["self"] = self
             self.local_env["result"] = ''
             exec(code, globals(), self.local_env)
             
+            if not no_print:
+                print('\t' * self.count_tab + "Результат:")
+                self.print(self.local_env["result"], count_tab=self.count_tab + 1)
+
             logger.info(f"Код выполнен успешно. Результат: {self.local_env["result"]}")
-            return self.local_env["result"]
+            return str(self.local_env["result"])
             
         except Exception as e:
             logger.error(f"Ошибка выполнения кода: {e}")
@@ -291,7 +307,13 @@ class Chat:
 
         try:
             if self.check_tool_args(required, tool_args, tool_id):
-                self.python_tool(f"result = self.{name}_tool(" + ', '.join(str(tool_args[arg]) for arg in required) + (', ' if len(additional) else '') + ', '.join(str(arg) + '=' + str(tool_args[arg]) for arg in additional) + ")")
+                self.python_tool(
+                    f"result = self.{name}_tool(" +
+                    ', '.join(str(tool_args[arg]) for arg in required) + 
+                    (', ' if len(additional) else '') + 
+                    ', '.join(str(arg) + '=' + str(tool_args[arg]) for arg in additional) + ")", 
+                    no_print=True
+                    )
                 self.send({
                     "role": "tool", 
                     "tool_call_id": tool_id, 
@@ -304,6 +326,17 @@ class Chat:
                     "tool_call_id": tool_id, 
                     "content": f"Ошибка инструмента: {e}"
                 })
+
+    def print(self, message, count_tab=-1):
+        if count_tab == -1:
+            count_tab = self.count_tab
+        f = False
+        if message[-1] == '\n':
+            message = message[:-1]
+            f = True
+        print('\t' * count_tab + message.replace('\n', '\n' + '\t' * count_tab))
+        if f:
+            print()
 
     def send(self, message):
         """Отправка сообщения с потоковым выводом"""
@@ -405,6 +438,8 @@ class Chat:
                 
                 if assistant_message.content:
                     result = assistant_message.content
+                
+                self.print("\n🤖 Агент (авто, ответ): " + result)
 
                 if assistant_message.tool_calls:
                     for tool_call in assistant_message.tool_calls:
@@ -427,7 +462,9 @@ class Chat:
                 error_msg = f"Произошла ошибка: {e}"
                 print(f"\n❌ {error_msg}")
                 result = self.send({"role": "system", "content": error_msg})
-            return result
+
+            finally:
+                return result
 
 
 def main():
