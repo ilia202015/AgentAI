@@ -318,7 +318,7 @@ class Chat:
                     f"result = self.{name}_tool(" +
                     ', '.join(str(tool_args[arg]) for arg in required) + 
                     (', ' if len(additional) else '') + 
-                    ', '.join(str(arg) + '=' + str(tool_args[arg]) for arg in additional) + ")", 
+                    ', '.join(str(arg) + '=' + str(tool_args[arg]) for arg in additional if arg in tool_args) + ")", 
                     no_print=True
                     )
                 self.send({
