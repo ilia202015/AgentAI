@@ -1,4 +1,4 @@
-import os, json, logging, ast, sys, types, readline, datetime
+import os, json, logging, ast, sys, types, readline, datetime, time
 from openai import OpenAI
 
 
@@ -12,8 +12,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-with open("agent_med/deepseek.key", 'r', encoding="utf8") as f:
-    deepseek_key = f.read()
+with open("agent_med/gemini.key", 'r', encoding="utf8") as f:
+    ai_key = f.read()
 
 with open("agent_med/user_profile.json", 'r', encoding="utf8") as f:
     self_user_profile = f.read()
@@ -36,7 +36,15 @@ with open("agent_med/chat_exec_prompt", 'r', encoding="utf8") as f:
 with open("agent_med/user_profile_prompt", 'r', encoding="utf8") as f:
     self_user_profile_prompt = f.read()
 
-client = OpenAI(api_key=deepseek_key, base_url="https://api.deepseek.com")
+#client = OpenAI(api_key=ai_key, base_url="https://api.deepseek.com")
+client = OpenAI(api_key=ai_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
+
+#model = "deepseek-chat"
+model = "gemini-2.5-flash"
+
+model_rpm = 10
+
+last_send_time = 0
 
 class Chat:
     local_env = dict()
@@ -62,7 +70,7 @@ class Chat:
                         "properties": {
                             "code": {
                                 "type": "string",
-                                "description": "Python код для выполнения",
+                                "description": "Python код для выполнения, не более 4000 символов, если нужно больше, разбей код на части и сделай несколько запросов",
                             }
                         },
                         "required": ["code"]
@@ -142,9 +150,8 @@ class Chat:
                         "type": "object",
                         "properties": {
                             "data": {
-                                "type": "object",
-                                "description": "Данные для записи в формате json",
-                                "additionalProperties": True,
+                                "type": "string",
+                                "description": "Данные для записи в формате json"
                             },
                         },
                         "required": ["data"]
@@ -340,12 +347,20 @@ class Chat:
 
     def send(self, message):
         """Отправка сообщения с потоковым выводом"""
+        global last_send_time
+
         self.messages.append(message)
+
+        delay = 60 / model_rpm - (time.time() - last_send_time)
+        if delay > 0:
+            self.print(f"Жду {delay} секунд")
+            time.sleep(delay)
+        last_send_time = time.time()
 
         if self.output_mode == "user":
             try:
                 response = client.chat.completions.create(
-                    model="deepseek-chat",
+                    model=model,
                     messages=self.messages,
                     tools=self.tools,
                     stream=True,
@@ -367,7 +382,7 @@ class Chat:
                     # Собираем tool calls если есть
                     if chunk.choices[0].delta.tool_calls:
                         for tool_call in chunk.choices[0].delta.tool_calls:
-                            if len(tool_calls) <= tool_call.index:
+                            if tool_call.index == None or len(tool_calls) <= tool_call.index:
                                 tool_calls.append({
                                     "id": tool_call.id,
                                     "type": "function",
@@ -426,7 +441,7 @@ class Chat:
 
             try:
                 response = client.chat.completions.create(
-                    model="deepseek-chat",
+                    model=model,
                     messages=self.messages,
                     tools=self.tools,
                 )
