@@ -40,9 +40,9 @@ with open("agent_med/user_profile_prompt", 'r', encoding="utf8") as f:
 client = OpenAI(api_key=ai_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
 
 #model = "deepseek-chat"
-model = "gemini-2.5-flash"
+model = "gemini-2.5-pro"
 
-model_rpm = 10
+model_rpm = 2
 
 last_send_time = 0
 
@@ -188,7 +188,7 @@ class Chat:
         if name not in self.chats:
             self.chats[name] = Chat(output_mode="auto", count_tab=self.count_tab + 1)
             
-        self.print(f"\n🤖 Агент (авто, запрос, чат: {name}): " + message)
+        self.print(f"\n⚙️ Агент (авто, запрос, чат: {name}): " + message)
 
         return self.chats[name].send({"role": "user", "content": message})
 
@@ -275,16 +275,14 @@ class Chat:
             # Выполняем код
             
             if not no_print:
-                print('\t' * self.count_tab + "python:")
-                self.print(code, count_tab=self.count_tab + 1)
+                self.print_code("python", code)
 
             self.local_env["self"] = self
             self.local_env["result"] = ''
             exec(code, globals(), self.local_env)
             
             if not no_print:
-                print('\t' * self.count_tab + "Результат:")
-                self.print(self.local_env["result"], count_tab=self.count_tab + 1)
+                self.print_code("Результат", self.local_env["result"])
 
             logger.info(f"Код выполнен успешно. Результат: {self.local_env["result"]}")
             return str(self.local_env["result"])
@@ -305,45 +303,93 @@ class Chat:
         return True
 
     def tool_exec(self, name, tool_args, tool_id):
+        """
+        Выполняет вызов инструмента, печатает ЗАПРОС и РЕЗУЛЬТАТ его работы.
+        Имеет специальную логику для красивого вывода python-кода.
+        """
         required = self.tools_dict_required[name]
         additional = self.tools_dict_additional[name]
 
-        for key, val in tool_args.items():
-            if type(val) == str:
-                tool_args[key] = repr(val)
+        # Вывод запроса
+        if name == 'python' and 'code' in tool_args:
+            self.print_code(f"Запрос {name}", tool_args['code'])
+        else:
+            try:
+                args_for_print = json.dumps(tool_args, ensure_ascii=False, indent=2)
+                self.print_code(f"Запрос {name}", args_for_print)
+            except Exception:
+                self.print_code(f"Запрос {name}", str(tool_args))
 
+        # Экранируем строковые аргументы для безопасного выполнения
+        args_for_exec = tool_args.copy()
+        for key, val in args_for_exec.items():
+            if isinstance(val, str):
+                args_for_exec[key] = repr(val)
+        
         try:
             if self.check_tool_args(required, tool_args, tool_id):
-                self.python_tool(
-                    f"result = self.{name}_tool(" +
-                    ', '.join(str(tool_args[arg]) for arg in required) + 
-                    (', ' if len(additional) else '') + 
-                    ', '.join(str(arg) + '=' + str(tool_args[arg]) for arg in additional if arg in tool_args) + ")", 
-                    no_print=True
-                    )
+                # Вызов инструмента
+                if name == 'python':
+                    tool_result = self.python_tool(tool_args['code'])
+                else:
+                    required_args_str = ', '.join(str(args_for_exec[arg]) for arg in required)
+                    additional_args_str = ', '.join(f"{arg}={args_for_exec[arg]}" for arg in additional if arg in args_for_exec)
+                    all_args = []
+                    if required_args_str: all_args.append(required_args_str)
+                    if additional_args_str: all_args.append(additional_args_str)
+                    call_string = f"result = self.{name}_tool({', '.join(all_args)})"
+                    self.python_tool(call_string, no_print=True)
+                    tool_result = self.local_env.get("result")
+
+                self.print_code(f"Результат {name}", str(tool_result))
+                
                 self.send({
                     "role": "tool", 
                     "tool_call_id": tool_id, 
-                    "content": self.local_env["result"]
+                    "content": str(tool_result)
                 })
+
         except Exception as e:
-            logger.error(f"Ошибка инструмента: {e}")
+            logger.error(f"Ошибка при выполнении инструмента {name}: {e}")
+            error_message = f"Ошибка инструмента: {e}"
+            self.print_code(f"Ошибка {name}", error_message)
             self.send({
-                    "role": "tool", 
-                    "tool_call_id": tool_id, 
-                    "content": f"Ошибка инструмента: {e}"
-                })
+                "role": "tool", 
+                "tool_call_id": tool_id, 
+                "content": error_message
+            })
 
     def print(self, message, count_tab=-1):
         if count_tab == -1:
             count_tab = self.count_tab
-        f = False
         if message[-1] == '\n':
             message = message[:-1]
-            f = True
         print('\t' * count_tab + message.replace('\n', '\n' + '\t' * count_tab))
-        if f:
-            print()
+        print()
+
+    def print_code(self, language, code, count_tab=-1, max_code_display_lines=6):
+            if count_tab == -1:
+                count_tab = self.count_tab
+
+            displayed_code = ""
+            lines = code.split('\n')
+            while len(lines) and lines[0] == '':
+                lines = lines[1:]
+
+            if len(lines):
+                while lines[-1] == '':
+                    lines.pop()
+
+                if len(lines) > max_code_display_lines:
+                    half_lines = max_code_display_lines // 2
+                    displayed_code = '\n'.join(lines[:half_lines]) + '\n' + \
+                                    '\t' * (count_tab + 1) + '...\n' + \
+                                    '\n'.join(lines[-half_lines:])
+                else:
+                    displayed_code = code
+
+            self.print(language + ":", count_tab=count_tab)
+            self.print(displayed_code, count_tab=count_tab + 1)
 
     def send(self, message):
         """Отправка сообщения с потоковым выводом"""
@@ -454,7 +500,7 @@ class Chat:
                 if assistant_message.content:
                     result = assistant_message.content
                 
-                self.print("\n🤖 Агент (авто, ответ): " + result)
+                self.print("\n⚙️ Агент (авто, ответ): " + result)
 
                 if assistant_message.tool_calls:
                     for tool_call in assistant_message.tool_calls:
