@@ -12,8 +12,22 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-with open("agent_med/gemini.key", 'r', encoding="utf8") as f:
-    ai_key = f.read()
+gemini_keys = []
+i = 0
+while True:
+    key_path = f"agent_med/gemini{i}.key"
+    if os.path.exists(key_path):
+        with open(key_path, 'r', encoding="utf8") as f:
+            gemini_keys.append(f.read().strip())
+        i += 1
+    else:
+        break
+
+if not gemini_keys:
+    raise ValueError("Не найдены файлы с ключами API Gemini (например, agent_med/gemini0.key)")
+
+ai_key = gemini_keys[0]
+current_key_index = 0
 
 with open("agent_med/user_profile.json", 'r', encoding="utf8") as f:
     self_user_profile = f.read()
@@ -36,10 +50,8 @@ with open("agent_med/chat_exec_prompt", 'r', encoding="utf8") as f:
 with open("agent_med/user_profile_prompt", 'r', encoding="utf8") as f:
     self_user_profile_prompt = f.read()
 
-#client = OpenAI(api_key=ai_key, base_url="https://api.deepseek.com")
 client = OpenAI(api_key=ai_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
 
-#model = "deepseek-chat"
 model = "gemini-2.5-pro"
 
 model_rpm = 2
@@ -162,7 +174,6 @@ class Chat:
 
         self.chats = dict()
 
-        # Обязательные параметры
         self.tools_dict_required = { 
             "chat" : ["name", "message"],
             "chat_exec" : ["name", "code"],
@@ -171,7 +182,6 @@ class Chat:
             "user_profile" : ["data"],
         }
 
-        # Дополнительные параметры
         self.tools_dict_additional  = { 
             "chat" : [],
             "chat_exec" : [],
@@ -199,22 +209,17 @@ class Chat:
 
     def google_search_tool(self, query, num_results=10):
         try:
-            # Импортируем внутри функции чтобы избежать проблем с областью видимости
             import json
             from googleapiclient.discovery import build
             
-            # Чтение ключа API из файла
             with open("agent_med/google.key", "r") as f:
                 api_key = f.read().strip()
             
-            # Чтение Search Engine ID
             with open("agent_med/search_engine.id", "r") as f:
                 search_engine_id = f.read().strip()
             
-            # Создаем сервис
             service = build("customsearch", "v1", developerKey=api_key)
             
-            # Выполняем поиск
             result = service.cse().list(
                 q=query,
                 cx=search_engine_id,
@@ -253,9 +258,7 @@ class Chat:
 
 
     def validate_python_code(self, code):
-        """Валидация Python кода для безопасности"""
         try:
-            # Проверка синтаксиса
             ast.parse(code)
             
             return True, "Код прошел валидацию"
@@ -265,25 +268,17 @@ class Chat:
             return False, f"Ошибка валидации: {e}"
 
     def python_tool(self, code, no_print=False):
-        """Безопасное выполнение Python кода"""
         is_valid, message = self.validate_python_code(code)
         if not is_valid:
             logger.warning(f"Код не прошел валидацию: {message}")
             return f"Ошибка: {message}"
         
         try:
-            # Выполняем код
             
-            if not no_print:
-                self.print_code("python", code)
-
             self.local_env["self"] = self
             self.local_env["result"] = ''
             exec(code, globals(), self.local_env)
             
-            if not no_print:
-                self.print_code("Результат", self.local_env["result"])
-
             logger.info(f"Код выполнен успешно. Результат: {self.local_env["result"]}")
             return str(self.local_env["result"])
             
@@ -303,14 +298,9 @@ class Chat:
         return True
 
     def tool_exec(self, name, tool_args, tool_id):
-        """
-        Выполняет вызов инструмента, печатает ЗАПРОС и РЕЗУЛЬТАТ его работы.
-        Имеет специальную логику для красивого вывода python-кода.
-        """
         required = self.tools_dict_required[name]
         additional = self.tools_dict_additional[name]
 
-        # Вывод запроса
         if name == 'python' and 'code' in tool_args:
             self.print_code(f"Запрос {name}", tool_args['code'])
         else:
@@ -320,7 +310,6 @@ class Chat:
             except Exception:
                 self.print_code(f"Запрос {name}", str(tool_args))
 
-        # Экранируем строковые аргументы для безопасного выполнения
         args_for_exec = tool_args.copy()
         for key, val in args_for_exec.items():
             if isinstance(val, str):
@@ -328,7 +317,6 @@ class Chat:
         
         try:
             if self.check_tool_args(required, tool_args, tool_id):
-                # Вызов инструмента
                 if name == 'python':
                     tool_result = self.python_tool(tool_args['code'])
                 else:
@@ -362,9 +350,10 @@ class Chat:
     def print(self, message, count_tab=-1):
         if count_tab == -1:
             count_tab = self.count_tab
-        if message[-1] == '\n':
-            message = message[:-1]
-        print('\t' * count_tab + message.replace('\n', '\n' + '\t' * count_tab))
+        if message != '':
+            if message[-1] == '\n':
+                message = message[:-1]
+            print('\t' * count_tab + message.replace('\n', '\n' + '\t' * count_tab))
         print()
 
     def print_code(self, language, code, count_tab=-1, max_code_display_lines=6):
@@ -372,28 +361,28 @@ class Chat:
                 count_tab = self.count_tab
 
             displayed_code = ""
-            lines = code.split('\n')
-            while len(lines) and lines[0] == '':
-                lines = lines[1:]
+            if code != '':
+                lines = code.split('\n')
+                while len(lines) and lines[0] == '':
+                    lines = lines[1:]
 
-            if len(lines):
-                while lines[-1] == '':
-                    lines.pop()
+                if len(lines):
+                    while lines[-1] == '':
+                        lines.pop()
 
-                if len(lines) > max_code_display_lines:
-                    half_lines = max_code_display_lines // 2
-                    displayed_code = '\n'.join(lines[:half_lines]) + '\n' + \
-                                    '\t' * (count_tab + 1) + '...\n' + \
-                                    '\n'.join(lines[-half_lines:])
-                else:
-                    displayed_code = code
+                    if len(lines) > max_code_display_lines:
+                        half_lines = max_code_display_lines // 2
+                        displayed_code = '\n'.join(lines[:half_lines]) + '\n' + \
+                                        '\t' * (count_tab + 1) + '...\n' + \
+                                        '\n'.join(lines[-half_lines:])
+                    else:
+                        displayed_code = code
 
             self.print(language + ":", count_tab=count_tab)
             self.print(displayed_code, count_tab=count_tab + 1)
 
     def send(self, message):
-        """Отправка сообщения с потоковым выводом"""
-        global last_send_time
+        global last_send_time, client, current_key_index
 
         self.messages.append(message)
 
@@ -404,132 +393,157 @@ class Chat:
         last_send_time = time.time()
 
         if self.output_mode == "user":
-            try:
-                response = client.chat.completions.create(
-                    model=model,
-                    messages=self.messages,
-                    tools=self.tools,
-                    stream=True,
-                )
-                
-                # Собираем полный ответ
-                full_content = ""
-                tool_calls = []
-                
-                print("\n🤖 Агент: ", end="", flush=True)
-                
-                
-                for chunk in response:
-                    if chunk.choices[0].delta.content is not None:
-                        content = chunk.choices[0].delta.content
-                        full_content += content
-                        print(content, end="", flush=True)
+            while True:
+                try:
+                    response = client.chat.completions.create(
+                        model=model,
+                        messages=self.messages,
+                        tools=self.tools,
+                        stream=True,
+                    )
                     
-                    # Собираем tool calls если есть
-                    if chunk.choices[0].delta.tool_calls:
-                        for tool_call in chunk.choices[0].delta.tool_calls:
-                            if tool_call.index == None or len(tool_calls) <= tool_call.index:
-                                tool_calls.append({
-                                    "id": tool_call.id,
-                                    "type": "function",
-                                    "function": {
-                                        "name": tool_call.function.name,
-                                        "arguments": tool_call.function.arguments or ""
-                                    }
-                                })
+                    full_content = ""
+                    tool_calls = []
+                    
+                    print("\n🤖 Агент: ", end="", flush=True)
+                    
+                    
+                    for chunk in response:
+                        if chunk.choices[0].delta.content is not None:
+                            content = chunk.choices[0].delta.content
+                            full_content += content
+                            print(content, end="", flush=True)
+                        
+                        if chunk.choices[0].delta.tool_calls:
+                            for tool_call in chunk.choices[0].delta.tool_calls:
+                                if tool_call.index == None or len(tool_calls) <= tool_call.index:
+                                    tool_calls.append({
+                                        "id": tool_call.id,
+                                        "type": "function",
+                                        "function": {
+                                            "name": tool_call.function.name,
+                                            "arguments": tool_call.function.arguments or ""
+                                        }
+                                    })
+                                else:
+                                    tool_calls[tool_call.index]["function"]["arguments"] += tool_call.function.arguments or ""
+                    
+                    print()
+                    
+                    assistant_message = {
+                        "role": "assistant",
+                        "content": full_content
+                    }
+                    
+                    if tool_calls:
+                        assistant_message["tool_calls"] = tool_calls
+                        
+                    self.messages.append(assistant_message)
+                    
+                    logger.info(f"Получен потоковый ответ от модели")
+                    
+                    if tool_calls:
+                        for tool_call in tool_calls:
+                            tool_name = tool_call["function"]["name"]
+                            try:
+                                tool_args = json.loads(tool_call["function"]["arguments"])
+                            except:
+                                tool_args = {}
+                            
+                            logger.info(f"Вызов инструмента: {tool_name} с аргументами: {tool_args}")
+                            
+                            if tool_name in self.tools_dict_required:
+                                self.tool_exec(tool_name, tool_args, tool_call["id"])
                             else:
-                                tool_calls[tool_call.index]["function"]["arguments"] += tool_call.function.arguments or ""
-                
-                print()  # Новая строка после завершения потока
-                
-                # Создаем полное сообщение ассистента
-                assistant_message = {
-                    "role": "assistant",
-                    "content": full_content
-                }
-                
-                if tool_calls:
-                    assistant_message["tool_calls"] = tool_calls
-                    
-                self.messages.append(assistant_message)
-                
-                logger.info(f"Получен потоковый ответ от модели")
-                
-                # Обрабатываем tool calls
-                if tool_calls:
-                    for tool_call in tool_calls:
-                        tool_name = tool_call["function"]["name"]
-                        try:
-                            tool_args = json.loads(tool_call["function"]["arguments"])
-                        except:
-                            tool_args = {}
-                        
-                        logger.info(f"Вызов инструмента: {tool_name} с аргументами: {tool_args}")
-                        
-                        if tool_name in self.tools_dict_required:
-                            self.tool_exec(tool_name, tool_args, tool_call["id"])
-                        else:
-                            self.send({
-                                "role": "tool", 
-                                "tool_call_id": tool_call["id"],
-                                "content": "Такого инструмента не существует"
-                            })
+                                self.send({
+                                    "role": "tool", 
+                                    "tool_call_id": tool_call["id"],
+                                    "content": "Такого инструмента не существует"
+                                })
+                    break
 
                         
-            except Exception as e:
-                logger.error(f"Ошибка при обработке сообщения: {e}")
-                error_msg = f"Произошла ошибка: {e}"
-                print(f"\n❌ {error_msg}")
-                self.send({"role": "system", "content": error_msg})
+                except Exception as e:
+                    logger.error(f"Ошибка при обработке сообщения: {e}")
+                    error_msg = f"Произошла ошибка: {e}"
+                    print(f"\n❌ {error_msg}")
+                    
+                    if "rate limit" in str(e).lower():
+                        current_key_index += 1
+                        current_key_index %= len(gemini_keys)
+
+                        ai_key = gemini_keys[current_key_index]
+                        client = OpenAI(api_key=ai_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
+                        print(f"\n🔑 Превышен лимит запросов. Переключаюсь на следующий ключ ({current_key_index}/{len(gemini_keys)}).")
+
+                        self.messages.pop()
+                        self.send(message)
+                    else:
+                        self.send({"role": "system", "content": error_msg})
+                    break
                 
         else:
             result = ''
+            while True:
+                try:
+                    response = client.chat.completions.create(
+                        model=model,
+                        messages=self.messages,
+                        tools=self.tools,
+                    )
+                    
+                    assistant_message = response.choices[0].message
+                    self.messages.append(assistant_message)
 
-            try:
-                response = client.chat.completions.create(
-                    model=model,
-                    messages=self.messages,
-                    tools=self.tools,
-                )
-                
-                assistant_message = response.choices[0].message
-                self.messages.append(assistant_message)
+                    logger.info(f"Получен ответ от модели")
+                    
+                    if assistant_message.content:
+                        result = assistant_message.content
+                    
+                    self.print("\n⚙️ Агент (авто, ответ): " + result)
 
-                logger.info(f"Получен ответ от модели")
-                
-                if assistant_message.content:
-                    result = assistant_message.content
-                
-                self.print("\n⚙️ Агент (авто, ответ): " + result)
-
-                if assistant_message.tool_calls:
-                    for tool_call in assistant_message.tool_calls:
-                        tool_name = tool_call.function.name
-                        tool_args = json.loads(tool_call.function.arguments)
-                        
-                        logger.info(f"Вызов инструмента: {tool_name} с аргументами: {tool_args}")
-                        
-                        if tool_name in self.tools_dict_required.keys():
-                            self.tool_exec(tool_name, tool_args, tool_call.id)
-                        else:
-                            result = self.send({
-                                "role": "tool", 
-                                "tool_call_id": tool_call.id,
-                                "content": "Такого инструмента не существует"
-                            })
+                    if assistant_message.tool_calls:
+                        for tool_call in assistant_message.tool_calls:
+                            tool_name = tool_call.function.name
+                            tool_args = json.loads(tool_call.function.arguments)
                             
-            except Exception as e:
-                logger.error(f"Ошибка при обработке сообщения: {e}")
-                error_msg = f"Произошла ошибка: {e}"
-                print(f"\n❌ {error_msg}")
-                result = self.send({"role": "system", "content": error_msg})
+                            logger.info(f"Вызов инструмента: {tool_name} с аргументами: {tool_args}")
+                            
+                            if tool_name in self.tools_dict_required.keys():
+                                self.tool_exec(tool_name, tool_args, tool_call.id)
+                            else:
+                                result = self.send({
+                                    "role": "tool", 
+                                    "tool_call_id": tool_call.id,
+                                    "content": "Такого инструмента не существует"
+                                })
+                    break
+                                
+                except Exception as e:
+                    logger.error(f"Ошибка при обработке сообщения: {e}")
+                    
+                    error_msg = f"Произошла ошибка: {e}"
+                    print(f"\n❌ {error_msg}")
 
-            finally:
-                return result
+                    if "rate limit" in str(e).lower():
+                        current_key_index += 1
+                        current_key_index %= len(gemini_keys)
+
+                        ai_key = gemini_keys[current_key_index]
+                        client = OpenAI(api_key=ai_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
+                        print(f"\n🔑 Превышен лимит запросов. Переключаюсь на следующий ключ ({current_key_index}/{len(gemini_keys)}).")
+
+                        self.messages.pop()
+                        result = self.send(message)
+                    else:
+                        result = self.send({"role": "system", "content": error_msg})
+                    break
+
+                finally:
+                    return result
 
 
 def main():
-    """Главная функция"""
     print("🚀 Запуск улучшенного AI-агента с самомодификацией!")
     print("=" * 60)
     print("Агент может:")
@@ -539,7 +553,6 @@ def main():
     print("• Адаптироваться к новым задачам")
     print("=" * 60)
 
-    # Стандартная структура профиля
     chat_agent = Chat()
     
     try:
