@@ -1,4 +1,4 @@
-import os, json, logging, ast, sys, types, readline, datetime, time
+import os, json, logging, ast, sys, types, readline, datetime, time, subprocess, traceback
 from openai import OpenAI
 
 
@@ -135,7 +135,7 @@ class Chat:
                 "type": "function",
                 "function": {
                     "name": "google_search",
-                    "description": "Выполняет поиск через Google Custom Search API. Возвращает результаты в формате JSON.",
+                    "description": "Выполняет поиск через Google Custom Search API. Возвращает результаты в формате JSON. Всегда использовать при необходимости (не обязательно чтобы пользователь попросил)",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -156,6 +156,28 @@ class Chat:
             {
                 "type": "function",
                 "function": {
+                    "name": "shell",
+                    "description": "Выполняет команду в системной оболочке (shell) и возвращает stdout, stderr и код возврата в формате JSON.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "command": {
+                                "type": "string",
+                                "description": "Команда для выполнения."
+                            },
+                            "timeout": {
+                                "type": "integer",
+                                "description": "Максимальное время выполнения команды в секундах. По умолчанию 120.",
+                                "default": 120
+                            }
+                        },
+                        "required": ["command"]
+                    }
+                }
+            },
+            {
+                "type": "function",
+                "function": {
                     "name": "user_profile",
                     "description": self_user_profile_prompt,
                     "parameters": {
@@ -169,6 +191,23 @@ class Chat:
                         "required": ["data"]
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "http",
+                    "description": "Загружает HTML-страницу по заданному URL, удаляет все HTML-теги (скрипты, стили, разметку) и возвращает чистый текст страницы.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "url": {
+                                "type": "string",
+                                "description": "URL-адрес веб-страницы для загрузки и очистки."
+                            }
+                        },
+                        "required": ["url"]
+                    }
+                }
             }
         ]
 
@@ -179,7 +218,9 @@ class Chat:
             "chat_exec" : ["name", "code"],
             "python" : ["code"],
             "google_search" : ["query"],
+            "shell" : ["command"],
             "user_profile" : ["data"],
+            "http" : ["url"],
         }
 
         self.tools_dict_additional  = { 
@@ -187,7 +228,9 @@ class Chat:
             "chat_exec" : [],
             "python" : [],
             "google_search" : ["num_results"],
+            "shell" : ["timeout"],
             "user_profile" : [],
+            "http" : [],
         }
 
         self.messages = [
@@ -225,11 +268,22 @@ class Chat:
                 cx=search_engine_id,
                 num=min(num_results, 10)
             ).execute()
+
+            if 'items' not in result:
+                return json.dumps([], ensure_ascii=False, indent=2)
+
+            simplified_results = []
+            for item in result['items']:
+                simplified_results.append({
+                    'title': item.get('title'),
+                    'link': item.get('link'),
+                    'snippet': item.get('snippet')
+                })
             
-            return json.dumps(result, ensure_ascii=False, indent=2)
+            return json.dumps(simplified_results, ensure_ascii=False, indent=2)
             
         except Exception as e:
-            return f"Ошибка при выполнении поиска: {e}"
+            return f"Ошибка при выполнении поиска: {e}" 
 
     def user_profile_tool(self, data):
         try:
@@ -257,6 +311,74 @@ class Chat:
             return f"Ошибка: {e}"
 
 
+    def shell_tool(self, command, timeout=120):
+        """
+        Выполняет команду в системной оболочке и возвращает stdout, stderr и код возврата.
+        """
+        try:
+            # Используем subprocess.run для выполнения команды
+            process = subprocess.run(
+                command,
+                shell=True,         # Позволяет выполнять сложные команды как в терминале
+                capture_output=True,# Захватывает stdout и stderr
+                text=True,          # Декодирует stdout/stderr в текст
+                timeout=timeout         # Таймаут в секундах для предотвращения зависаний
+            )
+            # Возвращаем результат в виде JSON-строки для удобства парсинга
+            return json.dumps({
+                "returncode": process.returncode,
+                "stdout": process.stdout,
+                "stderr": process.stderr
+            }, ensure_ascii=False, indent=2)
+        except subprocess.TimeoutExpired:
+            return json.dumps({
+                "returncode": -1,
+                "stdout": "",
+                "stderr": f"Ошибка: Команда выполнялась дольше {timeout} секунд и была прервана."
+            }, ensure_ascii=False, indent=2)
+        except Exception as e:
+            return json.dumps({
+                "returncode": -1,
+                "stdout": "",
+                "stderr": f"Критическая ошибка при выполнении команды: {str(e)}"
+            }, ensure_ascii=False, indent=2)
+
+    def http_tool(self, url):
+        """
+        Загружает HTML-страницу по URL, очищает от лишних тегов и возвращает основной текст.
+        """
+        try:
+            import requests
+            from bs4 import BeautifulSoup
+        except ImportError:
+            return "Ошибка: для работы этого инструмента необходимы библиотеки requests и beautifulsoup4. Установите их с помощью: pip install requests beautifulsoup4"
+
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            response = requests.get(url, headers=headers, timeout=10)
+            response.raise_for_status()  # Проверка на ошибки HTTP (4xx или 5xx)
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            # Удаляем ненужные теги (скрипты, стили, навигацию, футеры и т.д.)
+            for element in soup(["script", "style", "nav", "footer", "header", "aside"]):
+                element.decompose()
+
+            # Получаем текст и очищаем его от лишних пробелов и пустых строк
+            text = soup.get_text()
+            lines = (line.strip() for line in text.splitlines())
+            chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
+            cleaned_text = '\\n'.join(chunk for chunk in chunks if chunk)
+            
+            return cleaned_text
+
+        except requests.exceptions.RequestException as e:
+            return f"Ошибка сети при запросе к {url}: {e}"
+        except Exception as e:
+            return f"Ошибка при обработке URL {url}: {e}"
+
     def validate_python_code(self, code):
         try:
             ast.parse(code)
@@ -279,12 +401,14 @@ class Chat:
             self.local_env["result"] = ''
             exec(code, globals(), self.local_env)
             
-            logger.info(f"Код выполнен успешно. Результат: {self.local_env["result"]}")
+            logger.info(f"Код выполнен успешно. Результат: {self.local_env['result']}")
             return str(self.local_env["result"])
             
         except Exception as e:
             logger.error(f"Ошибка выполнения кода: {e}")
-            return f"Ошибка выполнения: {e}"
+            # Форматируем полный стектрейс для детального отчета
+            error_traceback = traceback.format_exc()
+            return f"Ошибка выполнения:\n{error_traceback}"
 
     def check_tool_args(self, args, tool_args, tool_id):
         for arg in args:
@@ -373,7 +497,7 @@ class Chat:
                     if len(lines) > max_code_display_lines:
                         half_lines = max_code_display_lines // 2
                         displayed_code = '\n'.join(lines[:half_lines]) + '\n' + \
-                                        '\t' * (count_tab + 1) + '...\n' + \
+                                        '\t' + '...\n' + \
                                         '\n'.join(lines[-half_lines:])
                     else:
                         displayed_code = code
@@ -468,13 +592,16 @@ class Chat:
                     error_msg = f"Произошла ошибка: {e}"
                     print(f"\n❌ {error_msg}")
                     
-                    if "rate limit" in str(e).lower():
-                        current_key_index += 1
-                        current_key_index %= len(gemini_keys)
+                    if "Error code: 429" in str(e):
+                        if "'quotaValue': '50'" in str(e):
+                            last_send_time -= 60
 
-                        ai_key = gemini_keys[current_key_index]
-                        client = OpenAI(api_key=ai_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
-                        print(f"\n🔑 Превышен лимит запросов. Переключаюсь на следующий ключ ({current_key_index}/{len(gemini_keys)}).")
+                            current_key_index += 1
+                            current_key_index %= len(gemini_keys)
+
+                            ai_key = gemini_keys[current_key_index]
+                            client = OpenAI(api_key=ai_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
+                            print(f"\n🔑 Превышен лимит запросов. Переключаюсь на следующий ключ ({current_key_index + 1}/{len(gemini_keys)}).")
 
                         self.messages.pop()
                         self.send(message)
@@ -525,13 +652,15 @@ class Chat:
                     error_msg = f"Произошла ошибка: {e}"
                     print(f"\n❌ {error_msg}")
 
-                    if "rate limit" in str(e).lower():
-                        current_key_index += 1
-                        current_key_index %= len(gemini_keys)
+                    if "Error code: 429" in str(e):
+                        if "'quotaValue': '50'" in str(e):
+                            last_send_time -= 60
+                            current_key_index += 1
+                            current_key_index %= len(gemini_keys)
 
-                        ai_key = gemini_keys[current_key_index]
-                        client = OpenAI(api_key=ai_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
-                        print(f"\n🔑 Превышен лимит запросов. Переключаюсь на следующий ключ ({current_key_index}/{len(gemini_keys)}).")
+                            ai_key = gemini_keys[current_key_index]
+                            client = OpenAI(api_key=ai_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
+                            print(f"\n🔑 Превышен лимит запросов. Переключаюсь на следующий ключ ({current_key_index + 1}/{len(gemini_keys)}).")
 
                         self.messages.pop()
                         result = self.send(message)
