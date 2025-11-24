@@ -496,11 +496,13 @@ class Chat:
 
                     if len(lines) > max_code_display_lines:
                         half_lines = max_code_display_lines // 2
-                        displayed_code = '\n'.join(lines[:half_lines]) + '\n' + \
-                                        '\t' + '...\n' + \
+                        displayed_code = '\n'.join(lines[:half_lines]) + \
+                                        '\n\t...\n' + \
                                         '\n'.join(lines[-half_lines:])
                     else:
                         displayed_code = code
+                    if len(displayed_code) > 100:
+                        displayed_code = code[:50] + '\n\t...\n' + code[-50:]
 
             self.print(language + ":", count_tab=count_tab)
             self.print(displayed_code, count_tab=count_tab + 1)
