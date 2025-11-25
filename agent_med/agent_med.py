@@ -26,14 +26,25 @@ while True:
 if not gemini_keys:
     raise ValueError("Не найдены файлы с ключами API Gemini (например, agent_med/gemini0.key)")
 
-ai_key = gemini_keys[0]
-current_key_index = 0
+if not os.path.exists("agent_med/gemini.key_num"):
+    with open("agent_med/gemini.key_num", 'w', encoding="utf8") as f:
+        f.write('0')
+with open("agent_med/gemini.key_num", 'r', encoding="utf8") as f:
+    current_key_index = int(f.read())
+
+ai_key = gemini_keys[current_key_index]
 
 with open("agent_med/user_profile.json", 'r', encoding="utf8") as f:
     self_user_profile = f.read()
 
 with open("agent_med/agent_med.py", 'r', encoding="utf8") as f:
     self_code = f.read()
+
+if not os.path.exists("agent_med/saved_code_changes.py"):
+    with open("agent_med/saved_code_changes.py", 'w', encoding="utf8") as f:
+        f.write('# Этот файл хранит сохраненные изменения кода агента. \n\n')
+with open("agent_med/saved_code_changes.py", 'r', encoding="utf8") as f:
+    self_saved_code = f.read()
 
 with open("agent_med/system_prompt", 'r', encoding="utf8") as f:
     self_system_prompt = f.read()
@@ -49,6 +60,9 @@ with open("agent_med/chat_exec_prompt", 'r', encoding="utf8") as f:
 
 with open("agent_med/user_profile_prompt", 'r', encoding="utf8") as f:
     self_user_profile_prompt = f.read()
+
+with open("agent_med/save_code_changes_prompt", 'r', encoding="utf8") as f:
+    self_save_code_changes_prompt = f.read()
 
 client = OpenAI(api_key=ai_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
 
@@ -69,7 +83,7 @@ class Chat:
 
         self.local_env["self"] = self
 
-        self.system_prompt = self_system_prompt + self_code + f"Режим вывода: {output_mode}\n" + "Информация о пользователе (user_profile.json):\n" + self_user_profile
+        self.system_prompt = self_system_prompt + self_code + "saved_code_changes.py (дополнительные изменения):\n" + self_saved_code + f"Режим вывода: {output_mode}\n" + "Информация о пользователе (user_profile.json):\n" + self_user_profile
 
         self.tools = [
             {
@@ -145,7 +159,7 @@ class Chat:
                             },
                             "num_results": {
                                 "type": "integer",
-                                "description": "Количество результатов (по умолчанию 10, максимум 10)",
+                                "description": "Количество результатов (по умолчанию 10)",
                                 "default": 10
                             }
                         },
@@ -208,6 +222,23 @@ class Chat:
                         "required": ["url"]
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "save_code_changes",
+                    "description": self_save_code_changes_prompt,
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "code": {
+                                "type": "string",
+                                "description": "Python код для сохранения."
+                            }
+                        },
+                        "required": ["code"]
+                    }
+                }
             }
         ]
 
@@ -221,6 +252,7 @@ class Chat:
             "shell" : ["command"],
             "user_profile" : ["data"],
             "http" : ["url"],
+            "save_code_changes" : ["code"],
         }
 
         self.tools_dict_additional  = { 
@@ -231,7 +263,26 @@ class Chat:
             "shell" : ["timeout"],
             "user_profile" : [],
             "http" : [],
+            "save_code_changes" : [],
         }
+
+
+        # Применяем сохраненные изменения кода при запуске
+        try:
+            saved_changes_path = "agent_med/saved_code_changes.py"
+            if os.path.exists(saved_changes_path):
+                with open(saved_changes_path, 'r', encoding='utf-8') as f:
+                    saved_code = f.read().strip()
+                if saved_code:
+                    print("⚙️ Обнаружены сохраненные изменения. Применяю...")
+                    # Используем no_print=True, т.к. результат выполнения не должен выводиться в консоль при старте
+                    result_of_loading = self.python_tool(saved_code, no_print=True)
+                    if result_of_loading and "Ошибка" in str(result_of_loading):
+                        print(f"❌ Ошибка при применении сохраненных изменений: {result_of_loading}")
+                    else:
+                        print("✅ Сохраненные изменения успешно применены к текущей сессии.")
+        except Exception as e:
+            print(f"❌ Критическая ошибка при загрузке сохраненных изменений: {e}")
 
         self.messages = [
             {"role": "system", "content": self.system_prompt},
@@ -408,8 +459,30 @@ class Chat:
             logger.error(f"Ошибка выполнения кода: {e}")
             # Форматируем полный стектрейс для детального отчета
             error_traceback = traceback.format_exc()
-            return f"Ошибка выполнения:\n{error_traceback}"
+            return f"Ошибка выполнения:\n\n{error_traceback}"
+        
+    def save_code_changes_tool(self, code):
+        """
+        Сохраняет протестированные изменения собственного кода в файл для их применения при следующем запуске.
+        Используй только для изменений, которые могут пригодиться позже или если пользователь попросил сохранить.
+        """
+        try:
+            is_valid, message = self.validate_python_code(code)
+            if not is_valid:
+                return f"Ошибка валидации: {message}. Изменения не сохранены."
 
+            file_path = "agent_med/saved_code_changes.py"
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+            with open(file_path, 'a', encoding='utf-8') as f:
+                f.write(f"\n# Saved on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(code)
+                f.write("\n" + "#" * 80 + "\n")
+
+            return "Изменения в коде успешно сохранены. Они будут автоматически применены при следующем запуске агента."
+        except Exception as e:
+            return f"Критическая ошибка при сохранении изменений: {e}"
+    
     def check_tool_args(self, args, tool_args, tool_id):
         for arg in args:
             if arg not in tool_args:
@@ -501,8 +574,9 @@ class Chat:
                                         '\n'.join(lines[-half_lines:])
                     else:
                         displayed_code = code
-                    if len(displayed_code) > 100:
-                        displayed_code = code[:50] + '\n\t...\n' + code[-50:]
+                    
+                    if len(displayed_code) > 500:
+                        displayed_code = code[:250] + '\n\t...\n' + code[-250:]
 
             self.print(language + ":", count_tab=count_tab)
             self.print(displayed_code, count_tab=count_tab + 1)
@@ -601,6 +675,9 @@ class Chat:
                             current_key_index += 1
                             current_key_index %= len(gemini_keys)
 
+                            with open("agent_med/gemini.key_num", 'w', encoding="utf8") as f:
+                                f.write(str(current_key_index))
+
                             ai_key = gemini_keys[current_key_index]
                             client = OpenAI(api_key=ai_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
                             print(f"\n🔑 Превышен лимит запросов. Переключаюсь на следующий ключ ({current_key_index + 1}/{len(gemini_keys)}).")
@@ -638,6 +715,9 @@ class Chat:
                             
                             logger.info(f"Вызов инструмента: {tool_name} с аргументами: {tool_args}")
                             
+                            with open("agent_med/gemini.key_num", 'w', encoding="utf8") as f:
+                                f.write(str(current_key_index))
+
                             if tool_name in self.tools_dict_required.keys():
                                 self.tool_exec(tool_name, tool_args, tool_call.id)
                             else:
