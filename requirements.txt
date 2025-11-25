@@ -1,0 +1,4 @@
+beautifulsoup4
+google-api-python-client
+openai
+requests

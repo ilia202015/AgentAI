@@ -171,7 +171,7 @@ class Chat:
                 "type": "function",
                 "function": {
                     "name": "shell",
-                    "description": "Выполняет команду в системной оболочке (shell) и возвращает stdout, stderr и код возврата в формате JSON.",
+                    "description": "Выполняет команду в системной оболочке (shell) и возвращает stdout, stderr и код возврата в формате JSON. ",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -528,21 +528,21 @@ class Chat:
 
                 self.print_code(f"Результат {name}", str(tool_result))
                 
-                self.send({
+                return {
                     "role": "tool", 
                     "tool_call_id": tool_id, 
                     "content": str(tool_result)
-                })
+                }
 
         except Exception as e:
             logger.error(f"Ошибка при выполнении инструмента {name}: {e}")
             error_message = f"Ошибка инструмента: {e}"
             self.print_code(f"Ошибка {name}", error_message)
-            self.send({
+            return {
                 "role": "tool", 
                 "tool_call_id": tool_id, 
                 "content": error_message
-            })
+            }
 
     def print(self, message, count_tab=-1):
         if count_tab == -1:
@@ -584,7 +584,10 @@ class Chat:
     def send(self, message):
         global last_send_time, client, current_key_index
 
-        self.messages.append(message)
+        if type(message == dict):
+            self.messages.append(message)
+        else:
+            self.messages += message
 
         delay = 60 / model_rpm - (time.time() - last_send_time)
         if delay > 0:
@@ -643,6 +646,7 @@ class Chat:
                     logger.info(f"Получен потоковый ответ от модели")
                     
                     if tool_calls:
+                        response = []
                         for tool_call in tool_calls:
                             tool_name = tool_call["function"]["name"]
                             try:
@@ -653,13 +657,14 @@ class Chat:
                             logger.info(f"Вызов инструмента: {tool_name} с аргументами: {tool_args}")
                             
                             if tool_name in self.tools_dict_required:
-                                self.tool_exec(tool_name, tool_args, tool_call["id"])
+                                response.append(self.tool_exec(tool_name, tool_args, tool_call["id"]))
                             else:
-                                self.send({
+                                response.append({
                                     "role": "tool", 
                                     "tool_call_id": tool_call["id"],
                                     "content": "Такого инструмента не существует"
                                 })
+                        self.send(response)
                     break
 
                         

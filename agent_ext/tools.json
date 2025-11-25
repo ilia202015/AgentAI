@@ -1,0 +1,158 @@
+{
+    "tools": [
+        {
+            "type": "function",
+            "function": {
+                "name": "python",
+                "description": "self_python_prompt",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "code": {
+                            "type": "string",
+                            "description": "Python код для выполнения, не более 4000 символов, если нужно больше, разбей код на части и сделай несколько запросов"
+                        }
+                    },
+                    "required": ["code"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "chat",
+                "description": "self_chat_prompt",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string", 
+                            "description": "Имя чата"
+                        },
+                        "message": {
+                            "type": "string",
+                            "description": "Сообщение для отправки в чат"
+                        }
+                    },
+                    "required": ["name", "message"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "chat_exec",
+                "description": "self_chat_exec_prompt",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "name": {
+                            "type": "string", 
+                            "description": "Имя чата"
+                        },
+                        "code": {
+                            "type": "string",
+                            "description": "Код для выполненич в чате"
+                        }
+                    },
+                    "required": ["name", "code"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "google_search",
+                "description": "self_google_search_exec_prompt",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Поисковый запрос"
+                        },
+                        "num_results": {
+                            "type": "integer",
+                            "description": "Количество результатов (по умолчанию 10)",
+                            "default": 10
+                        }
+                    },
+                    "required": ["query"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "shell",
+                "description": "self_shell_prompt",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "description": "Команда для выполнения."
+                        },
+                        "timeout": {
+                            "type": "integer",
+                            "description": "Максимальное время выполнения команды в секундах. По умолчанию 120.",
+                            "default": 120
+                        }
+                    },
+                    "required": ["command"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "user_profile",
+                "description": "self_user_profile_prompt",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "data": {
+                            "type": "string",
+                            "description": "Данные для записи в формате json"
+                        }
+                    },
+                    "required": ["data"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "http",
+                "description": "self_http_prompt",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {
+                            "type": "string",
+                            "description": "URL-адрес веб-страницы для загрузки и очистки."
+                        }
+                    },
+                    "required": ["url"]
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "save_code_changes",
+                "description": "self_save_code_changes_prompt",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "code": {
+                            "type": "string",
+                            "description": "Python код для сохранения."
+                        }
+                    },
+                    "required": ["code"]
+                }
+            }
+        }
+    ]
+}
