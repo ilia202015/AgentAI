@@ -153,6 +153,23 @@
                     "required": ["code"]
                 }
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "python_str",
+                "description": "self_python_str_prompt",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "text": {
+                            "type": "string",
+                            "description": "Обычный текст для преобразования в Python-строку."
+                        }
+                    },
+                    "required": ["text"]
+                }
+            }
         }
     ]
 }

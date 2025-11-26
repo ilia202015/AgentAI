@@ -23,8 +23,8 @@ class Chat:
         self.count_tab = count_tab
         self.chats = {}
         self.last_send_time = 0
-        self.model = "gemini-2.5-pro"
-        self.model_rpm = 2
+        #self.model, self.model_rpm = "gemini-2.5-pro", 2
+        self.model, self.model_rpm = "gemini-2.5-flash", 10
 
         self._load_config()
         self.client = OpenAI(api_key=self.ai_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
@@ -61,7 +61,7 @@ class Chat:
         self.ai_key = self.gemini_keys[self.current_key_index]
 
         self.prompts = {}
-        prompt_names = ["system", "python", "chat", "chat_exec", "user_profile", "save_code_changes", "http", "shell", "google_search"]
+        prompt_names = ["system", "python", "chat", "chat_exec", "user_profile", "save_code_changes", "http", "shell", "google_search", "python_str"]
         for name in prompt_names:
             try:
                 with open(f"{self.agent_dir}/prompts/{name}", 'r', encoding="utf8") as f: 
@@ -94,8 +94,21 @@ class Chat:
         for tool_num in range(len(self.tools)):
             self.tools[tool_num]["function"]["description"] = self.prompts[self.tools[tool_num]["function"]["name"]]
 
-        self.tools_dict_required = { "chat": ["name", "message"], "chat_exec": ["name", "code"], "python": ["code"], "google_search": ["query"], "shell": ["command"], "user_profile": ["data"], "http": ["url"], "save_code_changes": ["code"]}
-        self.tools_dict_additional = { "google_search": ["num_results"], "shell": ["timeout"]}
+        self.tools_dict_required = { 
+            "chat": ["name", "message"], 
+            "chat_exec": ["name", "code"], 
+            "python": ["code"], 
+            "google_search": ["query"], 
+            "shell": ["command"], 
+            "user_profile": ["data"], 
+            "http": ["url"], 
+            "save_code_changes": ["code"],
+            "python_str" : ["text"]
+        }
+        self.tools_dict_additional = { 
+            "google_search": ["num_results"], 
+            "shell": ["timeout"]
+        }
 
     def _apply_saved_changes(self):
         try:
@@ -242,6 +255,12 @@ class Chat:
             return f"Ошибка сети при запросе к {url}: {e}"
         except Exception as e:
             return f"Ошибка при обработке URL {url}: {e}"
+
+    def python_str_tool(self, text):
+        """
+        Принимает обычный текст и возвращает его в формате Python-строки, экранируя специальные символы.
+        """
+        return repr(text)
 
     def validate_python_code(self, code):
         try:
