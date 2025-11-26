@@ -61,7 +61,7 @@ class Chat:
         self.ai_key = self.gemini_keys[self.current_key_index]
 
         self.prompts = {}
-        prompt_names = ["system", "python", "chat", "chat_exec", "user_profile", "save_code_changes", "http", "shell", "google_search", "python_str"]
+        prompt_names = ["system", "python", "chat", "chat_exec", "user_profile", "save_code_changes", "http", "shell", "google_search", "python_str", "think"]
         for name in prompt_names:
             try:
                 with open(f"{self.agent_dir}/prompts/{name}", 'r', encoding="utf8") as f: 
@@ -103,7 +103,8 @@ class Chat:
             "user_profile": ["data"], 
             "http": ["url"], 
             "save_code_changes": ["code"],
-            "python_str" : ["text"]
+            "python_str" : ["text"],
+            "think" : ["thinks"]
         }
         self.tools_dict_additional = { 
             "google_search": ["num_results"], 
@@ -261,6 +262,9 @@ class Chat:
         Принимает обычный текст и возвращает его в формате Python-строки, экранируя специальные символы.
         """
         return repr(text)
+
+    def think_tool(self, thinks):
+        return ""
 
     def validate_python_code(self, code):
         try:
@@ -565,3 +569,25 @@ class Chat:
 
         if tool_responses:
              self.send(tool_responses)
+
+
+def main():
+    print("🚀 AI-агент запущен. Введите ваш запрос.")
+
+    chat_agent = Chat()
+    
+    try:
+        while True:
+            user_input = input("\n👤 Вы: ")
+            chat_agent.send({"role": "user", "content": user_input})
+    except KeyboardInterrupt:
+        print("\n👋 Программа завершена пользователем")
+    except EOFError:
+        print("\n👋 Программа завершена (Ctrl+D)")
+    except Exception as e:
+        logger.error(f"Критическая ошибка: {e}")
+        print(f"\n💥 Критическая ошибка: {e}")
+
+
+if __name__ == "__main__":
+    main()

@@ -170,6 +170,23 @@
                     "required": ["text"]
                 }
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "think",
+                "description": "self_think_prompt",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "thinks": {
+                            "type": "string",
+                            "description": "Мысли (любой текст)."
+                        }
+                    },
+                    "required": ["thinks"]
+                }
+            }
         }
     ]
 }
