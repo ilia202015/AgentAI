@@ -1,5 +1,7 @@
 import os, json, logging, ast, sys, types, readline, datetime, time, subprocess, traceback
-from openai import OpenAI
+from google import genai
+from google.genai import types
+
 
 
 # Настройка логирования
@@ -23,16 +25,16 @@ class Chat:
         self.count_tab = count_tab
         self.chats = {}
         self.last_send_time = 0
+
         # free
         #self.model, self.model_rpm = "gemini-2.5-pro", 2
         #self.model, self.model_rpm = "gemini-2.5-flash", 10
 
         # tier 1
         self.model, self.model_rpm = "gemini-3-pro-preview", 25
-        self.model, self.model_rpm = "gemini-2.5-pro", 150
 
         self._load_config()
-        self.client = OpenAI(api_key=self.ai_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
+        self.client = genai.Client(api_key=self.ai_key)
         
         system_prompt_parts = [
             self.prompts['system'], "Код файла agent.py:", self.self_code,
@@ -40,10 +42,20 @@ class Chat:
             f"Режим вывода: {self.output_mode}", "Информация о пользователе (user_profile.json):", self.user_profile
         ]
         self.system_prompt = "\n".join(system_prompt_parts)
-        self.messages = [{"role": "system", "content": self.system_prompt}]
 
         self._initialize_tools()
         self._apply_saved_changes()
+
+        self.chat = self.client.chats.create(
+            model=self.model,
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(function_declarations=self.tools)],
+                automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                    disable=True
+                ),
+                system_instruction=self.system_prompt,
+            )
+        )
 
     def _load_config(self):
         self.gemini_keys = []
@@ -66,7 +78,7 @@ class Chat:
         self.ai_key = self.gemini_keys[self.current_key_index]
 
         self.prompts = {}
-        prompt_names = ["system", "python", "chat", "chat_exec", "user_profile", "save_code_changes", "http", "shell", "google_search", "python_str", "think"]
+        prompt_names = ["system", "python", "chat", "chat_exec", "user_profile", "save_code_changes", "http", "shell", "google_search", "python_str"]
         for name in prompt_names:
             try:
                 with open(f"{self.agent_dir}/prompts/{name}", 'r', encoding="utf8") as f: 
@@ -108,8 +120,7 @@ class Chat:
             "user_profile": ["data"], 
             "http": ["url"], 
             "save_code_changes": ["code"],
-            "python_str" : ["text"],
-            "think" : ["thinks"]
+            "python_str" : ["text"]
         }
         self.tools_dict_additional = { 
             "google_search": ["num_results"], 
@@ -119,12 +130,12 @@ class Chat:
     def _apply_saved_changes(self):
         try:
             if self.saved_code.strip():
-                print("⚙️ Обнаружены сохраненные изменения. Применяю...")
+                self.print("⚙️ Обнаружены сохраненные изменения. Применяю...")
                 result = self.python_tool(self.saved_code, no_print=True)
                 if result and "Ошибка" in str(result): print(f"❌ Ошибка: {result}")
-                else: print("✅ Изменения успешно применены.")
+                else: self.print("✅ Изменения успешно применены.")
         except Exception as e:
-            print(f"❌ Критическая ошибка при загрузке изменений: {e}")
+            self.print(f"❌ Критическая ошибка при загрузке изменений: {e}")
 
     def chat_tool(self, name, message):
         if name not in self.chats:
@@ -267,9 +278,6 @@ class Chat:
         Принимает обычный текст и возвращает его в формате Python-строки, экранируя специальные символы.
         """
         return repr(text)
-
-    def think_tool(self, thinks):
-        return ""
 
     def validate_python_code(self, code):
         try:
