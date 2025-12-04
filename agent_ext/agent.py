@@ -17,10 +17,11 @@ class Chat:
     local_env = dict()
     result = ''
     
-    def __init__(self, output_mode="user", count_tab=0):
+    def __init__(self, output_mode="user", count_tab=0, print_to_console=False):
         self.agent_dir = "agent_ext"
         self.output_mode = output_mode
         self.count_tab = count_tab
+        self.print_to_console = print_to_console
         self.chats = {}
         self.last_send_time = 0
         # free
@@ -29,7 +30,7 @@ class Chat:
 
         # tier 1
         self.model, self.model_rpm = "gemini-3-pro-preview", 25
-        self.model, self.model_rpm = "gemini-2.5-pro", 150
+        #self.model, self.model_rpm = "gemini-2.5-pro", 150
 
         self._load_config()
         self.client = OpenAI(api_key=self.ai_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
@@ -66,7 +67,7 @@ class Chat:
         self.ai_key = self.gemini_keys[self.current_key_index]
 
         self.prompts = {}
-        prompt_names = ["system", "python", "chat", "chat_exec", "user_profile", "save_code_changes", "http", "shell", "google_search", "python_str", "think"]
+        prompt_names = ["system", "python", "chat", "chat_exec", "user_profile", "save_code_changes", "http", "shell", "google_search", "python_str"]
         for name in prompt_names:
             try:
                 with open(f"{self.agent_dir}/prompts/{name}", 'r', encoding="utf8") as f: 
@@ -108,8 +109,7 @@ class Chat:
             "user_profile": ["data"], 
             "http": ["url"], 
             "save_code_changes": ["code"],
-            "python_str" : ["text"],
-            "think" : ["thinks"]
+            "python_str" : ["text"]
         }
         self.tools_dict_additional = { 
             "google_search": ["num_results"], 
@@ -268,9 +268,6 @@ class Chat:
         """
         return repr(text)
 
-    def think_tool(self, thinks):
-        return ""
-
     def validate_python_code(self, code):
         try:
             ast.parse(code)
@@ -390,6 +387,8 @@ class Chat:
         if message != '':
             print('\t' * count_tab + message.replace('\n', '\n' + '\t' * count_tab), **kwargs)
 
+    print_thought = print
+
     def print_code(self, language, code, count_tab=-1, max_code_display_lines=6):
             if count_tab == -1:
                 count_tab = self.count_tab
@@ -438,14 +437,29 @@ class Chat:
                     time.sleep(delay)
                 self.last_send_time = time.time()
 
-                stream = self.output_mode == "user"
-                response_generator = self.client.chat.completions.create(
+                if self.print_to_console:
+                    if self.output_mode == "user":
+                        self.print("🤖 Агент: ", end="", flush=True)
+                    else:
+                        self.print("⚙️ Агент (авто, ответ): ", end="", flush=True)
+
+                stream = self.client.chat.completions.create(
                     model=self.model,
                     messages=self.messages,
                     tools=self.tools,
-                    stream=stream,
-                )
-                return self._handle_response(response_generator, stream)
+                    stream=True,
+                    extra_body={
+                        'extra_body': {
+                            "google": {
+                                "thinking_config": {
+                                    "include_thoughts": True
+                                }
+                            }
+                        }
+                    }
+                ) # type: ignore
+                
+                return self._handle_stream(stream)
 
             except Exception as e:
                 logger.error(f"Ошибка при обработке сообщения: {e}")
@@ -464,6 +478,92 @@ class Chat:
                         self.send({"role": "system", "content": error_msg})
                     return f"Критическая ошибка: {error_msg}" # Возвращаем ошибку в режиме auto
 
+    def _handle_stream(self, stream):
+        # Инициализация накопителей
+        full_content = ""
+        tool_calls_buffer = []
+        thought_signature = None
+        model_extra = None
+        is_thought = False
+
+        try:
+            # Итерация по чанкам стрима
+            for chunk in stream:
+                delta = chunk.choices[0].delta
+                
+                # 2. Обработка обычного контента
+                if delta.content:
+                    content_text = delta.content
+                    if "<thought>" in content_text:
+                        is_thought = True
+                        content_text = content_text.replace("<thought>", '')
+                        if self.print_to_console:
+                            self.print('\nМысли:', flush=True)
+                    if "</thought>" in content_text:
+                        is_thought = False
+                        content_text = content_text.replace("</thought>", '')
+                        if self.print_to_console:
+                            self.print('\nОтвет:', flush=True)
+                    if is_thought:
+                        self.print_thought(content_text, count_tab=self.count_tab + 1, flush=True, end='')
+                    else:
+                        full_content += content_text
+                        self.print(content_text, flush=True, end='')
+
+                # 3. Накопление вызовов инструментов (Tool Calls)
+                if delta.tool_calls:
+                    for tc in delta.tool_calls:
+                        tool_call = {
+                            "id": tc.id,
+                            "type": "function",
+                            "function": {"name": tc.function.name, "arguments": tc.function.arguments},
+                        }
+                        if tc.model_extra:
+                            #tool_call["model_extra"] = tc.model_extra
+                            tool_call["extra_content"] = tc.model_extra["extra_content"]
+
+                        tool_calls_buffer.append(tool_call)
+
+                # 4. Извлечение Thought Signature (Gemini 3 Pro Specific)
+                # Google передает thoughtSignature в дополнительных полях объекта ответа.
+                # В OpenAI SDK они обычно попадают в model_extra или корень объекта.
+                # Проверяем разные варианты расположения.
+                if 'model_extra' in delta:
+                    model_extra = delta['model_extra']
+                
+            # --- Пост-обработка после завершения стрима ---
+
+            self.print("") # Перевод строки после ответа
+            
+            # Формирование итогового сообщения для истории
+            assistant_message = {
+                "role": "assistant",
+                "content": full_content
+            }
+
+            if model_extra:
+                assistant_message["model_extra"] = model_extra
+
+            # Если были инструменты, добавляем их
+            if tool_calls_buffer:
+                assistant_message["tool_calls"] = tool_calls_buffer
+            
+            # Аппендим в историю
+            self.messages.append(assistant_message)
+
+            logger.info("Получен потоковый ответ от модели.")
+            
+            if "tool_calls" in assistant_message:
+                self._execute_tool_calls(assistant_message["tool_calls"])
+
+            return assistant_message["content"]
+        
+        except Exception as e:
+            e = traceback.format_exc()
+            logger.error(f"Ошибка обработки стрима: {e}")
+            self.print(f"Ошибка обработки стрима: {e}")
+            return f"Ошибка обработки стрима: {e}"
+
     def _switch_api_key(self):
         """Переключает на следующий доступный API ключ Gemini."""
         self.current_key_index = (self.current_key_index + 1) % len(self.gemini_keys)
@@ -474,62 +574,13 @@ class Chat:
         self.client = OpenAI(api_key=self.ai_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
         self.print(f"🔑 Превышен лимит запросов. Переключаюсь на следующий ключ ({self.current_key_index + 1}/{len(self.gemini_keys)}).")
 
-    def _handle_response(self, response, stream):
-        """Определяет, как обрабатывать ответ в зависимости от режима (stream/auto)."""
-        if stream:
-            return self._handle_stream_response(response)
-        else:
-            return self._handle_auto_mode_response(response)
-            
-    def _handle_stream_response(self, response_stream):
-        """Обрабатывает потоковый ответ от модели для режима 'user'."""
-        full_content = ""
-        tool_calls = []
-        
-        self.print("🤖 Агент: ", end="", flush=True)
-
-        for chunk in response_stream:
-            content_delta = chunk.choices[0].delta.content
-            tool_calls_delta = chunk.choices[0].delta.tool_calls
-
-            if content_delta:
-                full_content += content_delta
-                self.print(content_delta, end="", flush=True, count_tab=0) # Выводим без отступов
-            
-            if tool_calls_delta:
-                for tool_call in tool_calls_delta:
-                    # Если новый tool_call, добавляем его в список
-                    if tool_call.index is None or tool_call.index >= len(tool_calls):
-                         tool_calls.append({
-                             "id": tool_call.id,
-                             "type": "function",
-                             "function": {"name": tool_call.function.name, "arguments": tool_call.function.arguments or ""}
-                         })
-                    # Если продолжение существующего, дописываем аргументы
-                    else:
-                        tool_calls[tool_call.index]["function"]["arguments"] += tool_call.function.arguments or ""
-        
-        self.print("") # Перевод строки после ответа
-        
-        assistant_message = {"role": "assistant", "content": full_content}
-        if tool_calls:
-            assistant_message["tool_calls"] = tool_calls
-        
-        self.messages.append(assistant_message)
-        logger.info("Получен потоковый ответ от модели.")
-        
-        if tool_calls:
-            self._execute_tool_calls(tool_calls)
-        
-        return "Обработка завершена."
-
     def _handle_auto_mode_response(self, response):
         """Обрабатывает стандартный ответ от модели для режима 'auto'."""
         assistant_message = response.choices[0].message
         self.messages.append(assistant_message)
         logger.info("Получен ответ от модели в режиме auto.")
 
-        result = assistant_message.content or ""
+        result = assistant_message.content
         self.print("⚙️ Агент (авто, ответ): " + result)
 
         if assistant_message.tool_calls:
@@ -550,6 +601,8 @@ class Chat:
         """Выполняет вызовы инструментов, полученные от модели, и отправляет результаты обратно в модель."""
         tool_responses = []
         for tool_call in tool_calls:
+            if "function" not in tool_call:
+                continue
             tool_name = tool_call["function"]["name"]
             
             try:
@@ -579,7 +632,7 @@ class Chat:
 def main():
     print("🚀 AI-агент запущен. Введите ваш запрос.")
 
-    chat_agent = Chat()
+    chat_agent = Chat(print_to_console=True)
     
     try:
         while True:
