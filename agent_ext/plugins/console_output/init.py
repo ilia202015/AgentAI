@@ -3,6 +3,8 @@ import traceback
 
 def main(chat, settings):
     print("🚀 AI-агент запущен (плагин console_output). Введите ваш запрос.")
+
+    chat.print_to_console=True
     
     try:
         while True:

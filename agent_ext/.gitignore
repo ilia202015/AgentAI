@@ -46,3 +46,7 @@ Thumbs.db
 
 user_profile.json
 todo
+
+
+# Chat history
+chats/

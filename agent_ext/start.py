@@ -29,7 +29,7 @@ def load_plugins():
         return
 
     print("🤖 Инициализация главного чата...")
-    chat = Chat(print_to_console=True)
+    chat = Chat()
     
     # === Внедрение системной информации (код start.py, конфиг, структура папок) ===
     print("📝 Сбор системной информации для промпта...")
@@ -152,3 +152,15 @@ def load_plugins():
 
 if __name__ == "__main__":
     load_plugins()
+    
+    try:
+        while True:
+            input()
+    except KeyboardInterrupt:
+        print("\n👋 Программа завершена пользователем")
+    except EOFError:
+        print("\n👋 Программа завершена (Ctrl+D)")
+    except Exception as e:
+        print(f"\n💥 Критическая ошибка в плагине console_output: {e}")
+        traceback.print_exc()
+    
