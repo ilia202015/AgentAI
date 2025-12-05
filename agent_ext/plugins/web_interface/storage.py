@@ -19,7 +19,6 @@ def list_chats():
                 filepath = os.path.join(CHATS_DIR, filename)
                 with open(filepath, 'r', encoding='utf-8') as f:
                     data = json.load(f)
-                    # Базовая валидация
                     if "id" in data and "messages" in data:
                         chats.append({
                             "id": data["id"],
@@ -30,12 +29,10 @@ def list_chats():
             except Exception as e:
                 print(f"Error reading chat {filename}: {e}")
     
-    # Сортировка по дате обновления (новые сверху)
     chats.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
     return chats
 
 def _get_preview(messages):
-    # Ищем последнее сообщение пользователя или ассистента
     for msg in reversed(messages):
         if msg.get("role") in ["user", "assistant"] and msg.get("content"):
             content = msg["content"]
@@ -43,6 +40,7 @@ def _get_preview(messages):
     return "Empty chat"
 
 def load_chat(chat_id):
+    ensure_chats_dir()
     filepath = os.path.join(CHATS_DIR, f"{chat_id}.json")
     if not os.path.exists(filepath):
         return None
@@ -60,7 +58,6 @@ def save_chat(chat_id, messages, name=None):
         "messages": messages
     }
     
-    # Если имя не передано, пробуем сохранить старое или генерируем
     if name:
         data["name"] = name
     elif os.path.exists(filepath):
@@ -71,11 +68,14 @@ def save_chat(chat_id, messages, name=None):
         except:
              data["name"] = "New Chat"
     else:
-        # Генерируем имя из первого сообщения пользователя
+        # Generate name from first user message
         data["name"] = "New Chat"
         for msg in messages:
             if msg["role"] == "user":
-                data["name"] = (msg["content"][:30] + "...") if len(msg["content"]) > 30 else msg["content"]
+                content = msg["content"]
+                # Убираем переносы строк для названия
+                clean_content = content.replace('\n', ' ').strip()
+                data["name"] = (clean_content[:30] + "...") if len(clean_content) > 30 else clean_content
                 break
 
     with open(filepath, 'w', encoding='utf-8') as f:
@@ -83,14 +83,10 @@ def save_chat(chat_id, messages, name=None):
     
     return data
 
-def create_chat():
+def create_chat(messages=None):
     chat_id = str(uuid.uuid4())
-    messages = []
-    # Можно добавить системный промпт по умолчанию, если нужно, 
-    # но обычно агент сам его добавляет при инициализации. 
-    # В данном случае мы сохраняем чистый лист, агент добавит system prompt сам при загрузке контекста.
-    
-    return save_chat(chat_id, messages, "New Chat")
+    msgs = messages if messages is not None else []
+    return save_chat(chat_id, msgs)
 
 def delete_chat(chat_id):
     filepath = os.path.join(CHATS_DIR, f"{chat_id}.json")

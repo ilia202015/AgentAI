@@ -1,5 +1,6 @@
 import { store } from '../store.js';
 import * as api from '../api.js';
+import { onMounted } from 'vue';
 
 export default {
     template: `
@@ -65,10 +66,20 @@ export default {
         const refreshList = async () => {
             store.chats = await api.fetchChats();
         };
+
+        const checkCurrent = async () => {
+             const current = await api.fetchCurrentChat();
+             if (current && current.id) {
+                 store.currentChatId = current.id;
+                 store.setMessages(current.messages);
+             }
+        }
         
-        // Auto refresh list periodically or on event?
-        // For now just on mount.
-        refreshList();
+        onMounted(async () => {
+            await refreshList();
+            // Try to load current active chat from server
+            await checkCurrent();
+        });
         
         return { store, createNew, deleteChat, selectChat, connected: true };
     }

@@ -12,6 +12,13 @@ export async function loadChat(id) {
     return res.json();
 }
 
+export async function fetchCurrentChat() {
+    try {
+        const res = await fetch(`${API_BASE}/current`);
+        return await res.json();
+    } catch (e) { return null; }
+}
+
 export async function createChat() {
     const res = await fetch(`${API_BASE}/chats`, { method: 'POST' });
     return res.json();

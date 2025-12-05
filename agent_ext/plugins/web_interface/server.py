@@ -10,7 +10,9 @@ import traceback
 from urllib.parse import urlparse, parse_qs
 import mimetypes
 import importlib.util
+import socket
 
+# Импорт локальных модулей
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.append(current_dir)
@@ -25,8 +27,8 @@ except ImportError:
         storage = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(storage)
 
-PORT = 8085
 HOST = "127.0.0.1"
+START_PORT = 8080
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
 mimetypes.init()
@@ -38,9 +40,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
     chat_instance = None
     
     def log_message(self, format, *args):
-        # Mute logs slightly
         pass 
-        # print(f"🌐 [{self.address_string()}] {format%args}")
 
     def do_GET(self):
         try:
@@ -90,16 +90,11 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             if self.path == "/api/send":
                 msg = data.get("message")
                 if msg and self.chat_instance:
-                    # Если чат не выбран, создаем новый
                     if not self.chat_instance.current_chat_id:
                          new_chat = storage.create_chat()
                          self.chat_instance.current_chat_id = new_chat["id"]
-                         # Применяем базовый шаблон, если есть
                          if hasattr(self.chat_instance, "base_messages"):
                              self.chat_instance.messages = list(self.chat_instance.base_messages)
-                         else:
-                             # Если базы нет, оставляем как есть (скорее всего там уже что-то есть)
-                             pass
                     
                     threading.Thread(target=self.chat_instance.send, args=({"role": "user", "content": msg},)).start()
                     self.send_json({"status": "processing"})
@@ -111,12 +106,10 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 chat_data = storage.load_chat(chat_id)
                 
                 if chat_data and self.chat_instance:
-                    # 1. Загружаем сообщения в агента
                     self.chat_instance.messages = chat_data["messages"]
                     self.chat_instance.current_chat_id = chat_id
                     
-                    # 2. Важно: Если в загруженном чате нет системного промпта (старый формат?),
-                    # добавляем его из base_messages
+                    # Восстанавливаем system prompt
                     if hasattr(self.chat_instance, "base_messages") and not any(m["role"] == "system" for m in self.chat_instance.messages):
                         self.chat_instance.messages = list(self.chat_instance.base_messages) + self.chat_instance.messages
 
@@ -125,20 +118,14 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                     self.send_error(404)
 
             elif self.path == "/api/chats":
-                # Создание нового чата
                 new_chat = storage.create_chat()
-                # При создании нового чата мы НЕ переключаемся сразу в агенте, 
-                # пока пользователь не выберет его (или фронт не вызовет load)
-                # Но фронт обычно сразу вызывает load после создания.
                 self.send_json(new_chat)
             
             elif self.path.startswith("/api/chats/") and self.path.endswith("/save"):
-                 # Force save
                  chat_id = self.path.split("/")[-2]
                  if self.chat_instance:
                      storage.save_chat(chat_id, self.chat_instance.messages)
                      self.send_json({"status": "saved"})
-
             else:
                 self.send_error(404)
         except Exception as e:
@@ -149,7 +136,6 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
          if self.path.startswith("/api/chats/"):
             chat_id = self.path.split("/")[-1]
             if storage.delete_chat(chat_id):
-                # Если удалили текущий чат, сбрасываем ID
                 if self.chat_instance and self.chat_instance.current_chat_id == chat_id:
                     self.chat_instance.current_chat_id = None
                 self.send_json({"status": "deleted"})
@@ -166,6 +152,15 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
     def handle_api_get(self, path, query):
         if path == "/api/chats":
             self.send_json(storage.list_chats())
+        elif path == "/api/current":
+             # Новый эндпоинт для получения текущего состояния
+             if self.chat_instance and self.chat_instance.current_chat_id:
+                 chat = storage.load_chat(self.chat_instance.current_chat_id)
+                 if chat:
+                     self.send_json(chat)
+                     return
+             self.send_json({"id": None})
+
         elif path.startswith("/api/chats/"):
             chat_id = path.split("/")[-1]
             chat = storage.load_chat(chat_id)
@@ -204,15 +199,33 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             except:
                 break
 
+def get_free_port(start_port):
+    port = start_port
+    while port < 65535:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            try:
+                sock.bind((HOST, port))
+                return port
+            except OSError:
+                port += 1
+    return start_port
+
 def run_server(chat):
     WebRequestHandler.chat_instance = chat
     if not os.path.exists(STATIC_DIR): os.makedirs(STATIC_DIR)
     
-    server = socketserver.ThreadingTCPServer((HOST, PORT), WebRequestHandler)
-    server.allow_reuse_address = True
-    server.daemon_threads = True
-    print(f"🌍 Web Interface running at http://{HOST}:{PORT}")
+    port = get_free_port(START_PORT)
+    
     try:
+        server = socketserver.ThreadingTCPServer((HOST, port), WebRequestHandler)
+        server.allow_reuse_address = True
+        server.daemon_threads = True
+        print(f"🌍 Web Interface running at http://{HOST}:{port}")
+        
+        # Записываем порт в файл, чтобы другие плагины или пользователь знали
+        # with open("agent_ext/web_interface.port", "w") as f:
+        #    f.write(str(port))
+            
         server.serve_forever()
     except Exception as e:
         print(f"❌ Server crashed: {e}")
