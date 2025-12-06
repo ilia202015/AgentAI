@@ -17,47 +17,69 @@ def web_print(self, message, count_tab=-1, **kwargs):
     
     # Console
     if count_tab == -1: count_tab = self.count_tab
-    # Приводим к строке для безопасности консоли
     msg_str = str(message)
     if msg_str != '':
-        console_msg = '\t' * count_tab + msg_str.replace('\n', '\n' + '\t' * count_tab)
-        print(console_msg, **kwargs)
+        try:
+            console_msg = '\t' * count_tab + msg_str.replace('\n', '\n' + '\t' * count_tab)
+            print(console_msg, **kwargs)
+        except:
+            print(msg_str, **kwargs)
     elif end != '':
         print('\t' * count_tab, **kwargs)
     
     # Web
-    # Принудительно приводим к строке, чтобы избежать [object Object] в JS
     self.web_emit("text", str(message) + str(end))
 
 def web_print_thought(self, message, count_tab=-1, **kwargs):
+    msg_str = str(message)
+    
+    # 1. Update history directly
+    if self.messages and self.messages[-1]["role"] == "assistant":
+        last_msg = self.messages[-1]
+        last_msg["thoughts"] = (last_msg.get("thoughts", "") + msg_str)
+
+    # 2. Web emit
     if count_tab == -1: count_tab = self.count_tab
-    self.web_emit("thought", str(message))
+    self.web_emit("thought", msg_str)
 
 def web_print_code(self, language, code, count_tab=-1, max_code_display_lines=6):
+    code_str = str(code)
+    tool_data = {"title": str(language), "content": code_str}
+
+    # 1. Update history directly
+    # Мы прикрепляем код (инструмент или результат) к последнему сообщению ассистента
+    # Даже если это результат выполнения, который происходит позже, логически он относится к этому шагу.
+    if self.messages:
+        # Ищем последнее сообщение ассистента (идем с конца)
+        # Обычно это messages[-1], но если агент уже добавил message tool, то -2.
+        # Но agent.py добавляет tool message ПОСЛЕ выполнения. А print_code вызывается ВО ВРЕМЯ выполнения.
+        # Так что messages[-1] должно быть assistant (с tool_calls).
+        
+        target_msg = None
+        if self.messages[-1]["role"] == "assistant":
+            target_msg = self.messages[-1]
+        elif len(self.messages) > 1 and self.messages[-1]["role"] == "tool" and self.messages[-2]["role"] == "assistant":
+             target_msg = self.messages[-2]
+             
+        if target_msg:
+            if "tools" not in target_msg:
+                target_msg["tools"] = []
+            target_msg["tools"].append(tool_data)
+
+    # 2. Console output
     if count_tab == -1: count_tab = self.count_tab
-
-    displayed_code = ""
-    code_str = str(code) # Safety cast
-    if code_str != '':
-        lines = code_str.split('\n')
-        while len(lines) and lines[0] == '': lines = lines[1:]
-        if len(lines):
-            while lines[-1] == '': lines.pop()
-            if len(lines) > max_code_display_lines:
-                half_lines = max_code_display_lines // 2
-                displayed_code = '\n'.join(lines[:half_lines]) + '\n\t...\n' + '\n'.join(lines[-half_lines:])
-            else:
-                displayed_code = code_str
-            if len(displayed_code) > 500:
-                displayed_code = code_str[:250] + '\n\t...\n' + code_str[-250:]
-
     print("\n\n" + '\t' * count_tab + str(language) + ":\n")
-    print('\t' * (count_tab + 1) + displayed_code.replace('\n', '\n' + '\t' * (count_tab + 1)) + '\n')
+    lines = code_str.split('\n')
+    if len(lines) > 20:
+         print('\t' * (count_tab + 1) + f"... {len(lines)} lines ...\n")
+    else:
+         print('\t' * (count_tab + 1) + code_str.replace('\n', '\n' + '\t' * (count_tab + 1)) + '\n')
 
-    self.web_emit("tool", {"title": str(language), "content": code_str})
+    # 3. Web emit
+    self.web_emit("tool", tool_data)
 
 self.print = types.MethodType(web_print, self)
 self.print_thought = types.MethodType(web_print_thought, self)
 self.print_code = types.MethodType(web_print_code, self)
 
-print("✅ Web Interface: Enhanced hooks installed (Text/Thought/Tool).")
+print("✅ Web Interface: Hooks installed (Direct History Update).")

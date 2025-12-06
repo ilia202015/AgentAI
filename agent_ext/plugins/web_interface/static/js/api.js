@@ -37,3 +37,10 @@ export async function sendMessage(text) {
     });
     return res.json();
 }
+
+export async function stopGeneration() {
+    try {
+        const res = await fetch(`${API_BASE}/stop`, { method: 'POST' });
+        return await res.json();
+    } catch (e) { return { status: 'error' }; }
+}

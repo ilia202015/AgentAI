@@ -114,7 +114,16 @@ export default {
                         
                         <div class="flex justify-between items-center px-2 pb-2">
                             <div class="flex gap-1 px-2"></div>
-                            <button @click="send" :disabled="!inputText.trim() || store.isThinking"
+                            
+                             <!-- Кнопка STOP -->
+                            <button v-if="store.isThinking" @click="stop"
+                                class="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all duration-200 flex items-center justify-center gap-2 border border-red-500/20"
+                                title="Stop generation">
+                                <i class="ph-fill ph-stop text-lg"></i>
+                            </button>
+
+                            <!-- Кнопка SEND -->
+                            <button v-else @click="send" :disabled="!inputText.trim()"
                                 class="p-2 rounded-lg transition-all duration-200 flex items-center justify-center gap-2"
                                 :class="inputText.trim() ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25 hover:bg-blue-500' : 'bg-white/5 text-gray-600 cursor-not-allowed'">
                                 <i class="ph-fill ph-paper-plane-right text-lg"></i>
@@ -130,7 +139,8 @@ export default {
         const messagesContainer = ref(null);
         const textarea = ref(null);
         
-        const filteredMessages = computed(() => store.messages.filter(m => m.role !== 'system'));
+        // Hide 'system' and 'tool' messages
+        const filteredMessages = computed(() => store.messages.filter(m => m.role !== 'system' && m.role !== 'tool'));
         
         const scrollToBottom = async () => {
             await nextTick();
@@ -161,6 +171,11 @@ export default {
             try { await api.sendMessage(text); } 
             catch (e) { store.isThinking = false; }
         };
+        
+        const stop = async () => {
+            await api.stopGeneration();
+            store.isThinking = false;
+        };
 
         const renderMarkdown = (text) => {
             if (!text) return '';
@@ -180,6 +195,6 @@ export default {
             scrollToBottom();
         });
 
-        return { store, inputText, send, filteredMessages, messagesContainer, renderMarkdown, textarea, resizeTextarea, copyToClipboard };
+        return { store, inputText, send, stop, filteredMessages, messagesContainer, renderMarkdown, textarea, resizeTextarea, copyToClipboard };
     }
 }
