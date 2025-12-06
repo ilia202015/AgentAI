@@ -53,12 +53,60 @@
 
     <!-- Libs -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <!-- IDE-like Theme: Atom One Dark -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
     <style>
+        /* --- Atom One Dark Theme (GLOBAL & IMPORTANT) --- */
+        
+        /* Token Colors */
+        .hljs-comment, .hljs-quote { color: #5c6370 !important; font-style: italic; }
+        .hljs-doctag, .hljs-keyword, .hljs-formula { color: #c678dd !important; }
+        .hljs-section, .hljs-name, .hljs-selector-tag, .hljs-deletion, .hljs-subst { color: #e06c75 !important; }
+        .hljs-literal { color: #56b6c2 !important; }
+        .hljs-string, .hljs-regexp, .hljs-addition, .hljs-attribute, .hljs-meta .hljs-string { color: #98c379 !important; }
+        .hljs-attr, .hljs-variable, .hljs-template-variable, .hljs-type, .hljs-selector-class, .hljs-selector-attr, .hljs-selector-pseudo, .hljs-number { color: #d19a66 !important; }
+        .hljs-symbol, .hljs-bullet, .hljs-link, .hljs-meta, .hljs-selector-id, .hljs-title { color: #61aeee !important; }
+        .hljs-built_in, .hljs-title.class_, .hljs-class .hljs-title { color: #e6c07b !important; }
+        .hljs-emphasis { font-style: italic; }
+        .hljs-strong { font-weight: bold; }
+        .hljs-link { text-decoration: underline; }
+
+        /* Block Code (inside Pre) */
+        .prose pre {
+            background: #282c34 !important;
+            color: #abb2bf !important;
+            border: 1px solid #374151;
+            font-family: 'JetBrains Mono', monospace;
+            padding: 1em;
+            border-radius: 0.5em;
+            margin: 1em 0;
+            overflow-x: auto;
+        }
+        
+        .prose pre code {
+            background-color: transparent !important;
+            border: none !important;
+            padding: 0 !important;
+            color: inherit !important;
+            font-size: 0.9em;
+            font-weight: 400 !important;
+        }
+
+        /* Inline Code (NOT inside Pre) */
+        .prose :not(pre) > code { 
+            color: #e5c07b !important; 
+            background: rgba(40, 44, 52, 0.8) !important; 
+            padding: 0.2em 0.4em; 
+            border-radius: 0.3em; 
+            font-family: 'JetBrains Mono', monospace; 
+            font-size: 0.85em; 
+            border: 1px solid rgba(255,255,255,0.1);
+            font-weight: normal !important;
+        }
+
+        /* --- Custom Styles --- */
+        
         /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -78,36 +126,6 @@
         .prose a { color: #60a5fa; text-decoration: none; border-bottom: 1px solid rgba(96, 165, 250, 0.4); }
         .prose a:hover { border-color: #60a5fa; }
         
-        /* Inline Code */
-        .prose :not(pre) > code { 
-            color: #e5c07b; /* Gold for inline code */
-            background: rgba(40, 44, 52, 0.5); 
-            padding: 0.2em 0.4em; 
-            border-radius: 0.3em; 
-            font-family: 'JetBrains Mono', monospace; 
-            font-size: 0.85em; 
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        /* Code Blocks (Pre) - Let Highlight.js handle background */
-        .prose pre { 
-            margin: 1em 0; 
-            overflow-x: auto; 
-            border-radius: 0.5em; 
-            border: 1px solid #374151;
-            /* Важно: удаляем принудительный фон, чтобы работала тема hljs */
-            background: #282c34 !important; 
-            padding: 1em;
-        }
-        
-        .prose pre code { 
-            background: transparent !important; 
-            padding: 0; 
-            color: inherit; 
-            font-size: 0.9em; 
-            font-family: 'JetBrains Mono', monospace;
-        }
-
         /* Headings */
         .prose h1, .prose h2, .prose h3 { color: #f9fafb; font-weight: 700; margin-top: 1.5em; margin-bottom: 0.5em; }
         .prose h1 { font-size: 1.75em; border-bottom: 1px solid #1f2937; padding-bottom: 0.3em; }
@@ -138,6 +156,7 @@
     </div>
     <div id="app" class="w-full h-full flex opacity-0 transition-opacity duration-500"></div>
     
+    <!-- Load App -->
     <script type="module" src="./js/app.js"></script>
     
     <script>

@@ -92,7 +92,6 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             
             path = self.path.split('?')[0]
             
-            # /api/chats/{id}/rename
             if path.startswith("/api/chats/") and path.endswith("/rename"):
                  chat_id = path.split("/")[-2]
                  new_name = data.get("name")
@@ -201,6 +200,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             mime, _ = mimetypes.guess_type(full_path)
             if not mime and full_path.endswith(".js"): mime = "application/javascript"
             self.send_header("Content-Type", mime or "application/octet-stream")
+            
             with open(full_path, 'rb') as f:
                 content = f.read()
             self.send_header("Content-Length", str(len(content)))
