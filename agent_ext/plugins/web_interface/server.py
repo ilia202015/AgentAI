@@ -83,6 +83,27 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         except Exception as e:
             print(f"❌ Error in POST: {e}")
             self.send_error(500, str(e))
+            
+    def do_PATCH(self):
+         try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8')) if post_data else {}
+            
+            path = self.path.split('?')[0]
+            
+            # /api/chats/{id}/rename
+            if path.startswith("/api/chats/") and path.endswith("/rename"):
+                 chat_id = path.split("/")[-2]
+                 new_name = data.get("name")
+                 if new_name and storage.rename_chat(chat_id, new_name):
+                     self.send_json({"status": "ok", "name": new_name})
+                 else:
+                     self.send_error(400)
+            else:
+                 self.send_error(404)
+         except Exception as e:
+            self.send_error(500, str(e))
 
     def do_DELETE(self):
          path = self.path.split('?')[0]
@@ -105,7 +126,6 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                     new_chat = storage.create_chat_state(base)
                     self.chat_instance.current_chat_id = new_chat["id"]
             
-            # Сброс флага стопа перед новым сообщением
             self.chat_instance.stop_requested = False
             
             threading.Thread(target=self.chat_instance.send, args=({"role": "user", "content": msg},)).start()

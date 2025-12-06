@@ -29,6 +29,15 @@ export async function deleteChat(id) {
     return res.json();
 }
 
+export async function renameChat(id, name) {
+    const res = await fetch(`${API_BASE}/chats/${id}/rename`, { 
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }) 
+    });
+    return res.json();
+}
+
 export async function sendMessage(text) {
     const res = await fetch(`${API_BASE}/send`, {
         method: 'POST',

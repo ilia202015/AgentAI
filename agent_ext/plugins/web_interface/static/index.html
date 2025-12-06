@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="ru" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agent AI Workspace</title>
+    <title>Рабочая среда Агента</title>
     
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -25,12 +25,8 @@
                         gray: {
                             850: '#1f2937',
                             900: '#111827',
-                            950: '#030712', // Ultra dark
+                            950: '#030712',
                         },
-                        primary: {
-                            500: '#3b82f6',
-                            600: '#2563eb',
-                        }
                     },
                     animation: {
                         'fade-in-up': 'fadeInUp 0.3s ease-out forwards',
@@ -57,7 +53,8 @@
 
     <!-- Libs -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github-dark-dimmed.min.css">
+    <!-- IDE-like Theme: Atom One Dark -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
@@ -78,21 +75,47 @@
 
         /* Markdown Typography overrides */
         .prose { max-width: none; color: #e5e7eb; font-size: 0.95rem; line-height: 1.6; }
-        .prose a { color: #60a5fa; text-decoration: none; border-bottom: 1px solid rgba(96, 165, 250, 0.4); transition: border-color 0.2s; }
+        .prose a { color: #60a5fa; text-decoration: none; border-bottom: 1px solid rgba(96, 165, 250, 0.4); }
         .prose a:hover { border-color: #60a5fa; }
-        .prose strong { color: #f3f4f6; font-weight: 600; }
-        .prose code { color: #e5e7eb; background: rgba(255,255,255,0.1); padding: 0.2em 0.4em; border-radius: 0.3em; font-family: 'JetBrains Mono', monospace; font-size: 0.85em; font-weight: 500; }
-        .prose code::before, .prose code::after { content: none !important; }
-        .prose pre { background: #111827 !important; border: 1px solid #374151; border-radius: 0.5em; margin: 1em 0; overflow-x: auto; }
-        .prose pre code { background: transparent; padding: 0; color: inherit; font-size: 0.9em; }
-        .prose h1, .prose h2, .prose h3 { color: #f9fafb; font-weight: 700; margin-top: 1.5em; margin-bottom: 0.5em; letter-spacing: -0.025em; }
+        
+        /* Inline Code */
+        .prose :not(pre) > code { 
+            color: #e5c07b; /* Gold for inline code */
+            background: rgba(40, 44, 52, 0.5); 
+            padding: 0.2em 0.4em; 
+            border-radius: 0.3em; 
+            font-family: 'JetBrains Mono', monospace; 
+            font-size: 0.85em; 
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        /* Code Blocks (Pre) - Let Highlight.js handle background */
+        .prose pre { 
+            margin: 1em 0; 
+            overflow-x: auto; 
+            border-radius: 0.5em; 
+            border: 1px solid #374151;
+            /* Важно: удаляем принудительный фон, чтобы работала тема hljs */
+            background: #282c34 !important; 
+            padding: 1em;
+        }
+        
+        .prose pre code { 
+            background: transparent !important; 
+            padding: 0; 
+            color: inherit; 
+            font-size: 0.9em; 
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* Headings */
+        .prose h1, .prose h2, .prose h3 { color: #f9fafb; font-weight: 700; margin-top: 1.5em; margin-bottom: 0.5em; }
         .prose h1 { font-size: 1.75em; border-bottom: 1px solid #1f2937; padding-bottom: 0.3em; }
-        .prose h2 { font-size: 1.4em; }
-        .prose ul { list-style-type: disc; padding-left: 1.5em; margin: 0.5em 0; }
-        .prose ol { list-style-type: decimal; padding-left: 1.5em; margin: 0.5em 0; }
+        
+        /* Blockquote */
         .prose blockquote { border-left: 3px solid #3b82f6; padding-left: 1em; color: #9ca3af; font-style: italic; }
         
-        /* Loading spinner */
+        /* Loading */
         #loading {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: #030712; color: white; display: flex; flex-direction: column;
@@ -111,7 +134,7 @@
 <body class="text-gray-200 h-screen overflow-hidden text-sm selection:bg-blue-500/30 selection:text-blue-100">
     <div id="loading">
         <span class="loader"></span>
-        <span class="opacity-50">Connecting to Agent...</span>
+        <span class="opacity-50">Подключение к Агенту...</span>
     </div>
     <div id="app" class="w-full h-full flex opacity-0 transition-opacity duration-500"></div>
     

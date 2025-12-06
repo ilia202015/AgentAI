@@ -34,7 +34,7 @@ def main(chat, settings):
         chat.current_chat_id = None 
         
     chat.stop_requested = False
-    
+
     # 1. Autosave patch
     original_send = chat.send
     def send_with_autosave(self, message):
@@ -47,26 +47,58 @@ def main(chat, settings):
         return result
     chat.send = types.MethodType(send_with_autosave, chat)
 
-    # 2. Stop generation patch (Simplified)
+    # 2. Stop generation & Thoughts Capture patch
     original_handle_stream = chat._handle_stream
     
-    def handle_stream_with_stop(self, stream):
-        def interruptible_generator(gen):
+    def handle_stream_with_parsing(self, stream):
+        thoughts_buffer = []
+        is_thought_mode = False
+        
+        def parsing_generator(gen):
+            nonlocal is_thought_mode
             try:
                 for chunk in gen:
                     if getattr(self, 'stop_requested', False):
                         self.print("\n🛑 Force stopped.")
                         break
+                        
+                    if chunk.choices and chunk.choices[0].delta.content:
+                        content = chunk.choices[0].delta.content
+                        
+                        temp_content = content
+                        if "<thought>" in temp_content:
+                            is_thought_mode = True
+                            temp_content = temp_content.replace("<thought>", "")
+                        if "</thought>" in temp_content:
+                            is_thought_mode = False
+                            temp_content = temp_content.replace("</thought>", "")
+                            
+                        if is_thought_mode or "<thought>" in content or "</thought>" in content:
+                             thoughts_buffer.append(temp_content)
+
                     yield chunk
             except Exception as e:
                 print(f"Stream error: {e}")
             self.stop_requested = False
 
-        return original_handle_stream(interruptible_generator(stream))
+        result = original_handle_stream(parsing_generator(stream))
+        
+        # Save thoughts to history
+        if thoughts_buffer and self.messages and self.messages[-1]["role"] == "assistant":
+            full_thoughts = "".join(thoughts_buffer)
+            last_msg = self.messages[-1]
+            # Append in case of partial saves or splits
+            last_msg["thoughts"] = last_msg.get("thoughts", "") + full_thoughts
+            
+            if self.current_chat_id:
+                try:
+                    storage.save_chat_state(self, self.current_chat_id)
+                except Exception: pass
+        
+        return result
 
-    chat._handle_stream = types.MethodType(handle_stream_with_stop, chat)
+    chat._handle_stream = types.MethodType(handle_stream_with_parsing, chat)
 
-    # Start Server
     server_thread = threading.Thread(target=server.run_server, args=(chat,), daemon=True)
     server_thread.start()
     

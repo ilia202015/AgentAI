@@ -188,14 +188,26 @@ def save_chat_state(chat_instance, chat_id=None, name=None):
     if name:
         base_data["name"] = name
     else:
-        msg_name = "New Chat"
-        for msg in chat_instance.messages:
-            if msg["role"] == "user":
-                content = str(msg.get("content", ""))
-                clean = content.replace('\n', ' ').strip()
-                msg_name = (clean[:30] + "...") if len(clean) > 30 else clean
-                break
-        base_data["name"] = msg_name
+        # Если имя не передано явно, пытаемся сохранить старое имя
+        # Или генерируем новое, если это новый чат
+        old_name = "New Chat"
+        json_path = os.path.join(CHATS_DIR, f"{chat_id}.json")
+        if os.path.exists(json_path):
+             try:
+                 with open(json_path, 'r', encoding='utf-8') as f:
+                     old_name = json.load(f).get("name", "New Chat")
+             except: pass
+        
+        if old_name == "New Chat":
+             # Генерируем из первого сообщения
+             for msg in chat_instance.messages:
+                if msg["role"] == "user":
+                    content = str(msg.get("content", ""))
+                    clean = content.replace('\n', ' ').strip()
+                    old_name = (clean[:30] + "...") if len(clean) > 30 else clean
+                    break
+        
+        base_data["name"] = old_name
 
     # 1. Save JSON
     json_data = base_data.copy()
@@ -255,3 +267,27 @@ def delete_chat(chat_id):
         deleted = True
         
     return deleted
+
+def rename_chat(chat_id, new_name):
+    data, _ = load_chat_state(chat_id)
+    if not data: return False
+    
+    data["name"] = new_name
+    
+    # Save JSON
+    json_path = os.path.join(CHATS_DIR, f"{chat_id}.json")
+    try:
+        json_data = data.copy()
+        json_data["instance_state"] = {}
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(json_data, f, ensure_ascii=False, indent=2, default=str)
+    except: pass
+
+    # Save Pickle
+    pkl_path = os.path.join(CHATS_DIR, f"{chat_id}.pkl")
+    try:
+        with open(pkl_path, 'wb') as f:
+            pickle.dump(data, f)
+    except: return False
+    
+    return True

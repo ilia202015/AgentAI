@@ -13,8 +13,8 @@ export default {
                     <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-gray-800 to-gray-700 flex items-center justify-center mb-6 shadow-2xl border border-white/5">
                         <i class="ph-duotone ph-sparkle text-3xl text-blue-400"></i>
                     </div>
-                    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">How can I help you today?</h2>
-                    <p class="text-gray-500 max-w-md text-sm leading-relaxed">I can write code, analyze data, or help you with your creative tasks. Just type below.</p>
+                    <h2 class="text-2xl font-bold text-white mb-2 tracking-tight">Чем я могу помочь?</h2>
+                    <p class="text-gray-500 max-w-md text-sm leading-relaxed">Я могу писать код, анализировать данные и помогать с творческими задачами. Просто напишите ниже.</p>
                 </div>
                 
                 <!-- Message List -->
@@ -25,9 +25,9 @@ export default {
                     <!-- Role Label -->
                     <div class="flex items-center gap-2 mb-1.5 px-1 opacity-60 text-xs font-medium tracking-wide">
                         <span v-if="msg.role === 'assistant'" class="flex items-center gap-1.5 text-blue-400">
-                             <i class="ph-fill ph-robot"></i> Agent
+                             <i class="ph-fill ph-robot"></i> Агент
                         </span>
-                        <span v-else class="text-gray-400">You</span>
+                        <span v-else class="text-gray-400">Вы</span>
                     </div>
 
                     <!-- Assistant: Thoughts & Tools -->
@@ -37,8 +37,8 @@ export default {
                         <details v-if="msg.thoughts" class="group/thought">
                             <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
                                 <i class="ph ph-brain text-purple-400 group-open/thought:rotate-180 transition-transform"></i>
-                                <span>Thinking Process</span>
-                                <span class="opacity-50 text-[10px] ml-auto">Click to expand</span>
+                                <span>Процесс мышления</span>
+                                <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
                             </summary>
                             <div class="mt-2 pl-3 border-l-2 border-purple-500/20 text-gray-400 text-xs leading-relaxed whitespace-pre-wrap font-mono bg-black/20 p-3 rounded-r-lg">
                                 {{ msg.thoughts }}
@@ -48,15 +48,17 @@ export default {
                         <!-- Tools -->
                         <div v-if="msg.tools && msg.tools.length > 0" class="space-y-2">
                             <div v-for="(tool, tIdx) in msg.tools" :key="tIdx" 
-                                 class="rounded-lg border border-white/5 bg-black/20 overflow-hidden">
+                                 class="rounded-lg border border-white/5 bg-gray-900 overflow-hidden">
                                 <div class="px-3 py-2 bg-white/5 flex items-center justify-between text-xs text-gray-300 font-mono border-b border-white/5">
                                     <div class="flex items-center gap-2">
                                         <i class="ph ph-terminal-window text-emerald-400"></i>
                                         <span>{{ tool.title }}</span>
                                     </div>
                                 </div>
-                                <div class="p-3 overflow-x-auto">
-                                    <pre class="text-xs text-emerald-100/80 font-mono m-0 whitespace-pre-wrap">{{ tool.content }}</pre>
+                                <div class="p-0 overflow-x-auto bg-[#282c34]">
+                                    <!-- Highlighted Code Block for Tools -->
+                                    <pre class="text-xs font-mono m-0 p-3 whitespace-pre-wrap" 
+                                         v-html="highlightCode(tool.content, tool.title)"></pre>
                                 </div>
                             </div>
                         </div>
@@ -76,7 +78,7 @@ export default {
                               v-html="renderMarkdown(msg.content)"></div>
                               
                          <div v-if="msg.role === 'assistant'" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                            <button @click="copyToClipboard(msg.content)" class="p-1.5 text-gray-500 hover:text-white hover:bg-white/10 rounded transition" title="Copy">
+                            <button @click="copyToClipboard(msg.content)" class="p-1.5 text-gray-500 hover:text-white hover:bg-white/10 rounded transition" title="Копировать">
                                 <i class="ph ph-copy"></i>
                             </button>
                          </div>
@@ -89,7 +91,7 @@ export default {
                        <div class="w-6 h-6 rounded-full bg-blue-500/10 flex items-center justify-center">
                             <i class="ph-duotone ph-spinner animate-spin text-blue-500 text-xs"></i>
                        </div>
-                       <span class="text-xs text-blue-400/80 font-medium animate-pulse">Thinking...</span>
+                       <span class="text-xs text-blue-400/80 font-medium animate-pulse">Думаю...</span>
                    </div>
                 </div>
                 
@@ -105,7 +107,7 @@ export default {
                         <textarea 
                             v-model="inputText"
                             @keydown.enter.exact.prevent="send"
-                            placeholder="Message Agent..."
+                            placeholder="Отправить сообщение..."
                             rows="1"
                             ref="textarea"
                             @input="resizeTextarea"
@@ -118,7 +120,7 @@ export default {
                              <!-- Кнопка STOP -->
                             <button v-if="store.isThinking" @click="stop"
                                 class="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all duration-200 flex items-center justify-center gap-2 border border-red-500/20"
-                                title="Stop generation">
+                                title="Остановить генерацию">
                                 <i class="ph-fill ph-stop text-lg"></i>
                             </button>
 
@@ -139,7 +141,6 @@ export default {
         const messagesContainer = ref(null);
         const textarea = ref(null);
         
-        // Hide 'system' and 'tool' messages
         const filteredMessages = computed(() => store.messages.filter(m => m.role !== 'system' && m.role !== 'tool'));
         
         const scrollToBottom = async () => {
@@ -177,6 +178,14 @@ export default {
             store.isThinking = false;
         };
 
+        const highlightCode = (code, lang) => {
+             if (typeof window.hljs === 'undefined') return code;
+             // Удаляем "Запрос python" или похожие префиксы если они есть (но обычно там чистое название)
+             const cleanLang = lang.split(' ')[0].toLowerCase();
+             const language = window.hljs.getLanguage(cleanLang) ? cleanLang : 'plaintext';
+             return window.hljs.highlight(code, { language }).value;
+        }
+
         const renderMarkdown = (text) => {
             if (!text) return '';
             try { return marked.parse(text); } catch (e) { return text; }
@@ -187,14 +196,15 @@ export default {
         onMounted(() => {
             marked.setOptions({
                 highlight: function(code, lang) {
-                    const language = highlight.getLanguage(lang) ? lang : 'plaintext';
-                    return highlight.highlight(code, { language }).value;
+                    if (typeof window.hljs === 'undefined') return code;
+                    const language = window.hljs.getLanguage(lang) ? lang : 'plaintext';
+                    return window.hljs.highlight(code, { language }).value;
                 },
                 langPrefix: 'hljs language-'
             });
             scrollToBottom();
         });
 
-        return { store, inputText, send, stop, filteredMessages, messagesContainer, renderMarkdown, textarea, resizeTextarea, copyToClipboard };
+        return { store, inputText, send, stop, filteredMessages, messagesContainer, renderMarkdown, textarea, resizeTextarea, copyToClipboard, highlightCode };
     }
 }
