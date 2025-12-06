@@ -53,3 +53,8 @@ export async function stopGeneration() {
         return await res.json();
     } catch (e) { return { status: 'error' }; }
 }
+
+export async function startTempChat() {
+    const res = await fetch(`${API_BASE}/temp`, { method: 'POST' });
+    return res.json();
+}

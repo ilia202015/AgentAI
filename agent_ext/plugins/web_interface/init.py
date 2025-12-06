@@ -39,7 +39,8 @@ def main(chat, settings):
     original_send = chat.send
     def send_with_autosave(self, message):
         result = original_send(message)
-        if self.current_chat_id:
+        # Skip autosave for temporary chat
+        if self.current_chat_id and self.current_chat_id != 'temp':
             try:
                 storage.save_chat_state(self, self.current_chat_id)
             except Exception as e:
@@ -87,10 +88,9 @@ def main(chat, settings):
         if thoughts_buffer and self.messages and self.messages[-1]["role"] == "assistant":
             full_thoughts = "".join(thoughts_buffer)
             last_msg = self.messages[-1]
-            # Append in case of partial saves or splits
             last_msg["thoughts"] = last_msg.get("thoughts", "") + full_thoughts
             
-            if self.current_chat_id:
+            if self.current_chat_id and self.current_chat_id != 'temp':
                 try:
                     storage.save_chat_state(self, self.current_chat_id)
                 except Exception: pass

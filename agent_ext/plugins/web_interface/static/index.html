@@ -42,7 +42,6 @@
         }
     </script>
     
-    <!-- Import Map -->
     <script type="importmap">
     {
       "imports": {
@@ -51,15 +50,12 @@
     }
     </script>
 
-    <!-- Libs -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
     <style>
-        /* --- Atom One Dark Theme (GLOBAL & IMPORTANT) --- */
-        
-        /* Token Colors */
+        /* Atom One Dark Theme */
         .hljs-comment, .hljs-quote { color: #5c6370 !important; font-style: italic; }
         .hljs-doctag, .hljs-keyword, .hljs-formula { color: #c678dd !important; }
         .hljs-section, .hljs-name, .hljs-selector-tag, .hljs-deletion, .hljs-subst { color: #e06c75 !important; }
@@ -72,66 +68,29 @@
         .hljs-strong { font-weight: bold; }
         .hljs-link { text-decoration: underline; }
 
-        /* Block Code (inside Pre) */
-        .prose pre {
-            background: #282c34 !important;
-            color: #abb2bf !important;
-            border: 1px solid #374151;
-            font-family: 'JetBrains Mono', monospace;
-            padding: 1em;
-            border-radius: 0.5em;
-            margin: 1em 0;
-            overflow-x: auto;
-        }
-        
-        .prose pre code {
-            background-color: transparent !important;
-            border: none !important;
-            padding: 0 !important;
-            color: inherit !important;
-            font-size: 0.9em;
-            font-weight: 400 !important;
-        }
-
-        /* Inline Code (NOT inside Pre) */
-        .prose :not(pre) > code { 
-            color: #e5c07b !important; 
-            background: rgba(40, 44, 52, 0.8) !important; 
-            padding: 0.2em 0.4em; 
-            border-radius: 0.3em; 
-            font-family: 'JetBrains Mono', monospace; 
-            font-size: 0.85em; 
-            border: 1px solid rgba(255,255,255,0.1);
-            font-weight: normal !important;
-        }
-
-        /* --- Custom Styles --- */
-        
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
-        
-        body {
-            background-color: #030712;
-            background-image: 
-                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.05) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.05) 0px, transparent 50%);
-            background-attachment: fixed;
-        }
-
-        /* Markdown Typography overrides */
-        .prose { max-width: none; color: #e5e7eb; font-size: 0.95rem; line-height: 1.6; }
+        /* Typography */
         .prose a { color: #60a5fa; text-decoration: none; border-bottom: 1px solid rgba(96, 165, 250, 0.4); }
-        .prose a:hover { border-color: #60a5fa; }
-        
-        /* Headings */
         .prose h1, .prose h2, .prose h3 { color: #f9fafb; font-weight: 700; margin-top: 1.5em; margin-bottom: 0.5em; }
         .prose h1 { font-size: 1.75em; border-bottom: 1px solid #1f2937; padding-bottom: 0.3em; }
-        
-        /* Blockquote */
         .prose blockquote { border-left: 3px solid #3b82f6; padding-left: 1em; color: #9ca3af; font-style: italic; }
+        
+        /* Inline Code */
+        .prose :not(pre) > code { 
+            color: #e5c07b; background: rgba(40, 44, 52, 0.8); 
+            padding: 0.2em 0.4em; border-radius: 0.3em; 
+            font-family: 'JetBrains Mono', monospace; font-size: 0.85em; 
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        /* Pre settings */
+        .prose pre { background: transparent !important; padding: 0 !important; margin: 0 !important; border: none !important; }
+        .prose pre code { background: transparent !important; padding: 0 !important; color: inherit !important; font-size: 0.9em; font-family: 'JetBrains Mono', monospace; font-weight: normal !important; }
+
+        /* Custom Scrollbar (Wider and easier to grab) */
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: #111827; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 5px; border: 2px solid #111827; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
         
         /* Loading */
         #loading {
@@ -141,8 +100,7 @@
             transition: opacity 0.5s; font-family: 'Inter', sans-serif;
         }
         .loader {
-            width: 48px; height: 48px;
-            border: 3px solid #FFF; border-bottom-color: transparent;
+            width: 48px; height: 48px; border: 3px solid #FFF; border-bottom-color: transparent;
             border-radius: 50%; display: inline-block; box-sizing: border-box;
             animation: rotation 1s linear infinite; margin-bottom: 1rem;
         }
@@ -156,10 +114,21 @@
     </div>
     <div id="app" class="w-full h-full flex opacity-0 transition-opacity duration-500"></div>
     
-    <!-- Load App -->
     <script type="module" src="./js/app.js"></script>
     
     <script>
+        // Global Copy Function for Code Blocks
+        window.copyCode = function(btn) {
+            const pre = btn.closest('.code-block-wrapper').querySelector('pre code');
+            if (pre) {
+                navigator.clipboard.writeText(pre.innerText).then(() => {
+                    const originalHTML = btn.innerHTML;
+                    btn.innerHTML = '<i class="ph-bold ph-check text-emerald-400"></i>';
+                    setTimeout(() => btn.innerHTML = originalHTML, 2000);
+                });
+            }
+        };
+
         window.addEventListener('load', () => {
             setTimeout(() => {
                 const appEl = document.getElementById('app');

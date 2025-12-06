@@ -82,13 +82,27 @@ export default {
             </div>
             
             <!-- Footer -->
-            <div class="p-4 border-t border-white/5 bg-black/20 backdrop-blur-sm">
-                <div class="flex items-center gap-3">
+            <div class="p-4 border-t border-white/5 bg-black/20 backdrop-blur-sm space-y-3">
+                
+                <!-- Temp Chat Button -->
+                <button @click="startTemp" 
+                    class="w-full flex items-center gap-3 p-2 rounded-lg transition-all duration-200"
+                    :class="store.currentChatId === 'temp' ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' : 'hover:bg-white/5 text-gray-400 border border-transparent'">
+                    <div class="w-6 h-6 rounded flex items-center justify-center bg-purple-500/20">
+                        <i class="ph-bold ph-ghost text-purple-400"></i>
+                    </div>
+                    <div class="flex flex-col items-start">
+                        <span class="text-xs font-medium">Временный чат</span>
+                        <span class="text-[9px] opacity-60">Без сохранения истории</span>
+                    </div>
+                </button>
+
+                <div class="flex items-center gap-3 pt-1">
                     <div class="w-2 h-2 rounded-full animate-pulse" 
                          :class="connected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500'"></div>
                     <div class="flex flex-col">
                         <span class="text-xs font-medium text-gray-300">Агент онлайн</span>
-                        <span class="text-[10px] text-gray-600">v1.3.1 • {{ store.chats.length }} чатов</span>
+                        <span class="text-[10px] text-gray-600">v1.4.0 • {{ store.chats.length }} чатов</span>
                     </div>
                 </div>
             </div>
@@ -113,6 +127,12 @@ export default {
             const chat = await api.createChat();
             await refreshList();
             await selectChat(chat.id);
+        };
+
+        const startTemp = async () => {
+            await api.startTempChat();
+            store.currentChatId = 'temp';
+            store.setMessages([]); // Start clean
         };
         
         const deleteChat = async (id) => {
@@ -177,7 +197,7 @@ export default {
         });
         
         return { 
-            store, createNew, deleteChat, selectChat, 
+            store, createNew, deleteChat, selectChat, startTemp,
             connected: true, searchQuery, filteredChats,
             editingId, editName, startRename, saveRename, cancelRename, editInput
         };

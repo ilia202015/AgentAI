@@ -74,6 +74,8 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 self.api_stop()
             elif path == "/api/chats":
                 self.api_create_chat()
+            elif path == "/api/temp":
+                self.api_start_temp()
             elif path.endswith("/load"):
                 self.api_load_chat(path)
             elif path.endswith("/save"):
@@ -120,10 +122,14 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
     def api_send(self, data):
         msg = data.get("message")
         if msg and self.chat_instance:
+            # If current_chat_id is missing, create new unless in Temp mode
             if not self.chat_instance.current_chat_id:
-                    base = getattr(self.chat_instance, "base_messages", [])
-                    new_chat = storage.create_chat_state(base)
-                    self.chat_instance.current_chat_id = new_chat["id"]
+                 # Check if we intended to be in temp mode? 
+                 # Actually, start_temp sets ID to 'temp'. 
+                 # So if ID is None, we make a new saved chat.
+                 base = getattr(self.chat_instance, "base_messages", [])
+                 new_chat = storage.create_chat_state(base)
+                 self.chat_instance.current_chat_id = new_chat["id"]
             
             self.chat_instance.stop_requested = False
             
@@ -131,6 +137,19 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_json({"status": "processing"})
         else:
             self.send_error(400)
+
+    def api_start_temp(self):
+        if self.chat_instance:
+            self.chat_instance.current_chat_id = 'temp'
+            # Reset memory to base prompt
+            if hasattr(self.chat_instance, "base_messages"):
+                self.chat_instance.messages = list(self.chat_instance.base_messages)
+            else:
+                self.chat_instance.messages = []
+            
+            self.send_json({"status": "ok", "id": "temp"})
+        else:
+            self.send_error(500)
 
     def api_stop(self):
         if self.chat_instance:
@@ -176,11 +195,20 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         if path == "/api/chats":
             self.send_json(storage.list_chats())
         elif path == "/api/current":
-             if self.chat_instance and self.chat_instance.current_chat_id:
-                 data, _ = storage.load_chat_state(self.chat_instance.current_chat_id)
-                 if data:
-                     self.send_json(data)
+             if self.chat_instance:
+                 if self.chat_instance.current_chat_id == 'temp':
+                     # Return temp state structure
+                     self.send_json({
+                         "id": "temp", 
+                         "messages": self.chat_instance.messages,
+                         "name": "Временный чат"
+                     })
                      return
+                 elif self.chat_instance.current_chat_id:
+                     data, _ = storage.load_chat_state(self.chat_instance.current_chat_id)
+                     if data:
+                         self.send_json(data)
+                         return
              self.send_json({"id": None})
         elif path.startswith("/api/chats/"):
             chat_id = path.split("/")[-1]
