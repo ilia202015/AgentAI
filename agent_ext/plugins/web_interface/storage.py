@@ -34,23 +34,35 @@ def get_current_config():
 def list_chats():
     ensure_chats_dir()
     chats = []
+    chat_ids = set()
     for filename in os.listdir(CHATS_DIR):
-        if filename.endswith(".pkl"):
-            try:
-                filepath = os.path.join(CHATS_DIR, filename)
-                if os.path.getsize(filepath) == 0:
-                    continue
-                    
-                with open(filepath, 'rb') as f:
+        if filename.endswith(".pkl") or filename.endswith(".json"):
+            chat_ids.add(filename.rsplit('.', 1)[0])
+            
+    for chat_id in chat_ids:
+        pkl_path = os.path.join(CHATS_DIR, f"{chat_id}.pkl")
+        json_path = os.path.join(CHATS_DIR, f"{chat_id}.json")
+        
+        data = None
+        try:
+            # Приоритет PKL
+            if os.path.exists(pkl_path) and os.path.getsize(pkl_path) > 0:
+                with open(pkl_path, 'rb') as f:
                     data = pickle.load(f)
-                    chats.append({
-                        "id": data.get("id"),
-                        "name": data.get("name", "Unnamed Chat"),
-                        "updated_at": data.get("updated_at", ""),
-                        "preview": _get_preview(data.get("messages", []))
-                    })
-            except Exception as e:
-                pass
+            # Фолбэк на JSON
+            elif os.path.exists(json_path) and os.path.getsize(json_path) > 0:
+                 with open(json_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+            
+            if data:
+                chats.append({
+                    "id": data.get("id"),
+                    "name": data.get("name", "Unnamed Chat"),
+                    "updated_at": data.get("updated_at", ""),
+                    "preview": _get_preview(data.get("messages", []))
+                })
+        except Exception:
+            pass
     
     chats.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
     return chats
@@ -64,40 +76,59 @@ def _get_preview(messages):
 
 def load_chat_state(chat_id):
     ensure_chats_dir()
-    filepath = os.path.join(CHATS_DIR, f"{chat_id}.pkl")
-    if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
-        return None, None
+    pkl_path = os.path.join(CHATS_DIR, f"{chat_id}.pkl")
+    json_path = os.path.join(CHATS_DIR, f"{chat_id}.json")
     
-    try:
-        with open(filepath, 'rb') as f:
-            data = pickle.load(f)
-            
-        # Восстановление динамических функций в local_env
-        instance_state = data.get("instance_state", {})
-        if 'local_env' in instance_state:
-            env = instance_state['local_env']
-            for k, v in env.items():
-                if isinstance(v, dict) and v.get('__type') == 'dynamic_function':
-                    try:
-                        code = marshal.loads(v['code'])
-                        # Используем globals() текущего модуля. 
-                        # Функции будут привязаны к этому контексту, но работать будут.
-                        new_func = types.FunctionType(code, globals(), v['name'], v['defaults'])
-                        new_func.__doc__ = v['doc']
-                        env[k] = new_func
-                    except Exception as e:
-                        print(f"⚠️ Failed to restore function {k}: {e}")
+    data = None
+    loaded_source = None
+    
+    # 1. Пытаемся загрузить PKL
+    if os.path.exists(pkl_path) and os.path.getsize(pkl_path) > 0:
+        try:
+            with open(pkl_path, 'rb') as f:
+                data = pickle.load(f)
+                loaded_source = "pickle"
+                
+                # Восстановление динамических функций
+                instance_state = data.get("instance_state", {})
+                if 'local_env' in instance_state:
+                    env = instance_state['local_env']
+                    for k, v in env.items():
+                        if isinstance(v, dict) and v.get('__type') == 'dynamic_function':
+                            try:
+                                code = marshal.loads(v['code'])
+                                new_func = types.FunctionType(code, globals(), v['name'], v['defaults'])
+                                new_func.__doc__ = v['doc']
+                                env[k] = new_func
+                            except Exception as e:
+                                print(f"⚠️ Failed to restore function {k}: {e}")
 
-    except (EOFError, pickle.UnpicklingError):
-        return None, "Corrupted chat file"
+        except (EOFError, pickle.UnpicklingError, AttributeError, ImportError) as e:
+            print(f"⚠️ Failed to load PKL for {chat_id}: {e}. Trying JSON...")
+    
+    # 2. Если PKL не удалось, пробуем JSON
+    if not data and os.path.exists(json_path) and os.path.getsize(json_path) > 0:
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                loaded_source = "json"
+                print(f"✅ Recovered chat {chat_id} from JSON backup.")
+        except Exception as e:
+             print(f"❌ Failed to load JSON for {chat_id}: {e}")
+
+    if not data:
+        return None, "Chat not found or corrupted"
         
     saved_config = data.get("plugin_config", {})
     current_config = get_current_config()
     
     warning = None
     if saved_config != current_config:
-        warning = "⚠️ **Warning:** The plugin configuration has changed since this chat was saved."
-        
+        warning = "⚠️ **Warning:** The plugin configuration has changed."
+    
+    if loaded_source == "json":
+        warning = (warning or "") + "\n\n⚠️ **Restored from JSON backup.** Python variables and execution context were lost."
+
     return data, warning
 
 def save_chat_state(chat_instance, chat_id=None, name=None):
@@ -111,21 +142,14 @@ def save_chat_state(chat_instance, chat_id=None, name=None):
     # Собираем данные: атрибуты экземпляра
     attributes_to_save = chat_instance.__dict__.copy()
     
-    # Явно добавляем local_env, если он есть (даже если он классовый, getattr его достанет)
     if hasattr(chat_instance, 'local_env'):
         attributes_to_save['local_env'] = getattr(chat_instance, 'local_env')
     
     for key, value in attributes_to_save.items():
-        if key in EXCLUDED_ATTRS or key.startswith('__'):
-            continue
-            
-        if callable(value):
-            continue
-            
-        if isinstance(value, types.ModuleType):
-            continue
+        if key in EXCLUDED_ATTRS or key.startswith('__'): continue
+        if callable(value): continue
+        if isinstance(value, types.ModuleType): continue
         
-        # Специальная обработка для local_env
         if key == 'local_env' and isinstance(value, dict):
             safe_env = {}
             for k_env, v_env in value.items():
@@ -135,7 +159,6 @@ def save_chat_state(chat_instance, chat_id=None, name=None):
                     pickle.dumps(v_env)
                     safe_env[k_env] = v_env
                 except:
-                    # Пытаемся сохранить динамическую функцию
                     if isinstance(v_env, types.FunctionType):
                          try:
                              code_dump = marshal.dumps(v_env.__code__)
@@ -146,62 +169,57 @@ def save_chat_state(chat_instance, chat_id=None, name=None):
                                  'defaults': v_env.__defaults__,
                                  'doc': v_env.__doc__
                              }
-                         except Exception as e:
-                             # print(f"⚠️ Failed to marshal function {k_env}: {e}")
-                             pass
+                         except: pass
             instance_state[key] = safe_env
             continue
             
         try:
             pickle.dumps(value)
             instance_state[key] = value
-        except (TypeError, pickle.PicklingError) as e:
-            pass
+        except: pass
 
-    data = {
+    base_data = {
         "id": chat_id,
         "updated_at": datetime.datetime.now().isoformat(),
         "messages": chat_instance.messages,
-        "instance_state": instance_state,
         "plugin_config": get_current_config()
     }
 
-    filepath = os.path.join(CHATS_DIR, f"{chat_id}.pkl")
-    
     if name:
-        data["name"] = name
-    elif os.path.exists(filepath) and os.path.getsize(filepath) > 0:
-        try:
-            with open(filepath, 'rb') as f:
-                old_data = pickle.load(f)
-                data["name"] = old_data.get("name", "New Chat")
-        except:
-             data["name"] = "New Chat"
+        base_data["name"] = name
     else:
-        data["name"] = "New Chat"
+        msg_name = "New Chat"
         for msg in chat_instance.messages:
             if msg["role"] == "user":
                 content = str(msg.get("content", ""))
                 clean = content.replace('\n', ' ').strip()
-                data["name"] = (clean[:30] + "...") if len(clean) > 30 else clean
+                msg_name = (clean[:30] + "...") if len(clean) > 30 else clean
                 break
+        base_data["name"] = msg_name
 
-    temp_path = filepath + ".tmp"
-    try:
-        with open(temp_path, 'wb') as f:
-            pickle.dump(data, f)
-        
-        if os.path.exists(filepath):
-            os.remove(filepath)
-        os.rename(temp_path, filepath)
-        
-    except Exception as e:
-        print(f"❌ Critical save error: {e}")
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-        raise e
+    # 1. Save JSON
+    json_data = base_data.copy()
+    json_data["instance_state"] = {}
     
-    return data
+    json_path = os.path.join(CHATS_DIR, f"{chat_id}.json")
+    try:
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(json_data, f, ensure_ascii=False, indent=2, default=str)
+    except Exception as e:
+        print(f"❌ Error saving JSON backup: {e}")
+
+    # 2. Save Pickle
+    pkl_data = base_data.copy()
+    pkl_data["instance_state"] = instance_state
+    
+    pkl_path = os.path.join(CHATS_DIR, f"{chat_id}.pkl")
+    try:
+        with open(pkl_path, 'wb') as f:
+            pickle.dump(pkl_data, f)
+    except Exception as e:
+        print(f"❌ Error saving Pickle: {e}")
+    
+    return pkl_data
 
 def create_chat_state(base_messages=None):
     chat_id = str(uuid.uuid4())
@@ -214,15 +232,26 @@ def create_chat_state(base_messages=None):
         "plugin_config": get_current_config()
     }
     
-    filepath = os.path.join(CHATS_DIR, f"{chat_id}.pkl")
-    with open(filepath, 'wb') as f:
+    json_path = os.path.join(CHATS_DIR, f"{chat_id}.json")
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+        
+    pkl_path = os.path.join(CHATS_DIR, f"{chat_id}.pkl")
+    with open(pkl_path, 'wb') as f:
         pickle.dump(data, f)
         
     return data
 
 def delete_chat(chat_id):
-    filepath = os.path.join(CHATS_DIR, f"{chat_id}.pkl")
-    if os.path.exists(filepath):
-        os.remove(filepath)
-        return True
-    return False
+    deleted = False
+    pkl_path = os.path.join(CHATS_DIR, f"{chat_id}.pkl")
+    if os.path.exists(pkl_path):
+        os.remove(pkl_path)
+        deleted = True
+        
+    json_path = os.path.join(CHATS_DIR, f"{chat_id}.json")
+    if os.path.exists(json_path):
+        os.remove(json_path)
+        deleted = True
+        
+    return deleted
