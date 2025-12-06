@@ -17,24 +17,30 @@ const App = {
             
             eventSource.onmessage = (event) => {
                 try {
-                    const data = JSON.parse(event.data);
-                    if (data.text) {
-                        store.isThinking = false;
-                        store.appendChunk(data.text);
+                    const payload = JSON.parse(event.data);
+                    
+                    // payload теперь имеет вид: { type: 'text'|'thought'|'tool', data: '...' }
+                    if (payload && payload.type) {
+                        store.isThinking = false; // Пришло сообщение - значит, агент уже отвечает
+                        
+                        // Если это просто пинг 'keep-alive' (мы его не парсим как JSON в server.py, но вдруг)
+                        // В server.py мы шлем ": keep-alive", это игнорируется браузером как комментарий.
+                        // Если мы шлем data: ..., это попадает сюда.
+                        
+                        store.appendChunk(payload);
                     }
                 } catch (e) {
-                    console.error("SSE parse error", e);
+                    // console.error("SSE parse error", e);
                 }
             };
 
             eventSource.onerror = (e) => {
                 eventSource.close();
-                // Simple reconnect logic
+                store.isThinking = false; // Сбрасываем флаг при обрыве
                 setTimeout(initSSE, 3000);
             };
         };
 
-        // Start listening
         initSSE();
 
         return { store };

@@ -17,7 +17,6 @@ except ImportError:
         from . import server
         from . import storage
     except ImportError:
-        # Fallback
         spec = importlib.util.spec_from_file_location("server", os.path.join(current_dir, "server.py"))
         server = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(server)
@@ -29,27 +28,22 @@ except ImportError:
 def main(chat, settings):
     print("🚀 Запуск Web Interface...")
     
-    # 1. Сохраняем "базовое" состояние сообщений (System prompt)
     if not hasattr(chat, "base_messages"):
         chat.base_messages = list(chat.messages)
         print(f"📦 Base chat state saved ({len(chat.base_messages)} messages)")
 
-    # 2. Инициализация ID чата
     if not hasattr(chat, "current_chat_id"):
-        chat.current_chat_id = None # Нет активного чата при старте
+        chat.current_chat_id = None 
 
-    # 3. Декорируем chat.send для автосохранения
     original_send = chat.send
     
     def send_with_autosave(self, message):
-        # Вызываем оригинальный send
         result = original_send(message)
         
-        # После выполнения сохраняем текущий чат, если он выбран
         if self.current_chat_id:
             try:
-                storage.save_chat(self.current_chat_id, self.messages)
-                # print(f"💾 Chat {self.current_chat_id} autosaved.") 
+                # Используем save_chat_state, передавая ВЕСЬ инстанс
+                storage.save_chat_state(self, self.current_chat_id)
             except Exception as e:
                 print(f"⚠️ Autosave failed: {e}")
         
@@ -57,7 +51,6 @@ def main(chat, settings):
 
     chat.send = types.MethodType(send_with_autosave, chat)
 
-    # 4. Запуск сервера
     server_thread = threading.Thread(target=server.run_server, args=(chat,), daemon=True)
     server_thread.start()
     

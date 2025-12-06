@@ -4,18 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Agent AI Workspace</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             darkMode: 'class',
             theme: {
+                fontFamily: {
+                    sans: ['Inter', 'sans-serif'],
+                    mono: ['JetBrains Mono', 'monospace'],
+                },
                 extend: {
                     colors: {
                         gray: {
-                            750: '#2d2d2d',
-                            850: '#1a1a1a',
-                            900: '#111111',
-                            950: '#0a0a0a',
+                            850: '#1f2937',
+                            900: '#111827',
+                            950: '#030712', // Ultra dark
+                        },
+                        primary: {
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                        }
+                    },
+                    animation: {
+                        'fade-in-up': 'fadeInUp 0.3s ease-out forwards',
+                    },
+                    keyframes: {
+                        fadeInUp: {
+                            '0%': { opacity: '0', transform: 'translateY(10px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
                         }
                     }
                 }
@@ -23,7 +46,7 @@
         }
     </script>
     
-    <!-- ВАЖНО: Import Map для поддержки модулей -->
+    <!-- Import Map -->
     <script type="importmap">
     {
       "imports": {
@@ -32,52 +55,76 @@
     }
     </script>
 
+    <!-- Libs -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/atom-one-dark.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github-dark-dimmed.min.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
     <style>
-        ::-webkit-scrollbar { width: 6px; }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #555; }
-        .prose { max-width: none; color: #d1d5db; }
-        .prose a { color: #60a5fa; }
-        .prose code { color: #e5e7eb; background: #2d2d2d; padding: 0.1em 0.3em; border-radius: 0.2em; font-weight: normal; }
-        .prose pre { background: #1a1a1a !important; padding: 1em; border-radius: 0.5em; margin: 1em 0; overflow-x: auto; }
-        .prose pre code { background: transparent; padding: 0; color: inherit; }
-        .prose h1, .prose h2, .prose h3 { color: #f3f4f6; font-weight: 600; margin-top: 1.5em; margin-bottom: 0.5em; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+        
+        body {
+            background-color: #030712;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.05) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.05) 0px, transparent 50%);
+            background-attachment: fixed;
+        }
+
+        /* Markdown Typography overrides */
+        .prose { max-width: none; color: #e5e7eb; font-size: 0.95rem; line-height: 1.6; }
+        .prose a { color: #60a5fa; text-decoration: none; border-bottom: 1px solid rgba(96, 165, 250, 0.4); transition: border-color 0.2s; }
+        .prose a:hover { border-color: #60a5fa; }
+        .prose strong { color: #f3f4f6; font-weight: 600; }
+        .prose code { color: #e5e7eb; background: rgba(255,255,255,0.1); padding: 0.2em 0.4em; border-radius: 0.3em; font-family: 'JetBrains Mono', monospace; font-size: 0.85em; font-weight: 500; }
+        .prose code::before, .prose code::after { content: none !important; }
+        .prose pre { background: #111827 !important; border: 1px solid #374151; border-radius: 0.5em; margin: 1em 0; overflow-x: auto; }
+        .prose pre code { background: transparent; padding: 0; color: inherit; font-size: 0.9em; }
+        .prose h1, .prose h2, .prose h3 { color: #f9fafb; font-weight: 700; margin-top: 1.5em; margin-bottom: 0.5em; letter-spacing: -0.025em; }
+        .prose h1 { font-size: 1.75em; border-bottom: 1px solid #1f2937; padding-bottom: 0.3em; }
+        .prose h2 { font-size: 1.4em; }
         .prose ul { list-style-type: disc; padding-left: 1.5em; margin: 0.5em 0; }
         .prose ol { list-style-type: decimal; padding-left: 1.5em; margin: 0.5em 0; }
+        .prose blockquote { border-left: 3px solid #3b82f6; padding-left: 1em; color: #9ca3af; font-style: italic; }
         
         /* Loading spinner */
         #loading {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #0a0a0a; color: white; display: flex; 
+            background: #030712; color: white; display: flex; flex-direction: column;
             justify-content: center; align-items: center; z-index: 9999;
-            transition: opacity 0.5s;
+            transition: opacity 0.5s; font-family: 'Inter', sans-serif;
         }
+        .loader {
+            width: 48px; height: 48px;
+            border: 3px solid #FFF; border-bottom-color: transparent;
+            border-radius: 50%; display: inline-block; box-sizing: border-box;
+            animation: rotation 1s linear infinite; margin-bottom: 1rem;
+        }
+        @keyframes rotation { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
-<body class="bg-gray-950 text-gray-200 h-screen overflow-hidden text-sm selection:bg-blue-500 selection:text-white">
-    <div id="loading">Loading Interface...</div>
+<body class="text-gray-200 h-screen overflow-hidden text-sm selection:bg-blue-500/30 selection:text-blue-100">
+    <div id="loading">
+        <span class="loader"></span>
+        <span class="opacity-50">Connecting to Agent...</span>
+    </div>
     <div id="app" class="w-full h-full flex opacity-0 transition-opacity duration-500"></div>
     
     <script type="module" src="./js/app.js"></script>
     
     <script>
-        // Простой лоадер, который исчезнет, когда Vue смонтируется
         window.addEventListener('load', () => {
-            // Ждем чуть-чуть инициализацию Vue
             setTimeout(() => {
                 const appEl = document.getElementById('app');
-                if (appEl.innerHTML.trim() !== "") {
-                    document.getElementById('loading').style.opacity = '0';
-                    appEl.style.opacity = '1';
-                    setTimeout(() => document.getElementById('loading').remove(), 500);
-                }
-            }, 500);
+                document.getElementById('loading').style.opacity = '0';
+                appEl.style.opacity = '1';
+                setTimeout(() => document.getElementById('loading').remove(), 500);
+            }, 300);
         });
     </script>
 </body>
