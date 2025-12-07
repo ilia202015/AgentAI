@@ -10,24 +10,6 @@ function ensureMarkedConfig() {
     isMarkedConfigured = true;
 }
 
-// --- Toast Component ---
-const ToastContainer = defineComponent({
-    setup() { return { store } },
-    template: `
-        <div class="fixed top-4 right-4 z-[60] flex flex-col gap-2 pointer-events-none">
-            <div v-for="toast in store.toasts" :key="toast.id" 
-                 class="px-4 py-2 rounded-lg shadow-xl backdrop-blur-md border border-white/10 text-sm font-medium animate-fade-in-up pointer-events-auto flex items-center gap-2"
-                 :class="{
-                    'bg-emerald-500/20 text-emerald-200': toast.type === 'success',
-                    'bg-red-500/20 text-red-200': toast.type === 'error',
-                    'bg-blue-500/20 text-blue-200': toast.type === 'info'
-                 }">
-                 <span>{{ toast.message }}</span>
-            </div>
-        </div>
-    `
-});
-
 // --- Message Component ---
 const MessageBubble = defineComponent({
     props: ['msg', 'index'],
@@ -165,12 +147,9 @@ const MessageBubble = defineComponent({
 
 // --- Main Component ---
 export default {
-    components: { MessageBubble, ToastContainer },
+    components: { MessageBubble },
     template: `
-        <!-- Fixed: removed md:ml-[280px] to allow flex layout to work correctly with Sidebar relative pos -->
         <div class="flex-1 flex flex-col h-full relative z-10 min-w-0">
-            
-            <ToastContainer />
             
             <!-- Desktop Sidebar Toggle -->
             <div class="hidden md:block absolute top-4 left-2 z-50">
@@ -231,7 +210,6 @@ export default {
                 <div class="w-[95%] mx-auto relative group pointer-events-auto">
                     <div class="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl blur-lg opacity-0 group-focus-within:opacity-100 transition-opacity duration-500"></div>
                     <div class="relative bg-gray-900/80 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden flex flex-col transition-all group-focus-within:border-blue-500/30 group-focus-within:bg-gray-900/90">
-                        <!-- Edit Mode Banner -->
                         <div v-if="editingIndex !== null" class="bg-blue-500/10 border-b border-white/5 px-4 py-1 text-xs text-blue-300 flex justify-between items-center">
                             <span>Редактирование сообщения...</span>
                             <button @click="cancelEdit" class="hover:text-white"><i class="ph-bold ph-x"></i></button>

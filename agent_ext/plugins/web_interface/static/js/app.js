@@ -1,12 +1,34 @@
-import { createApp } from 'vue';
+import { createApp, defineComponent } from 'vue';
 import { store } from './store.js';
 import Sidebar from './components/Sidebar.js';
 import ChatArea from './components/ChatArea.js';
 
+// --- Toast Component (Global) ---
+const ToastContainer = defineComponent({
+    setup() { return { store } },
+    template: `
+        <div class="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
+            <div v-for="toast in store.toasts" :key="toast.id" 
+                 class="px-4 py-3 rounded-xl shadow-2xl backdrop-blur-xl border border-white/10 text-sm font-medium animate-fade-in-up pointer-events-auto flex items-center gap-3 transition-all duration-300"
+                 :class="{
+                    'bg-emerald-500/20 text-emerald-200 border-emerald-500/20': toast.type === 'success',
+                    'bg-red-500/20 text-red-200 border-red-500/20': toast.type === 'error',
+                    'bg-blue-500/20 text-blue-200 border-blue-500/20': toast.type === 'info'
+                 }">
+                 <i v-if="toast.type === 'success'" class="ph-bold ph-check-circle text-lg"></i>
+                 <i v-if="toast.type === 'error'" class="ph-bold ph-warning-circle text-lg"></i>
+                 <i v-if="toast.type === 'info'" class="ph-bold ph-info text-lg"></i>
+                 <span>{{ toast.message }}</span>
+            </div>
+        </div>
+    `
+});
+
 const App = {
-    components: { Sidebar, ChatArea },
+    components: { Sidebar, ChatArea, ToastContainer },
     template: `
         <div class="flex w-full h-full font-sans antialiased bg-gray-950 text-gray-200">
+            <ToastContainer />
             <Sidebar />
             <ChatArea />
         </div>
@@ -18,30 +40,24 @@ const App = {
             eventSource.onmessage = (event) => {
                 try {
                     const payload = JSON.parse(event.data);
-                    
-                    // payload теперь имеет вид: { type: 'text'|'thought'|'tool', data: '...' }
                     if (payload && payload.type) {
-                        store.isThinking = false; // Пришло сообщение - значит, агент уже отвечает
-                        
-                        // Если это просто пинг 'keep-alive' (мы его не парсим как JSON в server.py, но вдруг)
-                        // В server.py мы шлем ": keep-alive", это игнорируется браузером как комментарий.
-                        // Если мы шлем data: ..., это попадает сюда.
-                        
+                        store.isThinking = false; 
                         store.appendChunk(payload);
                     }
-                } catch (e) {
-                    // console.error("SSE parse error", e);
-                }
+                } catch (e) {}
             };
 
             eventSource.onerror = (e) => {
                 eventSource.close();
-                store.isThinking = false; // Сбрасываем флаг при обрыве
+                store.isThinking = false;
                 setTimeout(initSSE, 3000);
             };
         };
 
         initSSE();
+        
+        // Test toast on load
+        setTimeout(() => store.addToast('Агент готов к работе', 'success'), 1000);
 
         return { store };
     }
