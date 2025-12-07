@@ -47,6 +47,15 @@ export async function sendMessage(text) {
     return res.json();
 }
 
+export async function editMessage(index, text) {
+    const res = await fetch(`${API_BASE}/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ index: index, new_content: text })
+    });
+    return res.json();
+}
+
 export async function stopGeneration() {
     try {
         const res = await fetch(`${API_BASE}/stop`, { method: 'POST' });

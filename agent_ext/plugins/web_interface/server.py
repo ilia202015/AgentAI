@@ -80,6 +80,8 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 self.api_load_chat(path)
             elif path.endswith("/save"):
                 self.api_save_chat(path)
+            elif path.endswith("/edit"):
+                self.api_edit_message(path, data)
             else:
                 self.send_error(404)
         except Exception as e:
@@ -122,31 +124,75 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
     def api_send(self, data):
         msg = data.get("message")
         if msg and self.chat_instance:
-            # If current_chat_id is missing, create new unless in Temp mode
             if not self.chat_instance.current_chat_id:
-                 # Check if we intended to be in temp mode? 
-                 # Actually, start_temp sets ID to 'temp'. 
-                 # So if ID is None, we make a new saved chat.
                  base = getattr(self.chat_instance, "base_messages", [])
                  new_chat = storage.create_chat_state(base)
                  self.chat_instance.current_chat_id = new_chat["id"]
             
             self.chat_instance.stop_requested = False
-            
             threading.Thread(target=self.chat_instance.send, args=({"role": "user", "content": msg},)).start()
             self.send_json({"status": "processing"})
         else:
             self.send_error(400)
 
+    def api_edit_message(self, path, data):
+        # path: /api/chats/{id}/edit
+        # data: { index: 5, new_content: "..." }
+        if not self.chat_instance: return self.send_error(500)
+        
+        index = data.get("index")
+        new_content = data.get("new_content")
+        
+        if index is None or new_content is None:
+            return self.send_error(400)
+            
+        # Logic: 
+        # 1. Truncate messages up to 'index'
+        # 2. Append new message
+        # 3. Trigger generation
+        
+        # Note: 'index' comes from frontend filtered list (no system).
+        # We need to map it to real messages list.
+        # Assuming base_messages are at the start.
+        
+        try:
+            # Reconstruct index map. This is tricky without exact IDs.
+            # Simplified approach: Count user/assistant messages in self.messages
+            
+            target_real_index = -1
+            current_filtered_index = 0
+            
+            for i, m in enumerate(self.chat_instance.messages):
+                if m["role"] not in ["system", "tool"]:
+                    if current_filtered_index == index:
+                        target_real_index = i
+                        break
+                    current_filtered_index += 1
+            
+            if target_real_index != -1:
+                # Truncate everything AFTER this message (we will replace this message)
+                # Wait, if we edit, we replace THIS message and delete everything after.
+                self.chat_instance.messages = self.chat_instance.messages[:target_real_index]
+                
+                # Send as if it's new
+                self.chat_instance.stop_requested = False
+                threading.Thread(target=self.chat_instance.send, args=({"role": "user", "content": new_content},)).start()
+                
+                self.send_json({"status": "processing"})
+            else:
+                self.send_error(404, "Message not found")
+                
+        except Exception as e:
+            print(f"Edit error: {e}")
+            self.send_error(500, str(e))
+
     def api_start_temp(self):
         if self.chat_instance:
             self.chat_instance.current_chat_id = 'temp'
-            # Reset memory to base prompt
             if hasattr(self.chat_instance, "base_messages"):
                 self.chat_instance.messages = list(self.chat_instance.base_messages)
             else:
                 self.chat_instance.messages = []
-            
             self.send_json({"status": "ok", "id": "temp"})
         else:
             self.send_error(500)
@@ -197,7 +243,6 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         elif path == "/api/current":
              if self.chat_instance:
                  if self.chat_instance.current_chat_id == 'temp':
-                     # Return temp state structure
                      self.send_json({
                          "id": "temp", 
                          "messages": self.chat_instance.messages,
@@ -228,7 +273,6 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             mime, _ = mimetypes.guess_type(full_path)
             if not mime and full_path.endswith(".js"): mime = "application/javascript"
             self.send_header("Content-Type", mime or "application/octet-stream")
-            
             with open(full_path, 'rb') as f:
                 content = f.read()
             self.send_header("Content-Length", str(len(content)))
