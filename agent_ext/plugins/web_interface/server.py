@@ -76,7 +76,6 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             print(f"clone_root_chat()")
 
         # 1. Create instance WITHOUT calling __init__
-        #print(self.root_chat.__dict__.keys())
         new_agent = copy.deepcopy(self.root_chat)
         new_agent.client = self.ai_client
 
@@ -85,7 +84,6 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         new_agent.web_queue = queue.Queue()
         
         return new_agent
-
     def get_agent_for_chat(self, id):
         if is_print_debug:
             print(f"get_agent_for_chat({id})")
@@ -102,15 +100,19 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 new_agent = self.clone_root_chat()
                 
                 # 2. Setup ID
-                new_agent.id = id
-            
-                new_agent.id = 'temp'
-
+                new_agent.id = id # 'temp'
                 self.active_chats[id] = new_agent
                 return new_agent
             else:
                 chat, warning = storage.load_chat_state(id, self.clone_root_chat)
+                if not chat:
+                    return None
+                    
                 chat.client = self.ai_client
+                # Ensure web queue exists
+                if not hasattr(chat, 'web_queue') or chat.web_queue is None:
+                    chat.web_queue = queue.Queue()
+                    
                 if warning:
                     print(warning)
                 self.active_chats[id] = chat
@@ -153,7 +155,6 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             else: self.send_json_error(404, "Endpoint not found")
         except Exception as e:
             self.send_json_error(500, str(e))
-            
     def do_PATCH(self):
          try:
             length = int(self.headers.get('Content-Length', 0))
@@ -299,7 +300,6 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self._send_cors_headers()
         self.end_headers()
-
     def handle_stream(self):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
@@ -312,16 +312,42 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         self.wfile.flush()
         
         while True:
-            for chat in self.active_chats:
+            # Snapshot of active chats to avoid runtime errors if dict changes
+            current_chats = list(self.active_chats.values())
+            
+            if not current_chats:
                 try:
-                    event = chat.web_queue.get(timeout=1)
+                    time.sleep(1)
+                    self.wfile.write(b": keep-alive\n\n")
+                    self.wfile.flush()
+                except Exception:
+                    break
+                continue
+
+            got_event = False
+            for chat in current_chats:
+                try:
+                    # Use a small timeout to poll all chats
+                    if not hasattr(chat, 'web_queue') or chat.web_queue is None:
+                        continue
+                        
+                    event = chat.web_queue.get(timeout=0.05)
                     payload = json.dumps(event, ensure_ascii=False)
                     self.wfile.write(f"data: {payload}\n\n".encode())
                     self.wfile.flush()
+                    got_event = True
                 except queue.Empty:
+                    pass
+                except Exception: 
+                    # Connection closed
+                    return
+
+            if not got_event:
+                 try:
+                    time.sleep(0.5)
                     self.wfile.write(b": keep-alive\n\n")
                     self.wfile.flush()
-                except Exception: 
+                 except Exception:
                     break
 
 def get_free_port(start_port):
