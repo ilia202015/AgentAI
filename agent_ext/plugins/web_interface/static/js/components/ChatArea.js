@@ -2,7 +2,6 @@ import { store } from '../store.js';
 import * as api from '../api.js';
 import { nextTick, ref, watch, onMounted, computed, defineComponent } from 'vue';
 
-// --- Global Configuration for Marked ---
 let isMarkedConfigured = false;
 function ensureMarkedConfig() {
     if (typeof marked === 'undefined' || isMarkedConfigured) return;
@@ -10,7 +9,6 @@ function ensureMarkedConfig() {
     isMarkedConfigured = true;
 }
 
-// --- Message Component ---
 const MessageBubble = defineComponent({
     props: ['msg', 'index'],
     emits: ['edit'],
@@ -28,7 +26,7 @@ const MessageBubble = defineComponent({
                 </span>
             </div>
 
-            <!-- Assistant: Thoughts (Classic Style) -->
+            <!-- Assistant: Thoughts -->
             <div v-if="msg.role === 'assistant'" class="w-full mb-2 space-y-2">
                 <details v-if="msg.thoughts" class="group/thought">
                     <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
@@ -108,7 +106,7 @@ const MessageBubble = defineComponent({
             });
             if (typeof renderMathInElement !== 'undefined') {
                 renderMathInElement(root.value, {
-                    delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}, {left: '\\(', right: '\\)', display: false}, {left: '\\[', right: '\\]', display: true} ],
+                    delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}, {left: '\(', right: '\)', display: false}, {left: '\[', right: '\]', display: true} ],
                     throwOnError: false
                 });
             }
@@ -145,27 +143,21 @@ const MessageBubble = defineComponent({
     }
 });
 
-// --- Main Component ---
 export default {
     components: { MessageBubble },
     template: `
         <div class="flex-1 flex flex-col h-full relative z-10 min-w-0">
-            
-            <!-- Desktop Sidebar Toggle -->
             <div class="hidden md:block absolute top-4 left-2 z-50">
                 <button @click="store.toggleSidebarDesktop()" class="p-2 rounded-lg bg-gray-900/50 backdrop-blur border border-white/10 text-gray-400 hover:text-white transition-colors shadow-sm">
                     <i class="ph-bold" :class="store.isSidebarVisibleDesktop ? 'ph-caret-left' : 'ph-caret-right'"></i>
                 </button>
             </div>
-
-            <!-- Mobile Sidebar Toggle -->
             <div class="md:hidden absolute top-4 left-4 z-50">
                 <button @click="store.toggleSidebarMobile()" class="p-2 rounded-lg bg-gray-900/80 backdrop-blur border border-white/10 text-gray-300">
                     <i class="ph-bold ph-list"></i>
                 </button>
             </div>
             
-            <!-- Scroll Button -->
             <div class="absolute bottom-32 right-8 z-40 transition-all duration-300"
                  :class="showScrollButton ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'">
                 <button @click="scrollToBottom(true)" 
@@ -174,10 +166,8 @@ export default {
                 </button>
             </div>
 
-            <!-- Messages Area -->
             <div class="flex-1 overflow-y-auto px-2 md:px-0 pt-16 md:pt-6 pb-48 space-y-8 scroll-smooth custom-scrollbar" 
-                 ref="messagesContainer"
-                 @scroll="handleScroll">
+                 ref="messagesContainer" @scroll="handleScroll">
                 
                 <div v-if="filteredMessages.length === 0" class="h-full flex flex-col items-center justify-center text-center opacity-0 animate-fade-in-up" style="animation-delay: 0.1s; opacity: 1">
                     <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-gray-800 to-gray-700 flex items-center justify-center mb-6 shadow-2xl border border-white/5">
@@ -189,10 +179,7 @@ export default {
                 
                 <MessageBubble 
                     v-for="(msg, idx) in filteredMessages" 
-                    :key="idx" 
-                    :index="idx"
-                    :msg="msg" 
-                    @edit="handleEdit"
+                    :key="idx" :index="idx" :msg="msg" @edit="handleEdit"
                 />
 
                 <div v-if="store.isThinking" class="w-[95%] mx-auto w-full py-2">
@@ -205,7 +192,6 @@ export default {
                 </div>
             </div>
 
-            <!-- Input Area -->
             <div class="absolute bottom-0 left-0 w-full pb-6 pt-12 bg-gradient-to-t from-gray-950 via-gray-950/90 to-transparent z-20 pointer-events-none">
                 <div class="w-[95%] mx-auto relative group pointer-events-auto">
                     <div class="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl blur-lg opacity-0 group-focus-within:opacity-100 transition-opacity duration-500"></div>
@@ -269,7 +255,13 @@ export default {
         const handleEdit = async (index, newText) => {
             store.isThinking = true;
             try {
-                await api.editMessage(index, newText);
+                // Pass currentChatId
+                const res = await api.editMessage(store.currentChatId, index, newText);
+                if (res.error) {
+                     store.isThinking = false; 
+                     store.addToast(res.error, "error");
+                     return;
+                }
                 store.addToast("Сообщение обновлено", "success");
             } catch (e) {
                 store.isThinking = false;
@@ -300,11 +292,22 @@ export default {
                 inputText.value = '';
                 store.messages.push({ role: 'user', content: text });
                 await scrollToBottom(true);
-                try { await api.sendMessage(text); } 
+                try { 
+                    // Pass currentChatId
+                    const res = await api.sendMessage(store.currentChatId, text);
+                    if (res.error) {
+                         store.isThinking = false; 
+                         store.addToast(res.error, "error");
+                    }
+                } 
                 catch (e) { store.isThinking = false; store.addToast("Ошибка отправки", "error"); }
             }
         };
-        const stop = async () => { await api.stopGeneration(); store.isThinking = false; store.addToast("Генерация остановлена", "info"); };
+        const stop = async () => { 
+            store.isThinking = false; 
+            store.addToast("Остановка...", "info");
+            await api.stopGeneration(store.currentChatId); 
+        };
 
         onMounted(() => scrollToBottom(true));
 

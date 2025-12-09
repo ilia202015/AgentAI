@@ -11,21 +11,38 @@ from urllib.parse import urlparse, parse_qs
 import mimetypes
 import importlib.util
 import socket
+import copy
+import types
 
-# Импорт локальных модулей
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.append(current_dir)
+is_print_debug = False
+
+# Setup paths
+current_dir = os.path.dirname(os.path.abspath(__file__)) 
+plugins_dir = os.path.dirname(current_dir)
+agent_ext_dir = os.path.dirname(plugins_dir)
+
+if current_dir not in sys.path: sys.path.append(current_dir)
+if agent_ext_dir not in sys.path: sys.path.append(agent_ext_dir)
+
+# LOGGING
+LOG_FILE = os.path.join(agent_ext_dir, "server_debug.log")
+def log_debug(msg):
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(f"{time.strftime('%H:%M:%S')} - {msg}\n")
+    except: pass
+
+log_debug("--- Server Module Loaded ---")
 
 try:
     import storage
+except Exception as e:
+    log_debug(f"Storage import failed: {e}")
+
+try:
+    import init as plugin_init
 except ImportError:
-    try:
-        from . import storage
-    except ImportError:
-        spec = importlib.util.spec_from_file_location("storage", os.path.join(current_dir, "storage.py"))
-        storage = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(storage)
+    log_debug(f"Plugin Init import failed")
 
 HOST = "127.0.0.1"
 START_PORT = 8080
@@ -33,260 +50,245 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 
 mimetypes.init()
 mimetypes.add_type('application/javascript', '.js')
-mimetypes.add_type('text/css', '.css')
-mimetypes.add_type('text/html', '.html')
 
 class WebRequestHandler(http.server.BaseHTTPRequestHandler):
-    chat_instance = None
+    root_chat = None
+    ai_client = None
+    active_chats = {}
     
-    def log_message(self, format, *args):
-        pass 
+    def log_message(self, format, *args): 
+        pass
+
+    def send_json_error(self, code, message):
+        log_debug(f"Sending Error {code}: {message}")
+        try:
+            self.send_response(code)
+            self.send_header("Content-Type", "application/json")
+            self._send_cors_headers()
+            self.end_headers()
+            self.wfile.write(json.dumps({"error": message, "code": code}).encode())
+        except Exception as e:
+            log_debug(f"Failed to send error: {e}")
+
+    # --- TRUE CLONING LOGIC ---
+    def clone_root_chat(self):
+        if is_print_debug:
+            print(f"clone_root_chat()")
+
+        # 1. Create instance WITHOUT calling __init__
+        #print(self.root_chat.__dict__.keys())
+        new_agent = copy.deepcopy(self.root_chat)
+        new_agent.client = self.ai_client
+
+        # 3. Initialize fresh components
+        new_agent.print_to_console = False 
+        new_agent.web_queue = queue.Queue()
+        
+        return new_agent
+
+    def get_agent_for_chat(self, id):
+        if is_print_debug:
+            print(f"get_agent_for_chat({id})")
+
+        if not id: 
+            return None
+        if id in self.active_chats: 
+            return self.active_chats[id]
+        
+        log_debug(f"Creating agent for {id}")
+        try:
+            if id == 'temp':
+                # 1. Clone from Root (Clean copy without patches)
+                new_agent = self.clone_root_chat()
+                
+                # 2. Setup ID
+                new_agent.id = id
+            
+                new_agent.id = 'temp'
+
+                self.active_chats[id] = new_agent
+                return new_agent
+            else:
+                chat, warning = storage.load_chat_state(id, self.clone_root_chat)
+                chat.client = self.ai_client
+                if warning:
+                    print(warning)
+                self.active_chats[id] = chat
+                return chat
+
+        except Exception as e:
+            log_debug(f"Agent creation failed: {e}\n{traceback.format_exc()}")
+            return None
 
     def do_GET(self):
         try:
             parsed = urlparse(self.path)
             path = parsed.path
-            query = parse_qs(parsed.query)
-
-            if path == "/" or path == "":
+            
+            if path == "/" or path == "": 
                 self.serve_static("index.html")
-            elif path == "/stream":
+            elif path == "/stream": 
                 self.handle_stream()
-            elif path.startswith("/api/"):
+            elif path.startswith("/api/"): 
+                query = parse_qs(parsed.query)
                 self.handle_api_get(path, query)
-            else:
+            else: 
                 self.serve_static(path.lstrip("/"))
         except Exception as e:
-            print(f"❌ Error in do_GET: {e}")
-            self.send_error(500)
+            self.send_json_error(500, str(e))
 
     def do_POST(self):
         try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            data = json.loads(post_data.decode('utf-8')) if post_data else {}
-            
+            length = int(self.headers.get('Content-Length', 0))
+            data = json.loads(self.rfile.read(length).decode('utf-8')) if length else {}
             path = self.path.split('?')[0]
             
-            if path == "/api/send":
-                self.api_send(data)
-            elif path == "/api/stop":
-                self.api_stop()
-            elif path == "/api/chats":
-                self.api_create_chat()
-            elif path == "/api/temp":
-                self.api_start_temp()
-            elif path.endswith("/load"):
-                self.api_load_chat(path)
-            elif path.endswith("/save"):
-                self.api_save_chat(path)
-            elif path.endswith("/edit"):
-                self.api_edit_message(path, data)
-            else:
-                self.send_error(404)
+            if path == "/api/send": self.api_send(data)
+            elif path == "/api/stop": self.api_stop(data)
+            elif path == "/api/chats": self.api_create_chat()
+            elif path == "/api/temp": self.api_start_temp()
+            elif path.endswith("/load"): self.api_load_chat(path)
+            elif path.endswith("/save"): self.api_save_chat(path)
+            elif path.endswith("/edit"): self.api_edit_message(path, data)
+            else: self.send_json_error(404, "Endpoint not found")
         except Exception as e:
-            print(f"❌ Error in POST: {e}")
-            self.send_error(500, str(e))
+            self.send_json_error(500, str(e))
             
     def do_PATCH(self):
          try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            data = json.loads(post_data.decode('utf-8')) if post_data else {}
-            
+            length = int(self.headers.get('Content-Length', 0))
+            data = json.loads(self.rfile.read(length).decode('utf-8')) if length else {}
             path = self.path.split('?')[0]
-            
-            if path.startswith("/api/chats/") and path.endswith("/rename"):
-                 chat_id = path.split("/")[-2]
-                 new_name = data.get("name")
-                 if new_name and storage.rename_chat(chat_id, new_name):
-                     self.send_json({"status": "ok", "name": new_name})
-                 else:
-                     self.send_error(400)
-            else:
-                 self.send_error(404)
-         except Exception as e:
-            self.send_error(500, str(e))
+            if path.endswith("/rename"):
+                 cid = path.split("/")[-2]
+                 if storage.rename_chat(cid, data.get("name"), self.clone_root_chat): self.send_json({"status": "ok"})
+                 else: self.send_json_error(400, "Fail")
+            else: self.send_json_error(404, "Not found")
+         except Exception as e: self.send_json_error(500, str(e))
 
     def do_DELETE(self):
-         path = self.path.split('?')[0]
-         if path.startswith("/api/chats/"):
-            chat_id = path.split("/")[-1]
-            if storage.delete_chat(chat_id):
-                if self.chat_instance and self.chat_instance.current_chat_id == chat_id:
-                    self.chat_instance.current_chat_id = None
+         try:
+             path = self.path.split('?')[0]
+             cid = path.split("/")[-1]
+             if storage.delete_chat(cid):
+                if cid in self.active_chats: del self.active_chats[cid]
                 self.send_json({"status": "deleted"})
-            else:
-                self.send_error(404)
+             else: self.send_json_error(404, "Not found")
+         except Exception as e: self.send_json_error(500, str(e))
 
-    # --- API Handlers ---
-
+    # Handlers
     def api_send(self, data):
-        msg = data.get("message")
-        if msg and self.chat_instance:
-            if not self.chat_instance.current_chat_id:
-                 base = getattr(self.chat_instance, "base_messages", [])
-                 new_chat = storage.create_chat_state(base)
-                 self.chat_instance.current_chat_id = new_chat["id"]
-            
-            self.chat_instance.stop_requested = False
-            threading.Thread(target=self.chat_instance.send, args=({"role": "user", "content": msg},)).start()
-            self.send_json({"status": "processing"})
-        else:
-            self.send_error(400)
+        if is_print_debug:
+            print(f"api_send({data})")
 
-    def api_edit_message(self, path, data):
-        # path: /api/chats/{id}/edit
-        # data: { index: 5, new_content: "..." }
-        if not self.chat_instance: return self.send_error(500)
+        cid = data.get("chatId")
+        if not cid: 
+            return self.send_json_error(400, "No chatId")
         
-        index = data.get("index")
-        new_content = data.get("new_content")
+        agent = self.get_agent_for_chat(cid)
+        if not agent: 
+            return self.send_json_error(500, "Agent init failed")
         
-        if index is None or new_content is None:
-            return self.send_error(400)
-            
-        # Logic: 
-        # 1. Truncate messages up to 'index'
-        # 2. Append new message
-        # 3. Trigger generation
+        if getattr(agent, "busy_depth", False): 
+            return self.send_json_error(409, "Busy")
         
-        # Note: 'index' comes from frontend filtered list (no system).
-        # We need to map it to real messages list.
-        # Assuming base_messages are at the start.
-        
-        try:
-            # Reconstruct index map. This is tricky without exact IDs.
-            # Simplified approach: Count user/assistant messages in self.messages
-            
-            target_real_index = -1
-            current_filtered_index = 0
-            
-            for i, m in enumerate(self.chat_instance.messages):
-                if m["role"] not in ["system", "tool"]:
-                    if current_filtered_index == index:
-                        target_real_index = i
-                        break
-                    current_filtered_index += 1
-            
-            if target_real_index != -1:
-                # Truncate everything AFTER this message (we will replace this message)
-                # Wait, if we edit, we replace THIS message and delete everything after.
-                self.chat_instance.messages = self.chat_instance.messages[:target_real_index]
-                
-                # Send as if it's new
-                self.chat_instance.stop_requested = False
-                threading.Thread(target=self.chat_instance.send, args=({"role": "user", "content": new_content},)).start()
-                
-                self.send_json({"status": "processing"})
-            else:
-                self.send_error(404, "Message not found")
-                
-        except Exception as e:
-            print(f"Edit error: {e}")
-            self.send_error(500, str(e))
+        agent.stop_requested = False
 
-    def api_start_temp(self):
-        if self.chat_instance:
-            self.chat_instance.current_chat_id = 'temp'
-            if hasattr(self.chat_instance, "base_messages"):
-                self.chat_instance.messages = list(self.chat_instance.base_messages)
-            else:
-                self.chat_instance.messages = []
-            self.send_json({"status": "ok", "id": "temp"})
-        else:
-            self.send_error(500)
-
-    def api_stop(self):
-        if self.chat_instance:
-            self.chat_instance.stop_requested = True
-            print("🛑 Stop signal received from Web UI")
-        self.send_json({"status": "ok"})
+        threading.Thread(target=agent.send, args=({"role": "user", "content": data.get("message")},)).start()
+        self.send_json({"status": "processing"})
 
     def api_create_chat(self):
-        base = getattr(self.chat_instance, "base_messages", [])
-        new_chat = storage.create_chat_state(base)
-        self.send_json(new_chat)
+        if is_print_debug:
+            print(f"api_create_chat()")
+        
+        new_chat = storage.save_chat_state(self.clone_root_chat())
+        self.send_json(new_chat.__dict__)
+
+    def api_start_temp(self):
+        if is_print_debug:
+            print(f"api_start_temp()")
+        
+        agent = self.get_agent_for_chat('temp')
+        if not agent: 
+            return self.send_json_error(500, "Failed")
+        if getattr(agent, "is_busy", False): 
+            return self.send_json_error(409, "Busy")
+        
+        self.send_json({"status": "ok", "id": "temp"})
 
     def api_load_chat(self, path):
-        chat_id = path.split("/")[-2]
-        chat_data, warning = storage.load_chat_state(chat_id)
+        if is_print_debug:
+            print(f"api_load_chat({path})")
         
-        if chat_data and self.chat_instance:
-            instance_state = chat_data.get("instance_state", {})
-            for k, v in instance_state.items():
-                if not callable(v):
-                        setattr(self.chat_instance, k, v)
-            
-            self.chat_instance.messages = chat_data["messages"]
-            self.chat_instance.current_chat_id = chat_id
-            
-            if hasattr(self.chat_instance, "base_messages") and not any(m["role"] == "system" for m in self.chat_instance.messages):
-                self.chat_instance.messages = list(self.chat_instance.base_messages) + self.chat_instance.messages
-
-            if warning:
-                self.chat_instance.web_emit("text", f"\n\n> {warning}\n")
-
-            self.send_json({"status": "loaded", "chat": chat_data})
-        else:
-            self.send_error(404)
-
+        cid = path.split("/")[-2]
+        chat, _ = storage.load_chat_state(cid, self.clone_root_chat)
+        if chat: 
+            self.send_json({"status": "loaded", "chat": chat.__dict__})
+        else: 
+            self.send_json_error(404, "Not found")
+        
     def api_save_chat(self, path):
-        chat_id = path.split("/")[-2]
-        if self.chat_instance:
-            storage.save_chat_state(self.chat_instance, chat_id)
-            self.send_json({"status": "saved"})
+        if is_print_debug:
+            print(f"api_save_chat({path})")
+        
+        cid = path.split("/")[-2]
+        if cid in self.active_chats:
+            storage.save_chat_state(self.active_chats[cid])
+        self.send_json({"status": "saved"})
+
+    def api_edit_message(self, path, data): 
+        if is_print_debug:
+            print(f"api_edit_message({path}, {data})")
+
+        self.send_json_error(501, "Not impl in debug")
+    
+    def api_stop(self, data):
+        if is_print_debug:
+            print(f"api_stop({data})")
+        
+        cid = data.get("chatId")
+        if cid and cid in self.active_chats:
+             self.active_chats[cid].stop_requested = True
+        self.send_json({"status": "ok"})
 
     def handle_api_get(self, path, query):
-        if path == "/api/chats":
-            self.send_json(storage.list_chats())
-        elif path == "/api/current":
-             if self.chat_instance:
-                 if self.chat_instance.current_chat_id == 'temp':
-                     self.send_json({
-                         "id": "temp", 
-                         "messages": self.chat_instance.messages,
-                         "name": "Временный чат"
-                     })
-                     return
-                 elif self.chat_instance.current_chat_id:
-                     data, _ = storage.load_chat_state(self.chat_instance.current_chat_id)
-                     if data:
-                         self.send_json(data)
-                         return
-             self.send_json({"id": None})
-        elif path.startswith("/api/chats/"):
-            chat_id = path.split("/")[-1]
-            data, _ = storage.load_chat_state(chat_id)
-            self.send_json(data if data else {})
+        if is_print_debug:
+            print(f"handle_api_get({path}, {query})")
 
-    # --- Static & Utils ---
+        if path == "/api/chats": 
+            self.send_json(storage.list_chats(self.clone_root_chat))
+        else: 
+            self.send_json({})
 
     def serve_static(self, path):
-        full_path = os.path.abspath(os.path.join(STATIC_DIR, path))
-        if not full_path.startswith(STATIC_DIR):
-            self.send_error(403)
-            return
-
-        if os.path.exists(full_path) and os.path.isfile(full_path):
-            self.send_response(200)
-            mime, _ = mimetypes.guess_type(full_path)
-            if not mime and full_path.endswith(".js"): mime = "application/javascript"
-            self.send_header("Content-Type", mime or "application/octet-stream")
-            with open(full_path, 'rb') as f:
-                content = f.read()
-            self.send_header("Content-Length", str(len(content)))
-            self.end_headers()
-            self.wfile.write(content)
-        else:
-            self.send_error(404)
+        full = os.path.abspath(os.path.join(STATIC_DIR, path))
+        if not full.startswith(STATIC_DIR): 
+            return self.send_json_error(403, "Denied")
+        if os.path.exists(full) and os.path.isfile(full):
+            try:
+                self.send_response(200)
+                mime, _ = mimetypes.guess_type(full)
+                self.send_header("Content-Type", mime or "application/octet-stream")
+                with open(full, 'rb') as f: 
+                    content = f.read()
+                self.send_header("Content-Length", str(len(content)))
+                self._send_cors_headers()
+                self.end_headers()
+                self.wfile.write(content)
+            except Exception as e:
+                log_debug(f"Static serve error: {e}")
+        else: self.send_json_error(404, "File not found")
 
     def send_json(self, data):
-        self.send_response(200)
-        self.send_header("Content-Type", "application/json")
-        self._send_cors_headers()
-        self.end_headers()
-        self.wfile.write(json.dumps(data, default=str).encode())
+        try:
+            #print(f"send_json({data})")
+
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self._send_cors_headers()
+            self.end_headers()
+            self.wfile.write(json.dumps(data, default=str).encode())
+        except Exception as e: log_debug(f"Send JSON error: {e}")
 
     def _send_cors_headers(self):
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -306,29 +308,21 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         self._send_cors_headers()
         self.end_headers()
         
-        q = self.chat_instance.web_queue if self.chat_instance else None
-        if not q: return
-        
         self.wfile.write(b": keep-alive\n\n")
         self.wfile.flush()
         
         while True:
-            try:
-                event = q.get(timeout=1)
-                
-                if isinstance(event, dict):
+            for chat in self.active_chats:
+                try:
+                    event = chat.web_queue.get(timeout=1)
                     payload = json.dumps(event, ensure_ascii=False)
                     self.wfile.write(f"data: {payload}\n\n".encode())
-                else:
-                    payload = json.dumps({"type": "text", "data": str(event)}, ensure_ascii=False)
-                    self.wfile.write(f"data: {payload}\n\n".encode())
-                
-                self.wfile.flush()
-            except queue.Empty:
-                self.wfile.write(b": keep-alive\n\n")
-                self.wfile.flush()
-            except Exception:
-                break
+                    self.wfile.flush()
+                except queue.Empty:
+                    self.wfile.write(b": keep-alive\n\n")
+                    self.wfile.flush()
+                except Exception: 
+                    break
 
 def get_free_port(start_port):
     port = start_port
@@ -342,11 +336,15 @@ def get_free_port(start_port):
     return start_port
 
 def run_server(chat):
-    WebRequestHandler.chat_instance = chat
-    if not os.path.exists(STATIC_DIR): os.makedirs(STATIC_DIR)
-    
+    WebRequestHandler.ai_client = chat.client
+    chat.client = None
+    chat.web_queue = None
+    WebRequestHandler.root_chat = chat
+
+    if not os.path.exists(STATIC_DIR): 
+        os.makedirs(STATIC_DIR)
     port = get_free_port(START_PORT)
-    
+    log_debug(f"Server starting on {port}")
     try:
         server = socketserver.ThreadingTCPServer((HOST, port), WebRequestHandler)
         server.allow_reuse_address = True
@@ -354,4 +352,5 @@ def run_server(chat):
         print(f"🌍 Web Interface running at http://{HOST}:{port}")
         server.serve_forever()
     except Exception as e:
+        log_debug(f"Server crash: {e}")
         print(f"❌ Server crashed: {e}")

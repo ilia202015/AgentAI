@@ -80,7 +80,7 @@ export default {
                         </button>
                         <div class="flex items-center gap-3 pt-1">
                             <div class="w-2 h-2 rounded-full animate-pulse" :class="connected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500'"></div>
-                            <div class="flex flex-col"><span class="text-xs font-medium text-gray-300">Агент онлайн</span><span class="text-[10px] text-gray-600">v1.6.0 • {{ store.chats.length }} чатов</span></div>
+                            <div class="flex flex-col"><span class="text-xs font-medium text-gray-300">Агент онлайн</span><span class="text-[10px] text-gray-600">v1.6.1 • {{ store.chats.length }} чатов</span></div>
                         </div>
                     </div>
                 </div>
@@ -101,13 +101,21 @@ export default {
 
         const createNew = async () => {
             const chat = await api.createChat();
+            if (chat.error) {
+                store.addToast(chat.error, 'error');
+                return;
+            }
             await refreshList();
             await selectChat(chat.id);
             if (window.innerWidth < 768) store.closeSidebarMobile();
         };
 
         const startTemp = async () => {
-            await api.startTempChat();
+            const res = await api.startTempChat();
+            if (res.error) {
+                store.addToast(res.error, 'error');
+                return;
+            }
             store.currentChatId = 'temp';
             store.setMessages([]);
             if (window.innerWidth < 768) store.closeSidebarMobile();
@@ -115,7 +123,11 @@ export default {
         
         const deleteChat = async (id) => {
             if (confirm('Вы уверены?')) {
-                await api.deleteChat(id);
+                const res = await api.deleteChat(id);
+                if (res.error) {
+                    store.addToast(res.error, 'error');
+                    return;
+                }
                 if (store.currentChatId === id) { store.currentChatId = null; store.setMessages([]); }
                 await refreshList();
             }
@@ -123,11 +135,22 @@ export default {
         
         const selectChat = async (id) => {
             if (editingId.value) return; 
-            store.currentChatId = id;
+            
+            // Если уже выбран этот чат, ничего не делаем
+            if (store.currentChatId === id) return;
+
             try {
                 const data = await api.loadChat(id);
+                if (data.error) {
+                    store.addToast(data.error, 'error');
+                    return; 
+                }
+                store.currentChatId = id;
                 store.setMessages(data.chat.messages);
-            } catch (e) { console.error(e); }
+            } catch (e) { 
+                console.error(e); 
+                store.addToast("Ошибка соединения", 'error'); 
+            }
             if (window.innerWidth < 768) store.closeSidebarMobile();
         };
 
@@ -140,13 +163,22 @@ export default {
             if (!editingId.value) return;
             const newName = editName.value.trim();
             if (newName && newName !== chat.name) {
-                await api.renameChat(chat.id, newName);
-                await refreshList();
+                const res = await api.renameChat(chat.id, newName);
+                if (res.error) {
+                    store.addToast(res.error, 'error');
+                } else {
+                    await refreshList();
+                }
             }
             editingId.value = null;
         };
         const cancelRename = () => { editingId.value = null; }
-        const refreshList = async () => { store.chats = await api.fetchChats(); };
+        const refreshList = async () => { 
+            const res = await api.fetchChats(); 
+            // fetchChats in api.js returns [] on error, so it's safeish, but let's check
+            if (Array.isArray(res)) store.chats = res;
+        };
+        
         const checkCurrent = async () => {
              const current = await api.fetchCurrentChat();
              if (current && current.id) { store.currentChatId = current.id; store.setMessages(current.messages); }

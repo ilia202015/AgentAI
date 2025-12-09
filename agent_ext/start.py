@@ -129,7 +129,7 @@ def load_plugins():
 
             # 2. Выполнение include.py внутри чата
             if os.path.exists(include_path) and include_code:
-                chat.python_tool(include_code)
+                print(f"include.py: result = {chat.python_tool(include_code)}")
                 print(f"  - include.py выполнен")
                 
             # 3. Инициализация через init.py

@@ -8,15 +8,15 @@ export async function fetchChats() {
 }
 
 export async function loadChat(id) {
+    // В новой архитектуре loadChat - это просто получение истории.
+    // Агент инициализируется лениво при первом send.
     const res = await fetch(`${API_BASE}/chats/${id}/load`, { method: 'POST' });
     return res.json();
 }
 
 export async function fetchCurrentChat() {
-    try {
-        const res = await fetch(`${API_BASE}/current`);
-        return await res.json();
-    } catch (e) { return null; }
+    // Legacy support, or use local storage
+    return null; 
 }
 
 export async function createChat() {
@@ -38,27 +38,31 @@ export async function renameChat(id, name) {
     return res.json();
 }
 
-export async function sendMessage(text) {
+export async function sendMessage(chatId, text) {
     const res = await fetch(`${API_BASE}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text })
+        body: JSON.stringify({ chatId: chatId, message: text })
     });
     return res.json();
 }
 
-export async function editMessage(index, text) {
+export async function editMessage(chatId, index, text) {
     const res = await fetch(`${API_BASE}/edit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ index: index, new_content: text })
+        body: JSON.stringify({ chatId: chatId, index: index, new_content: text })
     });
     return res.json();
 }
 
-export async function stopGeneration() {
+export async function stopGeneration(chatId) {
     try {
-        const res = await fetch(`${API_BASE}/stop`, { method: 'POST' });
+        const res = await fetch(`${API_BASE}/stop`, { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ chatId: chatId }) 
+        });
         return await res.json();
     } catch (e) { return { status: 'error' }; }
 }

@@ -1,16 +1,5 @@
-import os, json, logging, ast, sys, types, readline, datetime, time, subprocess, traceback
+import os, json, ast, sys, types, readline, datetime, time, subprocess, traceback
 from openai import OpenAI
-
-
-# Настройка логирования
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('agent_ext/agent_ext.log')
-    ]
-)
-logger = logging.getLogger(__name__)
 
 
 class Chat:
@@ -281,7 +270,6 @@ class Chat:
     def python_tool(self, code, no_print=False):
         is_valid, message = self.validate_python_code(code)
         if not is_valid:
-            logger.warning(f"Код не прошел валидацию: {message}")
             return f"Ошибка: {message}"
         
         try:
@@ -289,11 +277,9 @@ class Chat:
             self.local_env["result"] = ''
             exec(code, globals(), self.local_env)
             
-            logger.info(f"Код выполнен успешно. Результат: {self.local_env['result']}")
             return str(self.local_env["result"])
             
         except Exception as e:
-            logger.error(f"Ошибка выполнения кода: {e}")
             # Форматируем полный стектрейс для детального отчета
             error_traceback = traceback.format_exc()
             return f"Ошибка выполнения:\n\n{error_traceback}"
@@ -372,7 +358,6 @@ class Chat:
                 }
 
         except Exception as e:
-            logger.error(f"Ошибка при выполнении инструмента {name}: {e}")
             error_message = f"Ошибка инструмента: {e}"
             self.print_code(f"Ошибка {name}", error_message)
             return {
@@ -462,7 +447,6 @@ class Chat:
                 return self._handle_stream(stream)
 
             except Exception as e:
-                logger.error(f"Ошибка при обработке сообщения: {e}")
                 error_msg = f"Произошла ошибка: {e}\n\n{traceback.format_exc()}"
                 self.print(f"\n❌ {error_msg}")
 
@@ -551,8 +535,6 @@ class Chat:
             # Аппендим в историю
             self.messages.append(assistant_message)
 
-            logger.info("Получен потоковый ответ от модели.")
-            
             if "tool_calls" in assistant_message:
                 self._execute_tool_calls(assistant_message["tool_calls"])
 
@@ -560,7 +542,6 @@ class Chat:
         
         except Exception as e:
             e = traceback.format_exc()
-            logger.error(f"Ошибка обработки стрима: {e}")
             self.print(f"Ошибка обработки стрима: {e}")
             return f"Ошибка обработки стрима: {e}"
 
@@ -578,7 +559,6 @@ class Chat:
         """Обрабатывает стандартный ответ от модели для режима 'auto'."""
         assistant_message = response.choices[0].message
         self.messages.append(assistant_message)
-        logger.info("Получен ответ от модели в режиме auto.")
 
         result = assistant_message.content
         self.print("⚙️ Агент (авто, ответ): " + result)
@@ -611,8 +591,6 @@ class Chat:
             except json.JSONDecodeError:
                 tool_args = {}
             
-            logger.info(f"Вызов инструмента: {tool_name} с аргументами: {tool_args}")
-            
             tool_call_id = tool_call["id"]
             
             if tool_name in self.tools_dict_required:
@@ -643,7 +621,6 @@ def main():
     except EOFError:
         print("\n👋 Программа завершена (Ctrl+D)")
     except Exception as e:
-        logger.error(f"Критическая ошибка: {e}")
         print(f"\n💥 Критическая ошибка: {e}")
 
 

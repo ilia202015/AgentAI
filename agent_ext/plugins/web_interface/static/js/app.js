@@ -35,19 +35,33 @@ const App = {
     `,
     setup() {
         const initSSE = () => {
+            console.log("Connecting to SSE...");
             const eventSource = new EventSource('/stream');
             
+            eventSource.onopen = () => { console.log("SSE Connected"); };
+
             eventSource.onmessage = (event) => {
                 try {
                     const payload = JSON.parse(event.data);
-                    if (payload && payload.type) {
-                        store.isThinking = false; 
-                        store.appendChunk(payload);
+                    
+                    // --- Parallel Chat Logic ---
+                    // Payload now has { type, chatId, data }
+                    
+                    if (payload && payload.chatId) {
+                        // Only process events for the currently open chat
+                        if (store.currentChatId === payload.chatId) {
+                            if (payload.type === 'finish') {
+                                store.isThinking = false;
+                            } else {
+                                store.appendChunk(payload);
+                            }
+                        }
                     }
-                } catch (e) {}
+                } catch (e) { console.error("SSE Parse Error:", e); }
             };
 
             eventSource.onerror = (e) => {
+                console.error("SSE Error/Disconnect:", e);
                 eventSource.close();
                 store.isThinking = false;
                 setTimeout(initSSE, 3000);
@@ -56,8 +70,7 @@ const App = {
 
         initSSE();
         
-        // Test toast on load
-        setTimeout(() => store.addToast('Агент готов к работе', 'success'), 1000);
+        setTimeout(() => store.addToast('Агент готов к работе (Parallel Mode)', 'success'), 1000);
 
         return { store };
     }
