@@ -64,6 +64,8 @@ def web_print_thought(self, message, count_tab=-1, **kwargs):
     end = kwargs.get('end', '\n')
     msg_str = str(message)
     
+    self.messages[-1]["thoughts"] = self.messages[-1].get("thoughts", "") + msg_str
+
     # Console
     print(f"[{getattr(self, 'id', '?')}] (thought): ", end='')
     if count_tab == -1: count_tab = self.count_tab
@@ -131,88 +133,17 @@ def handle_stream_with_parsing(self, stream):
     text_buffer = "" 
     
     def parsing_generator(gen):
-        class FakeDelta:
-            def __init__(self, content):
-                self.content = content
-                self.tool_calls = None
-                self.role = "assistant"
-                self.model_extra = {}
-            def __contains__(self, item): 
-                return item == 'model_extra' or hasattr(self, item)
-            def __getitem__(self, item): 
-                if item == 'model_extra': 
-                    return self.model_extra
-                return getattr(self, item, None)
-
-        class FakeChoice:
-            def __init__(self, content): 
-                self.delta = FakeDelta(content)
-
-        class FakeChunk:
-            def __init__(self, content, original_chunk):
-                self.choices = [FakeChoice(content)]
-                self.id = getattr(original_chunk, 'id', 'fake_id')
-                self.created = getattr(original_chunk, 'created', 0)
-                self.model = getattr(original_chunk, 'model', 'fake_model')
-                self.object = getattr(original_chunk, 'object', 'chat.completion.chunk')
-                if hasattr(original_chunk, 'model_extra'): 
-                    self.model_extra = original_chunk.model_extra
-                else: 
-                    self.model_extra = None
-
-
         nonlocal is_thought_mode, text_buffer
         for chunk in gen:
             if getattr(self, 'stop_requested', False):
-                self.busy_depth = 0
                 self.print("\n🛑 Force stopped.")
                 break
             
-            if chunk.choices and chunk.choices[0].delta.tool_calls:
-                yield chunk
-                continue
-
-            if chunk.choices and chunk.choices[0].delta.content:
-                content = chunk.choices[0].delta.content
-                text_buffer += content
-                while True:
-                    if is_thought_mode:
-                        if "</thought>" in text_buffer:
-                            end_idx = text_buffer.find("</thought>")
-                            thoughts_buffer.append(text_buffer[:end_idx])
-                            text_buffer = text_buffer[end_idx + len("</thought>"):]
-                            is_thought_mode = False
-                        elif "</" in text_buffer or "<" in text_buffer and len(text_buffer) < 20: 
-                            break
-                        else:
-                            thoughts_buffer.append(text_buffer)
-                            text_buffer = ""
-                            break
-                    else:
-                        if "<thought>" in text_buffer:
-                            start_idx = text_buffer.find("<thought>")
-                            if start_idx > 0: 
-                                yield FakeChunk(text_buffer[:start_idx], chunk)
-                            text_buffer = text_buffer[start_idx + len("<thought>"):]
-                            is_thought_mode = True
-                        elif "<" in text_buffer and len(text_buffer) < 20: 
-                            break
-                        else:
-                            yield FakeChunk(text_buffer, chunk)
-                            text_buffer = ""
-                            break
-            else:
-                yield chunk
-        
-        if text_buffer: 
-            yield FakeChunk(text_buffer, chunk)
+            yield chunk
 
     result = self.__original_handle_stream(parsing_generator(stream))
     
     if thoughts_buffer and self.messages and self.messages[-1]["role"] == "assistant":
-        full_thoughts = "".join(thoughts_buffer)
-        self.messages[-1]["thoughts"] = self.messages[-1].get("thoughts", "") + full_thoughts
-        
         cid = getattr(self, "id", None)
         if cid and cid != 'temp':
             try: 

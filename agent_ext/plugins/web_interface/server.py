@@ -14,7 +14,7 @@ import socket
 import copy
 import types
 
-is_print_debug = False
+is_print_debug = True
 
 # Setup paths
 current_dir = os.path.dirname(os.path.abspath(__file__)) 

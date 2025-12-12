@@ -1,6 +1,6 @@
-import os, json, ast, sys, types, readline, datetime, time, subprocess, traceback
-from openai import OpenAI
-
+import os, json, ast, sys, types, datetime, time, subprocess, traceback
+from google import genai
+from google.genai import types
 
 class Chat:
     local_env = dict()
@@ -13,6 +13,7 @@ class Chat:
         self.print_to_console = print_to_console
         self.chats = {}
         self.last_send_time = 0
+        
         # free
         #self.model, self.model_rpm = "gemini-2.5-pro", 2
         #self.model, self.model_rpm = "gemini-2.5-flash", 10
@@ -22,7 +23,7 @@ class Chat:
         #self.model, self.model_rpm = "gemini-2.5-pro", 150
 
         self._load_config()
-        self.client = OpenAI(api_key=self.ai_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
+        self.client = genai.Client(api_key=self.ai_key)
         
         system_prompt_parts = [
             self.prompts['system'], "Код файла agent.py:", self.self_code,
@@ -65,7 +66,10 @@ class Chat:
 
         with open(f"{self.agent_dir}/user_profile.json", 'r', encoding="utf8") as f: 
             self.user_profile = f.read()
-        with open(__file__, 'r', encoding="utf8") as f: 
+        
+        # Читаем agent.py для контекста
+        self_code_path = "agent_ext/agent.py" if os.path.exists("agent_ext/agent.py") else __file__
+        with open(self_code_path, 'r', encoding="utf8") as f: 
             self.self_code = f.read()
         
         saved_changes_path = f"{self.agent_dir}/saved_code_changes.py"
@@ -80,14 +84,36 @@ class Chat:
         
         with open("agent_ext/keys/search_engine.id", "r") as f:
             self.search_engine_id = f.read().strip()
-            
 
     def _initialize_tools(self):
         with open(f"{self.agent_dir}/tools.json", 'r', encoding="utf8") as f: 
-            self.tools = json.load(f)["tools"]
+            self.tools_config = json.load(f)["tools"]
         
-        for tool_num in range(len(self.tools)):
-            self.tools[tool_num]["function"]["description"] = self.prompts[self.tools[tool_num]["function"]["name"]]
+        for tool in self.tools_config:
+            tool["function"]["description"] = self.prompts.get(tool["function"]["name"], tool["function"]["description"])
+
+        # Конвертация в формат Google GenAI
+        function_declarations = []
+        for tool in self.tools_config:
+            func = tool["function"]
+            params = func.get("parameters", {})
+            # Fix for GenAI: properties required
+            if "properties" not in params:
+                params["properties"] = {}
+                params["type"] = "OBJECT"
+            
+            function_declarations.append(
+                types.FunctionDeclaration(
+                    name=func["name"],
+                    description=func["description"],
+                    parameters=params
+                )
+            )
+        
+        if function_declarations:
+            self.genai_tools = [types.Tool(function_declarations=function_declarations)]
+        else:
+            self.genai_tools = []
 
         self.tools_dict_required = { 
             "chat": ["name", "message"], 
@@ -118,9 +144,7 @@ class Chat:
     def chat_tool(self, name, message):
         if name not in self.chats:
             self.chats[name] = Chat(output_mode="auto", count_tab=self.count_tab + 1)
-            
         self.print(f"\n⚙️ Агент (авто, запрос, чат: {name}): " + message)
-
         return self.chats[name].send({"role": "user", "content": message})
 
     def chat_exec_tool(self, name, code):
@@ -132,135 +156,69 @@ class Chat:
         try:
             import json
             from googleapiclient.discovery import build
-            
             service = build("customsearch", "v1", developerKey=self.google_search_key)
-            
-            result = service.cse().list(
-                q=query,
-                cx=self.search_engine_id,
-                num=min(num_results, 10)
-            ).execute()
-
+            result = service.cse().list(q=query, cx=self.search_engine_id, num=min(num_results, 10)).execute()
             if 'items' not in result:
                 return json.dumps([], ensure_ascii=False, indent=2)
-
             simplified_results = []
             for item in result['items']:
-                simplified_results.append({
-                    'title': item.get('title'),
-                    'link': item.get('link'),
-                    'snippet': item.get('snippet')
-                })
-            
+                simplified_results.append({'title': item.get('title'), 'link': item.get('link'), 'snippet': item.get('snippet')})
             return json.dumps(simplified_results, ensure_ascii=False, indent=2)
-            
         except Exception as e:
             return f"Ошибка при выполнении поиска: {e}" 
 
     def user_profile_tool(self, data):
         try:
             profile_file = "agent_ext/user_profile.json"
-            
             data = json.loads(data)
             with open(profile_file, 'r', encoding="utf8") as f:
                 user_profile = json.load(f)
-
             for [key, val] in data.items():
                 if val == "":
                     if key in user_profile:
                         user_profile.pop(key)
                 else:
-                    user_profile[key] = {
-                        "data" : val,
-                        "time" : datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    }
-            
+                    user_profile[key] = {"data" : val, "time" : datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
             with open(profile_file, 'w', encoding="utf8") as f:
-                    json.dump(user_profile, f, ensure_ascii=False, indent=2)
-            
+                json.dump(user_profile, f, ensure_ascii=False, indent=2)
             return "Профиль обновлён успешно"
         except Exception as e:
             return f"Ошибка: {e}"
 
-
     def shell_tool(self, command, timeout=120):
-        """
-        Выполняет команду в системной оболочке и возвращает stdout, stderr и код возврата.
-        """
         try:
-            # Используем subprocess.run для выполнения команды
-            process = subprocess.run(
-                command,
-                shell=True,         # Позволяет выполнять сложные команды как в терминале
-                capture_output=True,# Захватывает stdout и stderr
-                text=True,          # Декодирует stdout/stderr в текст
-                timeout=timeout         # Таймаут в секундах для предотвращения зависаний
-            )
-            # Возвращаем результат в виде JSON-строки для удобства парсинга
-            return json.dumps({
-                "returncode": process.returncode,
-                "stdout": process.stdout,
-                "stderr": process.stderr
-            }, ensure_ascii=False, indent=2)
+            process = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=timeout)
+            return json.dumps({"returncode": process.returncode, "stdout": process.stdout, "stderr": process.stderr}, ensure_ascii=False, indent=2)
         except subprocess.TimeoutExpired:
-            return json.dumps({
-                "returncode": -1,
-                "stdout": "",
-                "stderr": f"Ошибка: Команда выполнялась дольше {timeout} секунд и была прервана."
-            }, ensure_ascii=False, indent=2)
+            return json.dumps({"returncode": -1, "stdout": "", "stderr": f"Ошибка: Команда выполнялась дольше {timeout} секунд и была прервана."}, ensure_ascii=False, indent=2)
         except Exception as e:
-            return json.dumps({
-                "returncode": -1,
-                "stdout": "",
-                "stderr": f"Критическая ошибка при выполнении команды: {str(e)}"
-            }, ensure_ascii=False, indent=2)
+            return json.dumps({"returncode": -1, "stdout": "", "stderr": f"Критическая ошибка при выполнении команды: {str(e)}"}, ensure_ascii=False, indent=2)
 
     def http_tool(self, url):
-        """
-        Загружает HTML-страницу по URL, очищает от лишних тегов и возвращает основной текст.
-        """
         try:
             import requests
             from bs4 import BeautifulSoup
-        except ImportError:
-            return "Ошибка: для работы этого инструмента необходимы библиотеки requests и beautifulsoup4. Установите их с помощью: pip install requests beautifulsoup4"
-
+        except ImportError: return "Ошибка: для работы этого инструмента необходимы библиотеки requests и beautifulsoup4."
         try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
+            headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
             response = requests.get(url, headers=headers, timeout=10)
-            response.raise_for_status()  # Проверка на ошибки HTTP (4xx или 5xx)
-            
+            response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
-
-            # Удаляем ненужные теги (скрипты, стили, навигацию, футеры и т.д.)
             for element in soup(["script", "style", "nav", "footer", "header", "aside"]):
                 element.decompose()
-
-            # Получаем текст и очищаем его от лишних пробелов и пустых строк
             text = soup.get_text()
             lines = (line.strip() for line in text.splitlines())
             chunks = (phrase.strip() for line in lines for phrase in line.split("  "))
-            cleaned_text = '\n'.join(chunk for chunk in chunks if chunk)
-            
-            return cleaned_text
-
-        except requests.exceptions.RequestException as e:
-            return f"Ошибка сети при запросе к {url}: {e}"
+            return '\n'.join(chunk for chunk in chunks if chunk)
         except Exception as e:
             return f"Ошибка при обработке URL {url}: {e}"
 
     def python_str_tool(self, text):
-        """
-        Принимает обычный текст и возвращает его в формате Python-строки, экранируя специальные символы.
-        """
         return repr(text)
 
     def validate_python_code(self, code):
         try:
             ast.parse(code)
-            
             return True, "Код прошел валидацию"
         except SyntaxError as e:
             return False, f"Синтаксическая ошибка: {e}"
@@ -271,37 +229,25 @@ class Chat:
         is_valid, message = self.validate_python_code(code)
         if not is_valid:
             return f"Ошибка: {message}"
-        
         try:
             self.local_env["self"] = self
             self.local_env["result"] = ''
             exec(code, globals(), self.local_env)
-            
             return str(self.local_env["result"])
-            
         except Exception as e:
-            # Форматируем полный стектрейс для детального отчета
-            error_traceback = traceback.format_exc()
-            return f"Ошибка выполнения:\n\n{error_traceback}"
+            return f"Ошибка выполнения:\n\n{traceback.format_exc()}"
         
     def save_code_changes_tool(self, code):
-        """
-        Сохраняет протестированные изменения собственного кода в файл для их применения при следующем запуске.
-        Используй только для изменений, которые могут пригодиться позже или если пользователь попросил сохранить.
-        """
         try:
             is_valid, message = self.validate_python_code(code)
             if not is_valid:
                 return f"Ошибка валидации: {message}. Изменения не сохранены."
-
             file_path = "agent_ext/saved_code_changes.py"
             os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
             with open(file_path, 'a', encoding='utf-8') as f:
                 f.write(f"\n# Saved on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(code)
                 f.write("\n" + "#" * 80 + "\n")
-
             return "Изменения в коде успешно сохранены. Они будут автоматически применены при следующем запуске агента."
         except Exception as e:
             return f"Критическая ошибка при сохранении изменений: {e}"
@@ -309,25 +255,20 @@ class Chat:
     def check_tool_args(self, args, tool_args, tool_id):
         for arg in args:
             if arg not in tool_args:
-                self.messages.append({
-                    "role": "tool", 
-                    "tool_call_id": tool_id, 
-                    "content": f"Ошибка: отсутствует параметр {arg}"
-                })
+                self.messages.append({"role": "tool", "tool_call_id": tool_id, "content": f"Ошибка: отсутствует параметр {arg}"})
                 return False
         return True
 
     def tool_exec(self, name, tool_args, tool_id):
-        required = self.tools_dict_required[name] if name in self.tools_dict_required else []
-        additional = self.tools_dict_additional[name] if name in self.tools_dict_additional else []
+        required = self.tools_dict_required.get(name, [])
+        additional = self.tools_dict_additional.get(name, [])
 
         if name == 'python' and 'code' in tool_args:
             self.print_code(f"Запрос {name}", tool_args['code'])
         else:
             try:
-                args_for_print = json.dumps(tool_args, ensure_ascii=False, indent=2)
-                self.print_code(f"Запрос {name}", args_for_print)
-            except Exception:
+                self.print_code(f"Запрос {name}", json.dumps(tool_args, ensure_ascii=False, indent=2))
+            except:
                 self.print_code(f"Запрос {name}", str(tool_args))
 
         args_for_exec = tool_args.copy()
@@ -342,29 +283,18 @@ class Chat:
                 else:
                     required_args_str = ', '.join(str(args_for_exec[arg]) for arg in required)
                     additional_args_str = ', '.join(f"{arg}={args_for_exec[arg]}" for arg in additional if arg in args_for_exec)
-                    all_args = []
-                    if required_args_str: all_args.append(required_args_str)
-                    if additional_args_str: all_args.append(additional_args_str)
+                    all_args = [arg for arg in [required_args_str, additional_args_str] if arg]
                     call_string = f"result = self.{name}_tool({', '.join(all_args)})"
                     self.python_tool(call_string, no_print=True)
                     tool_result = self.local_env.get("result")
 
                 self.print_code(f"Результат {name}", str(tool_result))
-                
-                return {
-                    "role": "tool", 
-                    "tool_call_id": tool_id, 
-                    "content": str(tool_result)
-                }
+                return {"role": "tool", "tool_call_id": tool_id, "content": str(tool_result)}
 
         except Exception as e:
             error_message = f"Ошибка инструмента: {e}"
             self.print_code(f"Ошибка {name}", error_message)
-            return {
-                "role": "tool", 
-                "tool_call_id": tool_id, 
-                "content": error_message
-            }
+            return {"role": "tool", "tool_call_id": tool_id, "content": error_message}
 
     def print(self, message, count_tab=-1, **kwargs):
         if count_tab == -1:
@@ -377,43 +307,116 @@ class Chat:
     def print_code(self, language, code, count_tab=-1, max_code_display_lines=6):
             if count_tab == -1:
                 count_tab = self.count_tab
-
             displayed_code = ""
             if code != '':
                 lines = code.split('\n')
                 while len(lines) and lines[0] == '':
                     lines = lines[1:]
-
                 if len(lines):
                     while lines[-1] == '':
                         lines.pop()
-
                     if len(lines) > max_code_display_lines:
                         half_lines = max_code_display_lines // 2
-                        displayed_code = '\n'.join(lines[:half_lines]) + \
-                                        '\n\t...\n' + \
-                                        '\n'.join(lines[-half_lines:])
+                        displayed_code = '\n'.join(lines[:half_lines]) + '\n\t...\n' + '\n'.join(lines[-half_lines:])
                     else:
                         displayed_code = code
-                    
                     if len(displayed_code) > 500:
                         displayed_code = code[:250] + '\n\t...\n' + code[-250:]
-
             self.print("\n\n" + language + ":\n", count_tab=count_tab)
             self.print(displayed_code + '\n', count_tab=count_tab + 1)
 
-    
     def send(self, message):
         if isinstance(message, dict):
             self.messages.append(message)
         else:
             self.messages.extend(message)
-
         return self._process_request()
 
+    def _convert_to_genai_history(self):
+        """Конвертирует историю OpenAI (self.messages) в формат Google GenAI (contents)."""
+        contents = []
+        system_instruction = None
+        
+        i = 0
+        while i < len(self.messages):
+            msg = self.messages[i]
+            role = msg["role"]
+            content_text = msg.get("content", "")
+            
+            if role == "system":
+                if system_instruction is None:
+                    system_instruction = content_text
+                else:
+                    system_instruction += "\n" + content_text
+                i += 1
+                continue
+                
+            if role == "user":
+                contents.append(types.Content(role="user", parts=[types.Part(text=content_text)]))
+                i += 1
+                
+            elif role == "assistant":
+                parts = []
+                if content_text:
+                    parts.append(types.Part(text=content_text))
+                
+                if "tool_calls" in msg and msg["tool_calls"]:
+                    for tc in msg["tool_calls"]:
+                        fn = tc["function"]
+                        try:
+                            args = json.loads(fn["arguments"])
+                        except:
+                            args = {}
+                        parts.append(types.Part(
+                            function_call=types.FunctionCall(
+                                name=fn["name"],
+                                args=args
+                            )
+                        ))
+                
+                if parts:
+                    contents.append(types.Content(role="model", parts=parts))
+                i += 1
+            
+            elif role == "tool":
+                function_responses = []
+                while i < len(self.messages) and self.messages[i]["role"] == "tool":
+                    tool_msg = self.messages[i]
+                    call_id = tool_msg.get("tool_call_id")
+                    
+                    # Ищем имя функции по ID
+                    func_name = "unknown"
+                    for hist_msg in reversed(self.messages[:i]):
+                        if hist_msg["role"] == "assistant" and "tool_calls" in hist_msg:
+                            for tc in hist_msg["tool_calls"]:
+                                if tc["id"] == call_id:
+                                    func_name = tc["function"]["name"]
+                                    break
+                            if func_name != "unknown": break
+                    
+                    response_content = tool_msg["content"]
+                    try:
+                        response_data = json.loads(response_content)
+                    except:
+                        response_data = {"result": response_content}
+
+                    function_responses.append(types.Part(
+                        function_response=types.FunctionResponse(
+                            name=func_name,
+                            response=response_data
+                        )
+                    ))
+                    i += 1
+                
+                if function_responses:
+                    contents.append(types.Content(role="user", parts=function_responses))
+            
+            else:
+                i += 1
+
+        return contents, system_instruction
+
     def _process_request(self):
-        """Основной цикл обработки запроса к AI.
-        Обрабатывает ошибки сети и лимитов API, автоматически переключая ключи."""
         while True:
             try:
                 delay = 60 / self.model_rpm - (time.time() - self.last_send_time)
@@ -423,26 +426,21 @@ class Chat:
                 self.last_send_time = time.time()
 
                 if self.print_to_console:
-                    if self.output_mode == "user":
-                        self.print("🤖 Агент: ", end="", flush=True)
-                    else:
-                        self.print("⚙️ Агент (авто, ответ): ", end="", flush=True)
+                    prefix = "🤖 Агент: " if self.output_mode == "user" else "⚙️ Агент (авто, ответ): "
+                    self.print(prefix, end="", flush=True)
 
-                stream = self.client.chat.completions.create(
+                contents, system_inst = self._convert_to_genai_history()
+                
+                config = types.GenerateContentConfig(
+                    tools=self.genai_tools,
+                    system_instruction=system_inst,
+                )
+
+                stream = self.client.models.generate_content_stream(
                     model=self.model,
-                    messages=self.messages,
-                    tools=self.tools,
-                    stream=True,
-                    extra_body={
-                        'extra_body': {
-                            "google": {
-                                "thinking_config": {
-                                    "include_thoughts": True
-                                }
-                            }
-                        }
-                    }
-                ) # type: ignore
+                    contents=contents,
+                    config=config
+                )
                 
                 return self._handle_stream(stream)
 
@@ -450,161 +448,110 @@ class Chat:
                 error_msg = f"Произошла ошибка: {e}\n\n{traceback.format_exc()}"
                 self.print(f"\n❌ {error_msg}")
 
-                if "Error code: 429" in str(e):
-                    if "'quotaValue': '50'" in str(e):
-                        self.last_send_time -= 60  # Даем шанс на быстрый повторный запрос
-                        self._switch_api_key()
-                        self.messages.pop() # Убираем сообщение, вызвавшее ошибку, чтобы попробовать снова
-                    continue # Повторяем запрос с новым ключом
+                if "429" in str(e) or "Resource has been exhausted" in str(e):
+                    self.last_send_time -= 60
+                    self._switch_api_key()
+                    continue
                 else:
-                    # Для других ошибок добавляем системное сообщение и выходим
                     if self.output_mode != "user":
                         self.send({"role": "system", "content": error_msg})
-                    return f"Критическая ошибка: {error_msg}" # Возвращаем ошибку в режиме auto
+                    return f"Критическая ошибка: {error_msg}"
 
     def _handle_stream(self, stream):
-        # Инициализация накопителей
         full_content = ""
         tool_calls_buffer = []
-        thought_signature = None
-        model_extra = None
         is_thought = False
 
         try:
-            # Итерация по чанкам стрима
             for chunk in stream:
-                delta = chunk.choices[0].delta
-                
-                # 2. Обработка обычного контента
-                if delta.content:
-                    content_text = delta.content
-                    if "<thought>" in content_text:
+                if chunk.text:
+                    text_part = chunk.text
+                    
+                    if "<thought>" in text_part:
                         is_thought = True
-                        content_text = content_text.replace("<thought>", '')
+                        display_text = text_part.replace("<thought>", '')
                         if self.print_to_console:
                             self.print('\nМысли:', flush=True)
-                    if "</thought>" in content_text:
+                    elif "</thought>" in text_part:
                         is_thought = False
-                        content_text = content_text.replace("</thought>", '')
-                        if self.print_to_console:
-                            self.print('\nОтвет:', flush=True)
-                    if is_thought:
-                        self.print_thought(content_text, count_tab=self.count_tab + 1, flush=True, end='')
+                        display_text = text_part.replace("</thought>", '')
+                        if self.print_to_console: self.print('\nОтвет:', flush=True)
                     else:
-                        full_content += content_text
-                        self.print(content_text, flush=True, end='')
+                        display_text = text_part
 
-                # 3. Накопление вызовов инструментов (Tool Calls)
-                if delta.tool_calls:
-                    for tc in delta.tool_calls:
-                        tool_call = {
-                            "id": tc.id,
-                            "type": "function",
-                            "function": {"name": tc.function.name, "arguments": tc.function.arguments},
-                        }
-                        if tc.model_extra:
-                            #tool_call["model_extra"] = tc.model_extra
-                            tool_call["extra_content"] = tc.model_extra["extra_content"]
+                    if is_thought:
+                        self.print_thought(display_text, count_tab=self.count_tab + 1, flush=True, end='')
+                    else:
+                        full_content += display_text
+                        self.print(display_text, flush=True, end='')
 
-                        tool_calls_buffer.append(tool_call)
+                if chunk.candidates and chunk.candidates[0].content and chunk.candidates[0].content.parts:
+                    for part in chunk.candidates[0].content.parts:
+                        if part.function_call:
+                            # Generate an ID for OpenAI compatibility
+                            call_id = f"call_{int(time.time())}_{part.function_call.name}"
+                            args_str = json.dumps(part.function_call.args) 
+                            
+                            tc = {
+                                "id": call_id,
+                                "type": "function",
+                                "function": {
+                                    "name": part.function_call.name,
+                                    "arguments": args_str
+                                }
+                            }
+                            tool_calls_buffer.append(tc)
 
-                # 4. Извлечение Thought Signature (Gemini 3 Pro Specific)
-                # Google передает thoughtSignature в дополнительных полях объекта ответа.
-                # В OpenAI SDK они обычно попадают в model_extra или корень объекта.
-                # Проверяем разные варианты расположения.
-                if 'model_extra' in delta:
-                    model_extra = delta['model_extra']
-                
-            # --- Пост-обработка после завершения стрима ---
+            self.print("") 
 
-            self.print("") # Перевод строки после ответа
-            
-            # Формирование итогового сообщения для истории
             assistant_message = {
                 "role": "assistant",
                 "content": full_content
             }
-
-            if model_extra:
-                assistant_message["model_extra"] = model_extra
-
-            # Если были инструменты, добавляем их
             if tool_calls_buffer:
                 assistant_message["tool_calls"] = tool_calls_buffer
-            
-            # Аппендим в историю
+
             self.messages.append(assistant_message)
 
             if "tool_calls" in assistant_message:
                 self._execute_tool_calls(assistant_message["tool_calls"])
 
-            return assistant_message["content"]
-        
+            return full_content
+
         except Exception as e:
-            e = traceback.format_exc()
-            self.print(f"Ошибка обработки стрима: {e}")
+            e_trace = traceback.format_exc()
+            self.print(f"Ошибка обработки стрима GenAI: {e}\n{e_trace}")
             return f"Ошибка обработки стрима: {e}"
 
     def _switch_api_key(self):
-        """Переключает на следующий доступный API ключ Gemini."""
         self.current_key_index = (self.current_key_index + 1) % len(self.gemini_keys)
         with open(f"{self.agent_dir}/keys/gemini.key_num", 'w', encoding="utf8") as f:
             f.write(str(self.current_key_index))
-        
         self.ai_key = self.gemini_keys[self.current_key_index]
-        self.client = OpenAI(api_key=self.ai_key, base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
+        self.client = genai.Client(api_key=self.ai_key)
         self.print(f"🔑 Превышен лимит запросов. Переключаюсь на следующий ключ ({self.current_key_index + 1}/{len(self.gemini_keys)}).")
 
-    def _handle_auto_mode_response(self, response):
-        """Обрабатывает стандартный ответ от модели для режима 'auto'."""
-        assistant_message = response.choices[0].message
-        self.messages.append(assistant_message)
-
-        result = assistant_message.content
-        self.print("⚙️ Агент (авто, ответ): " + result)
-
-        if assistant_message.tool_calls:
-            tool_calls = []
-            for tool in assistant_message.tool_calls:
-                tool_calls.append({
-                    "function" : {
-                        "name" : tool.function.name,
-                        "arguments" : tool.function.arguments
-                    },
-                    "id" : tool.id
-                    })
-            self._execute_tool_calls(tool_calls)
-
-        return result
-
     def _execute_tool_calls(self, tool_calls):
-        """Выполняет вызовы инструментов, полученные от модели, и отправляет результаты обратно в модель."""
         tool_responses = []
         for tool_call in tool_calls:
             if "function" not in tool_call:
                 continue
             tool_name = tool_call["function"]["name"]
-            
             try:
                 tool_args_str = tool_call["function"]["arguments"]
                 tool_args = json.loads(tool_args_str)
             except json.JSONDecodeError:
                 tool_args = {}
-            
             tool_call_id = tool_call["id"]
             
             if tool_name in self.tools_dict_required:
                 response = self.tool_exec(tool_name, tool_args, tool_call_id)
                 tool_responses.append(response)
             else:
-                tool_responses.append({
-                    "role": "tool",
-                    "tool_call_id": tool_call_id,
-                    "content": "Такого инструмента не существует"
-                })
+                tool_responses.append({"role": "tool", "tool_call_id": tool_call_id, "content": "Такого инструмента не существует"})
 
         if tool_responses:
-             self.send(tool_responses)
+            self.send(tool_responses)
 
 
 def main():
