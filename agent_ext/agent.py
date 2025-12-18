@@ -1,11 +1,79 @@
-import os, json, ast, sys, types, datetime, time, subprocess, traceback
+import os, json, ast, sys, types, datetime, time, subprocess, traceback, platform
 from google import genai
 from google.genai import types
 
 class Chat:
     local_env = dict()
     result = ''
-    
+
+    @staticmethod
+    def _get_full_console_info():
+        report = []
+
+        # --- 1. Определение Операционной системы ---
+        try:
+            sys_name = platform.system()
+            sys_release = platform.release()
+            
+            # Небольшое улучшение для macOS, чтобы было понятнее
+            if sys_name == 'Darwin':
+                sys_name = 'macOS (Darwin)'
+                
+            report.append(f"Операционная система: {sys_name} {sys_release}")
+        except Exception as e:
+            report.append(f"Операционная система: Не удалось определить ({e})")
+
+        # --- 2. Определение Оболочки (Shell) через переменные окружения ---
+        try:
+            shell_info = "Неизвестно"
+            env = os.environ
+            
+            if platform.system() == "Windows":
+                # Приоритетная проверка на PowerShell через специфичные переменные
+                if "PSModulePath" in env:
+                    shell_info = "PowerShell"
+                else:
+                    # Обычно возвращает путь к cmd.exe
+                    shell_info = env.get("COMSPEC", "cmd.exe")
+            else:
+                # Linux / macOS
+                shell_path = env.get("SHELL", None)
+                if shell_path:
+                    # Берем только имя файла (например, из /bin/zsh -> zsh)
+                    shell_info = os.path.basename(shell_path)
+                else:
+                    shell_info = "Не задана переменная $SHELL"
+                    
+            report.append(f"Оболочка (Shell): {shell_info}")
+        except Exception as e:
+            report.append(f"Оболочка (Shell): Ошибка при определении ({e})")
+
+        # --- 4. Определение среды терминала или IDE ---
+        try:
+            term_env = "Стандартный терминал"
+            env = os.environ
+
+            # Проверяем популярные маркеры
+            if "PYCHARM_HOSTED" in env or "XPC_SERVICE_NAME" in env and "pycharm" in env["XPC_SERVICE_NAME"].lower():
+                term_env = "PyCharm Console"
+            elif env.get("TERM_PROGRAM") == "vscode":
+                term_env = "VS Code Terminal"
+            elif "WT_SESSION" in env:
+                term_env = "Windows Terminal"
+            elif env.get("TERM_PROGRAM") == "Apple_Terminal":
+                term_env = "macOS Terminal"
+            elif env.get("TERM_PROGRAM") == "iTerm.app":
+                term_env = "iTerm2"
+            elif "TMUX" in env:
+                term_env = "Tmux Session"
+                
+            report.append(f"Среда запуска (IDE/Terminal): {term_env}")
+        except Exception as e:
+            report.append(f"Среда запуска: Ошибка при проверке ({e})")
+
+        # Возвращаем итоговую строку, разделенную переносами
+        return "\n".join(report)
+
     def __init__(self, output_mode="user", count_tab=0, print_to_console=False):
         self.agent_dir = "agent_ext"
         self.output_mode = output_mode
@@ -19,19 +87,24 @@ class Chat:
         #self.model, self.model_rpm = "gemini-2.5-flash", 10
 
         # tier 1
-        self.model, self.model_rpm = "gemini-3-pro-preview", 25
+        #self.model, self.model_rpm = "gemini-3-pro-preview", 25
+        self.model, self.model_rpm = "gemini-3-flash-preview", 1000
         #self.model, self.model_rpm = "gemini-2.5-pro", 150
 
         self._load_config()
         self.client = genai.Client(api_key=self.ai_key)
         
         system_prompt_parts = [
-            self.prompts['system'], "Код файла agent.py:", self.self_code,
+            self.prompts['system'], 
+            "Код файла agent.py:", self.self_code,
             "saved_code_changes.py (дополнительные изменения):", self.saved_code,
-            f"Режим вывода: {self.output_mode}", "Информация о пользователе (user_profile.json):", self.user_profile
+            f"Режим вывода: {self.output_mode}", 
+            "Информация о пользователе (user_profile.json):", self.user_profile,
+            "Информация о окружении:", self._get_full_console_info(),
         ]
         self.system_prompt = "\n".join(system_prompt_parts)
-        self.messages = [{"role": "system", "content": self.system_prompt}]
+        self.messages = [self.system_prompt]
+        self.gemini_messages = []
 
         self._initialize_tools()
         self._apply_saved_changes()
@@ -85,51 +158,24 @@ class Chat:
         with open("agent_ext/keys/search_engine.id", "r") as f:
             self.search_engine_id = f.read().strip()
 
+    def _get_tools_dicts(self):
+        tools_dict_required = {}
+        tools_dict_additional = {}
+        for tool in self.tools:
+            tools_dict_required[tool["function"]["name"]] = tool["function"]["parameters"]["required"]
+            for parameter in tool["function"]["parameters"].keys():
+                if parameter not in tool["function"]["parameters"]["required"]:
+                    if tool["function"]["name"] not in tools_dict_additional:
+                        tools_dict_additional[tool["function"]["name"]] = []
+                    tools_dict_additional[tool["function"]["name"]].append(parameter)
+        return tools_dict_required, tools_dict_additional
+
     def _initialize_tools(self):
         with open(f"{self.agent_dir}/tools.json", 'r', encoding="utf8") as f: 
-            self.tools_config = json.load(f)["tools"]
+            self.tools = json.load(f)["tools"]
         
-        for tool in self.tools_config:
+        for tool in self.tools:
             tool["function"]["description"] = self.prompts.get(tool["function"]["name"], tool["function"]["description"])
-
-        # Конвертация в формат Google GenAI
-        function_declarations = []
-        for tool in self.tools_config:
-            func = tool["function"]
-            params = func.get("parameters", {})
-            # Fix for GenAI: properties required
-            if "properties" not in params:
-                params["properties"] = {}
-                params["type"] = "OBJECT"
-            
-            function_declarations.append(
-                types.FunctionDeclaration(
-                    name=func["name"],
-                    description=func["description"],
-                    parameters=params
-                )
-            )
-        
-        if function_declarations:
-            self.genai_tools = [types.Tool(function_declarations=function_declarations)]
-        else:
-            self.genai_tools = []
-
-        self.tools_dict_required = { 
-            "chat": ["name", "message"], 
-            "chat_exec": ["name", "code"], 
-            "python": ["code"], 
-            "google_search": ["query"], 
-            "shell": ["command"], 
-            "user_profile": ["data"], 
-            "http": ["url"], 
-            "save_code_changes": ["code"],
-            "python_str" : ["text"]
-        }
-        self.tools_dict_additional = { 
-            "google_search": ["num_results"], 
-            "shell": ["timeout"]
-        }
 
     def _apply_saved_changes(self):
         try:
@@ -145,7 +191,11 @@ class Chat:
         if name not in self.chats:
             self.chats[name] = Chat(output_mode="auto", count_tab=self.count_tab + 1)
         self.print(f"\n⚙️ Агент (авто, запрос, чат: {name}): " + message)
-        return self.chats[name].send({"role": "user", "content": message})
+        return self.chats[name].send((
+                types.Content(
+                    role="user", parts=[types.Part(text=message)]
+                )
+            ))
 
     def chat_exec_tool(self, name, code):
         if name not in self.chats.keys():
@@ -187,7 +237,7 @@ class Chat:
 
     def shell_tool(self, command, timeout=120):
         try:
-            process = subprocess.run(command, shell=True, capture_output=True, text=True, timeout=timeout)
+            process = subprocess.run(command, encoding='utf-8', shell=True, capture_output=True, text=True, timeout=timeout)
             return json.dumps({"returncode": process.returncode, "stdout": process.stdout, "stderr": process.stderr}, ensure_ascii=False, indent=2)
         except subprocess.TimeoutExpired:
             return json.dumps({"returncode": -1, "stdout": "", "stderr": f"Ошибка: Команда выполнялась дольше {timeout} секунд и была прервана."}, ensure_ascii=False, indent=2)
@@ -252,16 +302,24 @@ class Chat:
         except Exception as e:
             return f"Критическая ошибка при сохранении изменений: {e}"
     
-    def check_tool_args(self, args, tool_args, tool_id):
+    def check_tool_args(self, args, tool_args):
         for arg in args:
             if arg not in tool_args:
-                self.messages.append({"role": "tool", "tool_call_id": tool_id, "content": f"Ошибка: отсутствует параметр {arg}"})
+                self.messages.append({"role": "user", "content": f"Ошибка: отсутствует параметр {arg}"})
+                self.gemini_messages.append((
+                    types.Content(
+                        role="user", 
+                        parts=[types.Part(text=f"Ошибка: отсутствует параметр {arg}")]
+                    )
+                ))
                 return False
         return True
 
-    def tool_exec(self, name, tool_args, tool_id):
-        required = self.tools_dict_required.get(name, [])
-        additional = self.tools_dict_additional.get(name, [])
+    def tool_exec(self, name, tool_args):
+        tools_dict_required, tools_dict_additional = self._get_tools_dicts()
+
+        required = tools_dict_required.get(name, [])
+        additional = tools_dict_additional.get(name, [])
 
         if name == 'python' and 'code' in tool_args:
             self.print_code(f"Запрос {name}", tool_args['code'])
@@ -277,7 +335,7 @@ class Chat:
                 args_for_exec[key] = repr(val)
         
         try:
-            if self.check_tool_args(required, tool_args, tool_id):
+            if self.check_tool_args(required, tool_args):
                 if name == 'python':
                     tool_result = self.python_tool(tool_args['code'])
                 else:
@@ -289,12 +347,12 @@ class Chat:
                     tool_result = self.local_env.get("result")
 
                 self.print_code(f"Результат {name}", str(tool_result))
-                return {"role": "tool", "tool_call_id": tool_id, "content": str(tool_result)}
+                return types.Content(role="user", parts=[types.Part(text=str(tool_result))])
 
         except Exception as e:
             error_message = f"Ошибка инструмента: {e}"
             self.print_code(f"Ошибка {name}", error_message)
-            return {"role": "tool", "tool_call_id": tool_id, "content": error_message}
+            return types.Content(role="user", parts=[types.Part(text="Такого инструмента не существует")])
 
     def print(self, message, count_tab=-1, **kwargs):
         if count_tab == -1:
@@ -325,96 +383,14 @@ class Chat:
             self.print("\n\n" + language + ":\n", count_tab=count_tab)
             self.print(displayed_code + '\n', count_tab=count_tab + 1)
 
-    def send(self, message):
-        if isinstance(message, dict):
-            self.messages.append(message)
-        else:
-            self.messages.extend(message)
+    def send(self, messages):
+        if not isinstance(messages, list):
+            messages = [messages]
+
+        for message in messages:
+            self.messages.append(({"role" : message.role, "content": message.parts[0].text}))
+            self.gemini_messages.append(message)
         return self._process_request()
-
-    def _convert_to_genai_history(self):
-        """Конвертирует историю OpenAI (self.messages) в формат Google GenAI (contents)."""
-        contents = []
-        system_instruction = None
-        
-        i = 0
-        while i < len(self.messages):
-            msg = self.messages[i]
-            role = msg["role"]
-            content_text = msg.get("content", "")
-            
-            if role == "system":
-                if system_instruction is None:
-                    system_instruction = content_text
-                else:
-                    system_instruction += "\n" + content_text
-                i += 1
-                continue
-                
-            if role == "user":
-                contents.append(types.Content(role="user", parts=[types.Part(text=content_text)]))
-                i += 1
-                
-            elif role == "assistant":
-                parts = []
-                if content_text:
-                    parts.append(types.Part(text=content_text))
-                
-                if "tool_calls" in msg and msg["tool_calls"]:
-                    for tc in msg["tool_calls"]:
-                        fn = tc["function"]
-                        try:
-                            args = json.loads(fn["arguments"])
-                        except:
-                            args = {}
-                        parts.append(types.Part(
-                            function_call=types.FunctionCall(
-                                name=fn["name"],
-                                args=args
-                            )
-                        ))
-                
-                if parts:
-                    contents.append(types.Content(role="model", parts=parts))
-                i += 1
-            
-            elif role == "tool":
-                function_responses = []
-                while i < len(self.messages) and self.messages[i]["role"] == "tool":
-                    tool_msg = self.messages[i]
-                    call_id = tool_msg.get("tool_call_id")
-                    
-                    # Ищем имя функции по ID
-                    func_name = "unknown"
-                    for hist_msg in reversed(self.messages[:i]):
-                        if hist_msg["role"] == "assistant" and "tool_calls" in hist_msg:
-                            for tc in hist_msg["tool_calls"]:
-                                if tc["id"] == call_id:
-                                    func_name = tc["function"]["name"]
-                                    break
-                            if func_name != "unknown": break
-                    
-                    response_content = tool_msg["content"]
-                    try:
-                        response_data = json.loads(response_content)
-                    except:
-                        response_data = {"result": response_content}
-
-                    function_responses.append(types.Part(
-                        function_response=types.FunctionResponse(
-                            name=func_name,
-                            response=response_data
-                        )
-                    ))
-                    i += 1
-                
-                if function_responses:
-                    contents.append(types.Content(role="user", parts=function_responses))
-            
-            else:
-                i += 1
-
-        return contents, system_instruction
 
     def _process_request(self):
         while True:
@@ -429,19 +405,24 @@ class Chat:
                     prefix = "🤖 Агент: " if self.output_mode == "user" else "⚙️ Агент (авто, ответ): "
                     self.print(prefix, end="", flush=True)
 
-                contents, system_inst = self._convert_to_genai_history()
-                
+                tools_gemini = []
+                for tool in self.tools:
+                    tools_gemini.append(types.Tool(function_declarations=[tool["function"]]))
+
                 config = types.GenerateContentConfig(
-                    tools=self.genai_tools,
-                    system_instruction=system_inst,
+                    tools=tools_gemini,
+                    system_instruction=self.system_prompt,
+                    thinking_config=types.ThinkingConfig(
+                        include_thoughts=True
+                    ),
                 )
 
                 stream = self.client.models.generate_content_stream(
                     model=self.model,
-                    contents=contents,
-                    config=config
+                    contents=self.gemini_messages,
+                    config=config,
                 )
-                
+
                 return self._handle_stream(stream)
 
             except Exception as e:
@@ -454,73 +435,110 @@ class Chat:
                     continue
                 else:
                     if self.output_mode != "user":
-                        self.send({"role": "system", "content": error_msg})
+                        self.send((
+                            types.Content(
+                                role="user", parts=[types.Part(text=error_msg)]
+                            )
+                        ))
                     return f"Критическая ошибка: {error_msg}"
 
     def _handle_stream(self, stream):
-        full_content = ""
-        tool_calls_buffer = []
+        full_content = ""           # Текст для пользователя (без мыслей)
+        
+        tool_calls_buffer = []      # Данные для вашего исполнителя функций
+        
+        history_parts = []
+
         is_thought = False
 
         try:
             for chunk in stream:
-                if chunk.text:
-                    text_part = chunk.text
+                # Проверка валидности чанка
+                if not chunk.candidates or not chunk.candidates[0].content or not chunk.candidates[0].content.parts:
+                    continue
+
+                # ПЕРЕБИРАЕМ ВСЕ ЧАСТИ (PARTS) ВНУТРИ ЧАНКА
+                for part in chunk.candidates[0].content.parts:
+                    history_parts.append(part)
                     
-                    if "<thought>" in text_part:
-                        is_thought = True
-                        display_text = text_part.replace("<thought>", '')
-                        if self.print_to_console:
-                            self.print('\nМысли:', flush=True)
-                    elif "</thought>" in text_part:
-                        is_thought = False
-                        display_text = text_part.replace("</thought>", '')
-                        if self.print_to_console: self.print('\nОтвет:', flush=True)
-                    else:
+                    # --- ВАРИАНТ 1: ЭТО ТЕКСТ ---
+                    if part.text:
+                        text_part = part.text
+
+                        # === Логика обработки <thought> ===
                         display_text = text_part
+                        
+                        # Обработка начала мысли
+                        if "<thought>" in text_part:
+                            is_thought = True
+                            display_text = display_text.replace("<thought>", '')
+                            if self.print_to_console:
+                                self.print('\nМысли:', flush=True)
+                        
+                        # Обработка конца мысли
+                        if "</thought>" in text_part:
+                            is_thought = False
+                            # Если тег закрылся, вырезаем его и готовимся к выводу ответа
+                            display_text = display_text.replace("</thought>", '') 
+                            if self.print_to_console: 
+                                self.print('\nОтвет:', flush=True)
 
-                    if is_thought:
-                        self.print_thought(display_text, count_tab=self.count_tab + 1, flush=True, end='')
-                    else:
-                        full_content += display_text
-                        self.print(display_text, flush=True, end='')
+                        # Вывод и накопление чистого ответа
+                        if is_thought:
+                            if display_text.strip(): # Не печатаем пустые строки от удаления тегов
+                                self.print_thought(display_text, count_tab=self.count_tab + 1, flush=True, end='')
+                        else:
+                            # Если мы не в режиме мыслей, добавляем в итоговый ответ пользователю
+                            full_content += display_text
+                            self.print(display_text, flush=True, end='')
 
-                if chunk.candidates and chunk.candidates[0].content and chunk.candidates[0].content.parts:
-                    for part in chunk.candidates[0].content.parts:
-                        if part.function_call:
-                            # Generate an ID for OpenAI compatibility
-                            call_id = f"call_{int(time.time())}_{part.function_call.name}"
-                            args_str = json.dumps(part.function_call.args) 
-                            
-                            tc = {
-                                "id": call_id,
-                                "type": "function",
-                                "function": {
-                                    "name": part.function_call.name,
-                                    "arguments": args_str
-                                }
+                    # --- ВАРИАНТ 2: ЭТО ВЫЗОВ ФУНКЦИИ (TOOL) ---
+                    elif part.function_call:
+                        # 2. Формируем словарь для вашего исполнителя (OpenAI формат)
+                        # Внимание: аргументы могут быть объектом, приводим к строке JSON если нужно
+                        # Но обычно part.function_call.args — это уже словарь.
+                        # json.dumps нужен, если ваш executor ожидает строку в 'arguments'.
+                        args_dict = type(part.function_call.args) is dict and part.function_call.args or dict(part.function_call.args)
+                        args_str = json.dumps(args_dict)
+                        
+                        tc = {
+                            "type": "function",
+                            "function": {
+                                "name": part.function_call.name,
+                                "arguments": args_str
                             }
-                            tool_calls_buffer.append(tc)
+                        }
+                        tool_calls_buffer.append(tc)
 
-            self.print("") 
+            self.print("") # Перенос строки после завершения стрима
 
+            # 3. Создаем Content и добавляем в историю
+            # (Только если есть хоть что-то, чтобы не сломать API пустым сообщением)
+            if history_parts:
+                self.gemini_messages.append(types.Content(
+                    role="model",
+                    parts=history_parts,
+                ))
+
+            # --- ВЫПОЛНЕНИЕ ИНСТРУМЕНТОВ ---
+            
+            # Формируем assistant_message для совместимости с вашей логикой (если она зависит от словарей)
             assistant_message = {
-                "role": "assistant",
+                "role": "model",
                 "content": full_content
             }
             if tool_calls_buffer:
                 assistant_message["tool_calls"] = tool_calls_buffer
+                # Вызываем ваш исполнитель
+                self._execute_tool_calls(assistant_message["tool_calls"])
 
             self.messages.append(assistant_message)
-
-            if "tool_calls" in assistant_message:
-                self._execute_tool_calls(assistant_message["tool_calls"])
 
             return full_content
 
         except Exception as e:
             e_trace = traceback.format_exc()
-            self.print(f"Ошибка обработки стрима GenAI: {e}\n{e_trace}")
+            self.print(f"Ошибка обработки стрима: {e}\n{e_trace}")
             return f"Ошибка обработки стрима: {e}"
 
     def _switch_api_key(self):
@@ -542,13 +560,17 @@ class Chat:
                 tool_args = json.loads(tool_args_str)
             except json.JSONDecodeError:
                 tool_args = {}
-            tool_call_id = tool_call["id"]
             
-            if tool_name in self.tools_dict_required:
-                response = self.tool_exec(tool_name, tool_args, tool_call_id)
+            tools_dict_required, tools_dict_additional = self._get_tools_dicts()
+            if tool_name in tools_dict_required:
+                response = self.tool_exec(tool_name, tool_args)
                 tool_responses.append(response)
             else:
-                tool_responses.append({"role": "tool", "tool_call_id": tool_call_id, "content": "Такого инструмента не существует"})
+                tool_responses.append((
+                    types.Content(
+                        role="user", parts=[types.Part(text="Такого инструмента не существует")]
+                    )
+                ))
 
         if tool_responses:
             self.send(tool_responses)
@@ -562,7 +584,11 @@ def main():
     try:
         while True:
             user_input = input("\n👤 Вы: ")
-            chat_agent.send({"role": "user", "content": user_input})
+            chat_agent.send(
+                types.Content(
+                    role="user", parts=[types.Part(text=user_input)]
+                )
+            )
     except KeyboardInterrupt:
         print("\n👋 Программа завершена пользователем")
     except EOFError:
