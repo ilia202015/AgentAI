@@ -103,7 +103,7 @@ class Chat:
             "Информация о окружении:", self._get_full_console_info(),
         ]
         self.system_prompt = "\n".join(system_prompt_parts)
-        self.messages = [self.system_prompt]
+        self.messages = [{"role" : "system", "content": "self.system_prompt"}]
         self.gemini_messages = []
 
         self._initialize_tools()
@@ -388,8 +388,12 @@ class Chat:
             messages = [messages]
 
         for message in messages:
-            self.messages.append(({"role" : message.role, "content": message.parts[0].text}))
-            self.gemini_messages.append(message)
+            if isinstance(message, dict):
+                self.messages.append(message)
+                self.gemini_messages.append(types.Content(role=message["role"], parts=[types.Part(text=message["content"])]))
+            else:
+                self.messages.append(({"role" : message.role, "content": message.parts[0].text}))
+                self.gemini_messages.append(message)
         return self._process_request()
 
     def _process_request(self):
