@@ -9,51 +9,36 @@ class Chat:
     @staticmethod
     def _get_full_console_info():
         report = []
-
-        # --- 1. Определение Операционной системы ---
         try:
             sys_name = platform.system()
             sys_release = platform.release()
-            
-            # Небольшое улучшение для macOS, чтобы было понятнее
             if sys_name == 'Darwin':
                 sys_name = 'macOS (Darwin)'
-                
             report.append(f"Операционная система: {sys_name} {sys_release}")
         except Exception as e:
             report.append(f"Операционная система: Не удалось определить ({e})")
 
-        # --- 2. Определение Оболочки (Shell) через переменные окружения ---
         try:
             shell_info = "Неизвестно"
             env = os.environ
-            
             if platform.system() == "Windows":
-                # Приоритетная проверка на PowerShell через специфичные переменные
                 if "PSModulePath" in env:
                     shell_info = "PowerShell"
                 else:
-                    # Обычно возвращает путь к cmd.exe
                     shell_info = env.get("COMSPEC", "cmd.exe")
             else:
-                # Linux / macOS
                 shell_path = env.get("SHELL", None)
                 if shell_path:
-                    # Берем только имя файла (например, из /bin/zsh -> zsh)
                     shell_info = os.path.basename(shell_path)
                 else:
                     shell_info = "Не задана переменная $SHELL"
-                    
             report.append(f"Оболочка (Shell): {shell_info}")
         except Exception as e:
             report.append(f"Оболочка (Shell): Ошибка при определении ({e})")
 
-        # --- 4. Определение среды терминала или IDE ---
         try:
             term_env = "Стандартный терминал"
             env = os.environ
-
-            # Проверяем популярные маркеры
             if "PYCHARM_HOSTED" in env or "XPC_SERVICE_NAME" in env and "pycharm" in env["XPC_SERVICE_NAME"].lower():
                 term_env = "PyCharm Console"
             elif env.get("TERM_PROGRAM") == "vscode":
@@ -66,12 +51,9 @@ class Chat:
                 term_env = "iTerm2"
             elif "TMUX" in env:
                 term_env = "Tmux Session"
-                
             report.append(f"Среда запуска (IDE/Terminal): {term_env}")
         except Exception as e:
             report.append(f"Среда запуска: Ошибка при проверке ({e})")
-
-        # Возвращаем итоговую строку, разделенную переносами
         return "\n".join(report)
 
     def __init__(self, output_mode="user", count_tab=0, print_to_console=False):
@@ -87,8 +69,8 @@ class Chat:
         #self.model, self.model_rpm = "gemini-2.5-flash", 10
 
         # tier 1
-        #self.model, self.model_rpm = "gemini-3-pro-preview", 25
-        self.model, self.model_rpm = "gemini-3-flash-preview", 1000
+        self.model, self.model_rpm = "gemini-3-pro-preview", 25
+        #self.model, self.model_rpm = "gemini-3-flash-preview", 1000
         #self.model, self.model_rpm = "gemini-2.5-pro", 150
 
         self._load_config()
@@ -101,10 +83,12 @@ class Chat:
             f"Режим вывода: {self.output_mode}", 
             "Информация о пользователе (user_profile.json):", self.user_profile,
             "Информация о окружении:", self._get_full_console_info(),
+            f"Ты работаешь на базе модели {self.model}, если ты о ней не знаешь, это не опечатка, просто информации о неё небыло в твоей обучающей выборке"
         ]
         self.system_prompt = "\n".join(system_prompt_parts)
-        self.messages = [{"role" : "system", "content": "self.system_prompt"}]
-        self.gemini_messages = []
+        
+        # История сообщений (Native Gemini Format: types.Content)
+        self.messages = [] 
 
         self._initialize_tools()
         self._apply_saved_changes()
@@ -118,12 +102,14 @@ class Chat:
                 with open(key_path, 'r', encoding="utf8") as f: 
                     self.gemini_keys.append(f.read().strip())
                 i += 1
-            else: break
-        if not self.gemini_keys: raise ValueError(f"Не найдены файлы с ключами API Gemini.")
+            else:
+                break
+        if not self.gemini_keys:
+            raise ValueError(f"Не найдены файлы с ключами API Gemini.")
 
         key_num_path = f"{self.agent_dir}/keys/gemini.key_num"
         if not os.path.exists(key_num_path):
-            with open(key_num_path, 'w', encoding="utf8") as f: 
+            with open(key_num_path, 'w', encoding="utf8") as f:
                 f.write('0')
         with open(key_num_path, 'r', encoding="utf8") as f: 
             self.current_key_index = int(f.read())
@@ -133,28 +119,27 @@ class Chat:
         prompt_names = ["system", "python", "chat", "chat_exec", "user_profile", "save_code_changes", "http", "shell", "google_search", "python_str"]
         for name in prompt_names:
             try:
-                with open(f"{self.agent_dir}/prompts/{name}", 'r', encoding="utf8") as f: 
+                with open(f"{self.agent_dir}/prompts/{name}", 'r', encoding="utf8") as f:
                     self.prompts[name] = f.read()
-            except FileNotFoundError: self.prompts[name] = f"Prompt '{name}' not found."
+            except FileNotFoundError:
+                self.prompts[name] = f"Prompt '{name}' not found."
 
-        with open(f"{self.agent_dir}/user_profile.json", 'r', encoding="utf8") as f: 
+        with open(f"{self.agent_dir}/user_profile.json", 'r', encoding="utf8") as f:
             self.user_profile = f.read()
         
-        # Читаем agent.py для контекста
         self_code_path = "agent_ext/agent.py" if os.path.exists("agent_ext/agent.py") else __file__
-        with open(self_code_path, 'r', encoding="utf8") as f: 
+        with open(self_code_path, 'r', encoding="utf8") as f:
             self.self_code = f.read()
         
         saved_changes_path = f"{self.agent_dir}/saved_code_changes.py"
         if not os.path.exists(saved_changes_path):
-            with open(saved_changes_path, 'w', encoding="utf8") as f: 
+            with open(saved_changes_path, 'w', encoding="utf8") as f:
                 f.write('# Этот файл хранит сохраненные изменения кода агента.\n\n')
-        with open(saved_changes_path, 'r', encoding="utf8") as f: 
+        with open(saved_changes_path, 'r', encoding="utf8") as f:
             self.saved_code = f.read()
 
         with open("agent_ext/keys/google.key", "r") as f:
             self.google_search_key = f.read().strip()
-        
         with open("agent_ext/keys/search_engine.id", "r") as f:
             self.search_engine_id = f.read().strip()
 
@@ -173,7 +158,6 @@ class Chat:
     def _initialize_tools(self):
         with open(f"{self.agent_dir}/tools.json", 'r', encoding="utf8") as f: 
             self.tools = json.load(f)["tools"]
-        
         for tool in self.tools:
             tool["function"]["description"] = self.prompts.get(tool["function"]["name"], tool["function"]["description"])
 
@@ -182,20 +166,21 @@ class Chat:
             if self.saved_code.strip():
                 print("⚙️ Обнаружены сохраненные изменения. Применяю...")
                 result = self.python_tool(self.saved_code, no_print=True)
-                if result and "Ошибка" in str(result): print(f"❌ Ошибка: {result}")
-                else: print("✅ Изменения успешно применены.")
+                if result and "Ошибка" in str(result):
+                    print(f"❌ Ошибка: {result}")
+                else:
+                    print("✅ Изменения успешно применены.")
         except Exception as e:
             print(f"❌ Критическая ошибка при загрузке изменений: {e}")
+
+    # === TOOLS IMPLEMENTATION ===
 
     def chat_tool(self, name, message):
         if name not in self.chats:
             self.chats[name] = Chat(output_mode="auto", count_tab=self.count_tab + 1)
         self.print(f"\n⚙️ Агент (авто, запрос, чат: {name}): " + message)
-        return self.chats[name].send((
-                types.Content(
-                    role="user", parts=[types.Part(text=message)]
-                )
-            ))
+        # Отправляем сообщение как user
+        return self.chats[name].send(types.Content(role="user", parts=[types.Part(text=message)]))
 
     def chat_exec_tool(self, name, code):
         if name not in self.chats.keys():
@@ -248,7 +233,8 @@ class Chat:
         try:
             import requests
             from bs4 import BeautifulSoup
-        except ImportError: return "Ошибка: для работы этого инструмента необходимы библиотеки requests и beautifulsoup4."
+        except ImportError:
+            return "Ошибка: для работы этого инструмента необходимы библиотеки requests и beautifulsoup4."
         try:
             headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
             response = requests.get(url, headers=headers, timeout=10)
@@ -305,22 +291,15 @@ class Chat:
     def check_tool_args(self, args, tool_args):
         for arg in args:
             if arg not in tool_args:
-                self.messages.append({"role": "user", "content": f"Ошибка: отсутствует параметр {arg}"})
-                self.gemini_messages.append((
-                    types.Content(
-                        role="user", 
-                        parts=[types.Part(text=f"Ошибка: отсутствует параметр {arg}")]
-                    )
-                ))
                 return False
         return True
 
     def tool_exec(self, name, tool_args):
         tools_dict_required, tools_dict_additional = self._get_tools_dicts()
-
         required = tools_dict_required.get(name, [])
         additional = tools_dict_additional.get(name, [])
 
+        # Логирование
         if name == 'python' and 'code' in tool_args:
             self.print_code(f"Запрос {name}", tool_args['code'])
         else:
@@ -347,12 +326,16 @@ class Chat:
                     tool_result = self.local_env.get("result")
 
                 self.print_code(f"Результат {name}", str(tool_result))
-                return types.Content(role="user", parts=[types.Part(text=str(tool_result))])
+                return tool_result 
 
         except Exception as e:
             error_message = f"Ошибка инструмента: {e}"
             self.print_code(f"Ошибка {name}", error_message)
-            return types.Content(role="user", parts=[types.Part(text="Такого инструмента не существует")])
+            return error_message
+            
+        return "Ошибка: неверные аргументы или инструмент не найден"
+
+    # === OUTPUT & LOGGING ===
 
     def print(self, message, count_tab=-1, **kwargs):
         if count_tab == -1:
@@ -383,22 +366,31 @@ class Chat:
             self.print("\n\n" + language + ":\n", count_tab=count_tab)
             self.print(displayed_code + '\n', count_tab=count_tab + 1)
 
+    # === CORE LOGIC ===
+
     def send(self, messages):
+        # В Native режиме принимаем типы types.Content или список parts
         if not isinstance(messages, list):
             messages = [messages]
 
-        for message in messages:
-            if isinstance(message, dict):
-                self.messages.append(message)
-                self.gemini_messages.append(types.Content(role=message["role"], parts=[types.Part(text=message["content"])]))
+        for msg in messages:
+            # Если это словарь или простой текст, пробуем преобразовать в types.Content
+            if isinstance(msg, dict):
+                 # Простой адаптер для dict-формата (role/content)
+                 parts = [types.Part(text=msg["content"])]
+                 self.messages.append(types.Content(role=msg["role"], parts=parts))
+            elif isinstance(msg, str):
+                 self.messages.append(types.Content(role="user", parts=[types.Part(text=msg)]))
             else:
-                self.messages.append(({"role" : message.role, "content": message.parts[0].text}))
-                self.gemini_messages.append(message)
+                 # Предполагаем types.Content
+                 self.messages.append(msg)
+        
         return self._process_request()
 
     def _process_request(self):
         while True:
             try:
+                # Rate limiter
                 delay = 60 / self.model_rpm - (time.time() - self.last_send_time)
                 if delay > 0:
                     self.print(f"Жду {delay:.2f} секунд")
@@ -416,21 +408,19 @@ class Chat:
                 config = types.GenerateContentConfig(
                     tools=tools_gemini,
                     system_instruction=self.system_prompt,
-                    thinking_config=types.ThinkingConfig(
-                        include_thoughts=True
-                    ),
+                    thinking_config=types.ThinkingConfig(include_thoughts=True),
                 )
 
                 stream = self.client.models.generate_content_stream(
                     model=self.model,
-                    contents=self.gemini_messages,
+                    contents=self.messages,
                     config=config,
                 )
 
                 return self._handle_stream(stream)
 
             except Exception as e:
-                error_msg = f"Произошла ошибка: {e}\n\n{traceback.format_exc()}"
+                error_msg = f"Произошла ошибка API: {e}\n\n{traceback.format_exc()}"
                 self.print(f"\n❌ {error_msg}")
 
                 if "429" in str(e) or "Resource has been exhausted" in str(e):
@@ -438,112 +428,86 @@ class Chat:
                     self._switch_api_key()
                     continue
                 else:
-                    if self.output_mode != "user":
-                        self.send((
-                            types.Content(
-                                role="user", parts=[types.Part(text=error_msg)]
-                            )
-                        ))
                     return f"Критическая ошибка: {error_msg}"
 
     def _handle_stream(self, stream):
-        full_content = ""           # Текст для пользователя (без мыслей)
+        # Буфер для сборки ответа модели
+        response_parts = []
         
-        tool_calls_buffer = []      # Данные для вашего исполнителя функций
+        # Для отображения
+        full_text = ""
         
-        history_parts = []
-
-        is_thought = False
-
+        tool_calls_buffer = []
+        
         try:
             for chunk in stream:
-                # Проверка валидности чанка
                 if not chunk.candidates or not chunk.candidates[0].content or not chunk.candidates[0].content.parts:
                     continue
-
-                # ПЕРЕБИРАЕМ ВСЕ ЧАСТИ (PARTS) ВНУТРИ ЧАНКА
+                
                 for part in chunk.candidates[0].content.parts:
-                    history_parts.append(part)
+                    response_parts.append(part) # Собираем все части для истории
                     
-                    # --- ВАРИАНТ 1: ЭТО ТЕКСТ ---
+                    # 2. Текст
                     if part.text:
-                        text_part = part.text
-
-                        # === Логика обработки <thought> ===
-                        display_text = text_part
-                        
-                        # Обработка начала мысли
-                        if "<thought>" in text_part:
-                            is_thought = True
-                            display_text = display_text.replace("<thought>", '')
+                        if part.thought:
                             if self.print_to_console:
-                                self.print('\nМысли:', flush=True)
-                        
-                        # Обработка конца мысли
-                        if "</thought>" in text_part:
-                            is_thought = False
-                            # Если тег закрылся, вырезаем его и готовимся к выводу ответа
-                            display_text = display_text.replace("</thought>", '') 
-                            if self.print_to_console: 
-                                self.print('\nОтвет:', flush=True)
-
-                        # Вывод и накопление чистого ответа
-                        if is_thought:
-                            if display_text.strip(): # Не печатаем пустые строки от удаления тегов
-                                self.print_thought(display_text, count_tab=self.count_tab + 1, flush=True, end='')
+                                self.print("Мысль:", end='\t\t\t')
+                            self.print_thought(part.text, flush=True, end='')
                         else:
-                            # Если мы не в режиме мыслей, добавляем в итоговый ответ пользователю
-                            full_content += display_text
-                            self.print(display_text, flush=True, end='')
+                            self.print(part.text, flush=True, end='')
+                    
+                    # 3. Function Call
+                    if part.function_call:
+                        tool_calls_buffer.append(part.function_call)
 
-                    # --- ВАРИАНТ 2: ЭТО ВЫЗОВ ФУНКЦИИ (TOOL) ---
-                    elif part.function_call:
-                        # 2. Формируем словарь для вашего исполнителя (OpenAI формат)
-                        # Внимание: аргументы могут быть объектом, приводим к строке JSON если нужно
-                        # Но обычно part.function_call.args — это уже словарь.
-                        # json.dumps нужен, если ваш executor ожидает строку в 'arguments'.
-                        args_dict = type(part.function_call.args) is dict and part.function_call.args or dict(part.function_call.args)
-                        args_str = json.dumps(args_dict)
-                        
-                        tc = {
-                            "type": "function",
-                            "function": {
-                                "name": part.function_call.name,
-                                "arguments": args_str
-                            }
-                        }
-                        tool_calls_buffer.append(tc)
+            self.print("") # Перенос строки
 
-            self.print("") # Перенос строки после завершения стрима
+            # Сохраняем ответ модели в историю
+            self.messages.append(types.Content(role="model", parts=response_parts))
 
-            # 3. Создаем Content и добавляем в историю
-            # (Только если есть хоть что-то, чтобы не сломать API пустым сообщением)
-            if history_parts:
-                self.gemini_messages.append(types.Content(
-                    role="model",
-                    parts=history_parts,
-                ))
-
-            # --- ВЫПОЛНЕНИЕ ИНСТРУМЕНТОВ ---
-            
-            # Формируем assistant_message для совместимости с вашей логикой (если она зависит от словарей)
-            assistant_message = {
-                "role": "model",
-                "content": full_content
-            }
+            # Если были вызовы функций
             if tool_calls_buffer:
-                assistant_message["tool_calls"] = tool_calls_buffer
-                # Вызываем ваш исполнитель
-                self._execute_tool_calls(assistant_message["tool_calls"])
+                return self._execute_tool_calls(tool_calls_buffer)
 
-            self.messages.append(assistant_message)
-
-            return full_content
+            return full_text
 
         except Exception as e:
             e_trace = traceback.format_exc()
             self.print(f"Ошибка обработки стрима: {e}\n{e_trace}")
             return f"Ошибка обработки стрима: {e}"
+
+    def _execute_tool_calls(self, tool_calls):
+        # Gemini Protocol: Model -> User (FunctionResponse) -> Model
+        
+        response_parts = []
+        
+        for fc in tool_calls:
+            name = fc.name
+            args = fc.args
+            
+            # Приводим аргументы к dict
+            if not isinstance(args, dict):
+                 try:
+                     args = json.loads(args)
+                 except:
+                     args = {}
+
+            # Выполнение
+            result_str = self.tool_exec(name, args)
+
+            # Формируем ответ
+            response_parts.append(types.Part(
+                function_response=types.FunctionResponse(
+                    name=name,
+                    response={"result": result_str} 
+                )
+            ))
+        
+        # Добавляем ответы инструментов в историю (от имени user)
+        self.messages.append(types.Content(role="user", parts=response_parts))
+
+        # Продолжаем диалог
+        return self._process_request()
 
     def _switch_api_key(self):
         self.current_key_index = (self.current_key_index + 1) % len(self.gemini_keys)
@@ -553,53 +517,20 @@ class Chat:
         self.client = genai.Client(api_key=self.ai_key)
         self.print(f"🔑 Превышен лимит запросов. Переключаюсь на следующий ключ ({self.current_key_index + 1}/{len(self.gemini_keys)}).")
 
-    def _execute_tool_calls(self, tool_calls):
-        tool_responses = []
-        for tool_call in tool_calls:
-            if "function" not in tool_call:
-                continue
-            tool_name = tool_call["function"]["name"]
-            try:
-                tool_args_str = tool_call["function"]["arguments"]
-                tool_args = json.loads(tool_args_str)
-            except json.JSONDecodeError:
-                tool_args = {}
-            
-            tools_dict_required, tools_dict_additional = self._get_tools_dicts()
-            if tool_name in tools_dict_required:
-                response = self.tool_exec(tool_name, tool_args)
-                tool_responses.append(response)
-            else:
-                tool_responses.append((
-                    types.Content(
-                        role="user", parts=[types.Part(text="Такого инструмента не существует")]
-                    )
-                ))
-
-        if tool_responses:
-            self.send(tool_responses)
-
 
 def main():
-    print("🚀 AI-агент запущен. Введите ваш запрос.")
-
+    print("🚀 AI-агент запущен (Gemini Native Mode). Введите ваш запрос.")
     chat_agent = Chat(print_to_console=True)
-    
     try:
         while True:
             user_input = input("\n👤 Вы: ")
-            chat_agent.send(
-                types.Content(
-                    role="user", parts=[types.Part(text=user_input)]
-                )
-            )
+            chat_agent.send(user_input)
     except KeyboardInterrupt:
         print("\n👋 Программа завершена пользователем")
     except EOFError:
         print("\n👋 Программа завершена (Ctrl+D)")
     except Exception as e:
         print(f"\n💥 Критическая ошибка: {e}")
-
 
 if __name__ == "__main__":
     main()
