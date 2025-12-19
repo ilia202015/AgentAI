@@ -1,3 +1,4 @@
+
 import { store } from '../store.js';
 import * as api from '../api.js';
 import { nextTick, ref, watch, onMounted, computed, defineComponent } from 'vue';
@@ -17,7 +18,7 @@ const MessageBubble = defineComponent({
             :class="msg.role === 'user' ? 'items-end' : 'items-start'">
             
             <div class="flex items-center gap-2 mb-1.5 px-1 opacity-60 text-xs font-medium tracking-wide">
-                <span v-if="msg.role === 'assistant'" class="flex items-center gap-1.5 text-blue-400">
+                <span v-if="msg.role === 'assistant' || msg.role === 'model'" class="flex items-center gap-1.5 text-blue-400">
                         <i class="ph-fill ph-robot"></i> Агент
                 </span>
                 <span v-else class="text-gray-400 flex items-center gap-2">
@@ -27,8 +28,8 @@ const MessageBubble = defineComponent({
             </div>
 
             <!-- Assistant: Thoughts -->
-            <div v-if="msg.role === 'assistant'" class="w-full mb-2 space-y-2">
-                <details v-if="msg.thoughts" class="group/thought">
+            <div v-if="(msg.role === 'assistant' || msg.role === 'model') && msg.thoughts" class="w-full mb-2 space-y-2">
+                <details class="group/thought">
                     <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
                         <i class="ph ph-brain text-purple-400 group-open/thought:rotate-180 transition-transform"></i>
                         <span>Процесс мышления</span>
@@ -60,14 +61,14 @@ const MessageBubble = defineComponent({
                         <div class="prose prose-invert prose-sm break-words leading-relaxed max-w-none" 
                             :class="msg.role === 'user' ? 'text-white/95' : ''"
                             v-html="renderedContent"></div>
-                        <div v-if="msg.role === 'assistant'" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                            <button @click="copyToClipboard(msg.content)" class="p-1.5 text-gray-500 hover:text-white hover:bg-white/10 rounded transition" title="Копировать"><i class="ph ph-copy"></i></button>
+                        <div v-if="msg.role === 'assistant' || msg.role === 'model'" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                            <button @click="copyToClipboard(rawContent)" class="p-1.5 text-gray-500 hover:text-white hover:bg-white/10 rounded transition" title="Копировать"><i class="ph ph-copy"></i></button>
                         </div>
                     </div>
             </div>
 
             <!-- Assistant: Tools -->
-            <div v-if="msg.role === 'assistant' && msg.tools && msg.tools.length > 0" class="w-full mt-2">
+            <div v-if="(msg.role === 'assistant' || msg.role === 'model') && msg.tools && msg.tools.length > 0" class="w-full mt-2">
                 <details class="group/tools">
                     <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
                         <i class="ph ph-wrench text-emerald-500 group-open/tools:rotate-180 transition-transform"></i>
@@ -93,10 +94,25 @@ const MessageBubble = defineComponent({
         const editContent = ref('');
         ensureMarkedConfig();
 
+        // Универсальная функция получения текста сообщения
+        const getMessageText = (msg) => {
+            if (msg.content) return msg.content;
+            if (msg.parts && Array.isArray(msg.parts)) {
+                return msg.parts
+                    .filter(p => p.text)
+                    .map(p => p.text)
+                    .join('');
+            }
+            return '';
+        };
+
         const renderedContent = computed(() => {
-            if (!props.msg.content) return '';
-            try { return marked.parse(props.msg.content); } catch (e) { return props.msg.content; }
+            const text = getMessageText(props.msg);
+            if (!text) return '';
+            try { return marked.parse(text); } catch (e) { return text; }
         });
+        
+        const rawContent = computed(() => getMessageText(props.msg));
 
         const processContent = () => {
             if (!root.value) return;
@@ -106,7 +122,7 @@ const MessageBubble = defineComponent({
             });
             if (typeof renderMathInElement !== 'undefined') {
                 renderMathInElement(root.value, {
-                    delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}, {left: '\(', right: '\)', display: false}, {left: '\[', right: '\]', display: true} ],
+                    delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}, {left: '\\(', right: '\\)', display: false}, {left: '\\[', right: '\\]', display: true} ],
                     throwOnError: false
                 });
             }
@@ -134,12 +150,12 @@ const MessageBubble = defineComponent({
         onMounted(async () => { await nextTick(); processContent(); });
         watch(() => props.msg.tools, async () => { await nextTick(); processContent(); }, { deep: true });
 
-        const startEdit = () => { editContent.value = props.msg.content; isEditing.value = true; };
+        const startEdit = () => { editContent.value = getMessageText(props.msg); isEditing.value = true; };
         const cancelEdit = () => { isEditing.value = false; };
-        const saveEdit = () => { if (editContent.value.trim() !== props.msg.content) { emit('edit', props.index, editContent.value); } isEditing.value = false; };
+        const saveEdit = () => { if (editContent.value.trim() !== getMessageText(props.msg)) { emit('edit', props.index, editContent.value); } isEditing.value = false; };
         const copyToClipboard = (text) => { navigator.clipboard.writeText(text); store.addToast("Текст скопирован", "success"); };
 
-        return { renderedContent, copyToClipboard, root, isEditing, editContent, startEdit, cancelEdit, saveEdit };
+        return { renderedContent, rawContent, copyToClipboard, root, isEditing, editContent, startEdit, cancelEdit, saveEdit };
     }
 });
 

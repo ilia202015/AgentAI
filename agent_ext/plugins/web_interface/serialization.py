@@ -2,22 +2,21 @@ import json
 from google.genai import types
 
 def serialize_message(msg):
-    # Если это уже dict (старый формат или ошибка), возвращаем как есть
     if isinstance(msg, dict):
-        return msg
-        
-    try:
-        # Используем Pydantic метод model_dump
-        # Он АВТОМАТИЧЕСКИ сохраняет 'thought': True и 'thought_signature' внутри parts
-        data = msg.model_dump(mode='json', exclude_none=True)
-    except Exception:
-        # Fallback
+        data = msg.copy()
+    else:
         try:
-             data = msg.to_json_dict()
-        except:
-             data = {"role": msg.role, "parts": [{"text": p.text} for p in msg.parts]}
+            # Чистый дамп, без самодеятельности
+            data = msg.model_dump(mode='json', exclude_none=True)
+        except Exception:
+            try:
+                data = msg.to_json_dict()
+            except:
+                data = {"role": getattr(msg, "role", "user"), "parts": []}
+                if hasattr(msg, "parts"):
+                    data["parts"] = [{"text": p.text} for p in msg.parts if hasattr(p, "text")]
 
-    # Добавляем кастомные поля Web Interface (дублируем мысли для удобства UI)
+    # Добавляем ТОЛЬКО метаданные плагина
     if hasattr(msg, "_web_thoughts"):
         data["thoughts"] = msg._web_thoughts
     if hasattr(msg, "_web_tools"):
@@ -29,49 +28,39 @@ def deserialize_message(data):
     if not isinstance(data, dict):
         return data
 
-    # Извлекаем кастомные поля UI
     thoughts = data.get("thoughts", None)
     tools = data.get("tools", None)
     
-    # Очищаем данные от лишних полей перед валидацией
-    clean_data = {k: v for k, v in data.items() if k not in ["thoughts", "tools"]}
+    # Удаляем поля, которых нет в SDK
+    clean_data = {k: v for k, v in data.items() if k not in ["thoughts", "tools", "content", "tool_calls"]}
     
     try:
-        # 1. Пробуем загрузить как нативный объект Gemini (с parts и signatures)
         msg = types.Content.model_validate(clean_data)
     except Exception:
-        # 2. Fallback: Legacy format (обычный content="...", без parts)
         parts = []
-        
-        # Если есть 'parts' (но валидация не прошла по другой причине)
         if "parts" in clean_data:
             for p in clean_data["parts"]:
                 if "text" in p:
-                    # Если это мысль без сигнатуры (старый формат), загружаем как текст, 
-                    # чтобы не сломать API требованием сигнатуры.
-                    is_thought = p.get("thought", False)
-                    signature = p.get("thought_signature", None)
-                    
-                    if is_thought and not signature:
-                        # Превращаем в обычный текст, скрывая флаг мысли от API, 
-                        # так как без сигнатуры API вернет ошибку.
+                    # Legacy fix: мысль без сигнатуры превращаем в текст
+                    if p.get("thought", False) and not p.get("thought_signature"):
                         parts.append(types.Part(text=p["text"]))
                     else:
-                        # Пытаемся восстановить как есть
-                        parts.append(types.Part(**p))
-                        
-        # Если старый формат 'content'
-        elif "content" in clean_data:
-            parts.append(types.Part(text=str(clean_data["content"])))
-            
+                        try: parts.append(types.Part.model_validate(p))
+                        except: parts.append(types.Part(text=p["text"]))
+                elif "function_call" in p:
+                    try: parts.append(types.Part(function_call=types.FunctionCall(**p["function_call"])))
+                    except: pass
+                elif "function_response" in p:
+                    try: parts.append(types.Part(function_response=types.FunctionResponse(**p["function_response"])))
+                    except: pass
+        
+        if not parts and "content" in data:
+             parts.append(types.Part(text=str(data["content"])))
+
         msg = types.Content(role=clean_data.get("role", "user"), parts=parts)
 
-    # Восстанавливаем атрибуты для UI
-    if thoughts:
-        msg._web_thoughts = thoughts
-    if tools:
-        msg._web_tools = tools
-        
+    if thoughts: msg._web_thoughts = thoughts
+    if tools: msg._web_tools = tools
     return msg
 
 def serialize_history(messages):
