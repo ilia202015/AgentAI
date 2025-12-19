@@ -431,12 +431,7 @@ class Chat:
                     return f"Критическая ошибка: {error_msg}"
 
     def _handle_stream(self, stream):
-        # Буфер для сборки ответа модели
         response_parts = []
-        
-        # Для отображения
-        full_text = ""
-        
         tool_calls_buffer = []
         
         try:
@@ -445,31 +440,29 @@ class Chat:
                     continue
                 
                 for part in chunk.candidates[0].content.parts:
-                    response_parts.append(part) # Собираем все части для истории
+                    response_parts.append(part)
                     
-                    # 2. Текст
                     if part.text:
-                        if part.thought:
+                        # FIX: Безопасный доступ к thought
+                        is_thought = getattr(part, 'thought', False)
+                        if is_thought:
                             if self.print_to_console:
                                 self.print("Мысль:", end='\t\t\t')
                             self.print_thought(part.text, flush=True, end='')
                         else:
                             self.print(part.text, flush=True, end='')
                     
-                    # 3. Function Call
                     if part.function_call:
                         tool_calls_buffer.append(part.function_call)
 
-            self.print("") # Перенос строки
-
-            # Сохраняем ответ модели в историю
+            self.print("")
+            
             self.messages.append(types.Content(role="model", parts=response_parts))
 
-            # Если были вызовы функций
             if tool_calls_buffer:
                 return self._execute_tool_calls(tool_calls_buffer)
 
-            return full_text
+            return "" 
 
         except Exception as e:
             e_trace = traceback.format_exc()

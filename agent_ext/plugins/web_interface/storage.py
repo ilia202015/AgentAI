@@ -9,6 +9,17 @@ import types
 import queue
 import traceback
 
+# Import serialization utils
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
+try:
+    import serialization
+except ImportError:
+    # Fallback/Error handling if serialization not found
+    print("Warning: serialization module not found in storage")
+    serialization = None
+
 is_print_debug = False
 
 CHATS_DIR = "agent_ext/chats"
@@ -47,16 +58,35 @@ def list_chats(get_chat):
                     "preview": _get_preview(chat.messages)
                 })
         except Exception as e:
-            print(f"list_chats() error: {e}")
+            print(f"list_chats() error for {id}: {e}")
     
     chats.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
     return chats
 
 def _get_preview(messages):
     for msg in reversed(messages):
-        if msg.get("role") in ["user", "assistant"] and msg.get("content"):
-            content = str(msg["content"])
-            return (content[:50] + '...') if len(content) > 50 else content
+        # Handle both dict and Object
+        role = getattr(msg, "role", msg.get("role") if isinstance(msg, dict) else None)
+        
+        if role in ["user", "assistant", "model"]:
+            content = ""
+            # Handle Object
+            if hasattr(msg, "parts"):
+                for p in msg.parts:
+                    if hasattr(p, "text") and p.text:
+                        content += p.text + " "
+            # Handle Dict
+            elif isinstance(msg, dict) and "parts" in msg:
+                 for p in msg["parts"]:
+                     if "text" in p:
+                         content += p["text"] + " "
+            # Handle Dict Legacy
+            elif isinstance(msg, dict) and "content" in msg:
+                content = str(msg["content"])
+                
+            content = content.strip()
+            if content:
+                return (content[:50] + '...') if len(content) > 50 else content
     return "Empty chat"
 
 def load_chat_state(id, get_chat):
@@ -72,15 +102,14 @@ def load_chat_state(id, get_chat):
         try:
             with open(pkl_path, 'rb') as f:
                 chat = dill.load(f)
-
-                if not getattr(chat, "name", False):
-                    chat.name = "New chat"
-                if not getattr(chat, "id", False):
-                    chat.id = id
-                if not getattr(chat, "web_queue", False):
-                    chat.web_queue = queue.Queue()
+                
+                # Basic fixups
+                if not getattr(chat, "name", False): chat.name = "New chat"
+                if not getattr(chat, "id", False): chat.id = id
+                if not getattr(chat, "web_queue", False): chat.web_queue = queue.Queue()
                 chat.busy_depth = 0
                 
+                # Check config
                 warning = None
                 if getattr(chat, "plugin_config", None) != get_current_config():
                     warning = "⚠️ **Warning:** The plugin configuration has changed."
@@ -108,13 +137,16 @@ def load_chat_state(id, get_chat):
         return None, "Chat not found or corrupted"
     
     chat = get_chat()
+    
+    # Restore fields
     for key, value in data.items():
-        setattr(chat, key, value)
+        if key == "messages" and serialization:
+            chat.messages = serialization.deserialize_history(value)
+        else:
+            setattr(chat, key, value)
 
-    if not getattr(chat, "name", False):
-        chat.name = "New chat"
-    if not getattr(chat, "id", False):
-        chat.id = id
+    if not getattr(chat, "name", False): chat.name = "New chat"
+    if not getattr(chat, "id", False): chat.id = id
                 
     saved_config = data.get("plugin_config", {})
     current_config = get_current_config()
@@ -140,18 +172,22 @@ def save_chat_state(chat):
     chat.updated_at = datetime.datetime.now().isoformat()
     chat.plugin_config = get_current_config()
     
+    # Serialize messages for JSON
+    messages_json = chat.messages
+    if serialization:
+        messages_json = serialization.serialize_history(chat.messages)
+    
     base_data = {
         "id": chat.id,
         "updated_at": datetime.datetime.now().isoformat(),
-        "messages": chat.messages,
+        "messages": messages_json,
         "plugin_config": get_current_config()
     }
 
     if getattr(chat, "name", None):
         base_data["name"] = chat.name
     else:
-        # Если имя не передано явно, пытаемся сохранить старое имя
-        # Или генерируем новое, если это новый чат
+        # Generate Name Logic
         old_name = "New Chat"
         json_path = os.path.join(CHATS_DIR, f"{chat.id}.json")
         if os.path.exists(json_path):
@@ -161,30 +197,24 @@ def save_chat_state(chat):
              except: pass
         
         if old_name == "New Chat":
-             # Генерируем из первого сообщения
-             for msg in chat.messages:
-                if msg["role"] == "user":
-                    content = str(msg.get("content", ""))
-                    clean = content.replace('\n', ' ').strip()
-                    old_name = (clean[:30] + "...") if len(clean) > 30 else clean
-                    break
+             # Try to generate from messages
+             preview = _get_preview(chat.messages)
+             if preview != "Empty chat":
+                 old_name = preview[:30]
         
         base_data["name"] = old_name
 
     chat.name = base_data["name"]
 
     # 1. Save JSON
-    json_data = base_data.copy()
-    
     json_path = os.path.join(CHATS_DIR, f"{chat.id}.json")
     try:
         with open(json_path, 'w', encoding='utf-8') as f:
-            json.dump(json_data, f, ensure_ascii=False, indent=2, default=str)
+            json.dump(base_data, f, ensure_ascii=False, indent=2, default=str)
     except Exception as e:
         print(f"❌ Error saving JSON backup: {e}")
 
     # 2. Save dill
-    
     pkl_path = os.path.join(CHATS_DIR, f"{chat.id}.pkl")
     try:
         with open(pkl_path, 'wb') as f:            

@@ -40,6 +40,12 @@ except Exception as e:
     log_debug(f"Storage import failed: {e}")
 
 try:
+    import serialization
+except ImportError:
+    log_debug(f"Serialization import failed")
+    serialization = None
+
+try:
     import init as plugin_init
 except ImportError:
     log_debug(f"Plugin Init import failed")
@@ -203,7 +209,15 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             print(f"api_create_chat()")
         
         new_chat = storage.save_chat_state(self.clone_root_chat())
-        self.send_json(new_chat.__dict__)
+        
+        resp = new_chat.__dict__.copy()
+        if 'client' in resp: del resp['client']
+        if 'web_queue' in resp: del resp['web_queue']
+        
+        if serialization:
+            resp['messages'] = serialization.serialize_history(new_chat.messages)
+            
+        self.send_json(resp)
 
     def api_start_temp(self):
         if is_print_debug:
@@ -224,7 +238,14 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         cid = path.split("/")[-2]
         chat, _ = storage.load_chat_state(cid, self.clone_root_chat)
         if chat: 
-            self.send_json({"status": "loaded", "chat": chat.__dict__})
+            resp = chat.__dict__.copy()
+            if 'client' in resp: del resp['client']
+            if 'web_queue' in resp: del resp['web_queue']
+            
+            if serialization:
+                resp['messages'] = serialization.serialize_history(chat.messages)
+            
+            self.send_json({"status": "loaded", "chat": resp})
         else: 
             self.send_json_error(404, "Not found")
         
