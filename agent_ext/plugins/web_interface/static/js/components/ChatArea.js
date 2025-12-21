@@ -38,13 +38,45 @@ marked.setOptions({
     breaks: true,
 });
 
+const MarkdownContent = defineComponent({
+    props: ['content'],
+    template: `<div ref="root" class="markdown-content" v-html="rendered"></div>`,
+    setup(props) {
+        const root = ref(null);
+        
+        const rendered = computed(() => {
+            if (!props.content) return '';
+            const text = typeof props.content === 'string' ? props.content : JSON.stringify(props.content);
+            try { return marked.parse(text); } catch (e) { return text; }
+        });
+
+        const updateMath = () => {
+            if (!root.value || typeof renderMathInElement === 'undefined') return;
+            try {
+                renderMathInElement(root.value, {
+                    delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}, {left: '\(', right: '\)', display: false}, {left: '\[', right: '\]', display: true} ],
+                    ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code", "option"],
+                    throwOnError: false
+                });
+            } catch(e) {}
+        };
+
+        watch(rendered, async () => { await nextTick(); updateMath(); });
+        onMounted(async () => { await nextTick(); updateMath(); });
+
+        return { root, rendered };
+    }
+});
+
 const MessageBubble = defineComponent({
+    components: { MarkdownContent },
     props: ['msg', 'index'],
     emits: ['edit'],
     template: `
         <div class="group flex flex-col w-[95%] mx-auto animate-fade-in-up"
             :class="msg.role === 'user' ? 'items-end' : 'items-start'">
             
+            <!-- Header -->
             <div class="flex items-center gap-2 mb-1.5 px-1 opacity-60 text-xs font-medium tracking-wide">
                 <span v-if="msg.role === 'assistant' || msg.role === 'model'" class="flex items-center gap-1.5 text-blue-400">
                         <i class="ph-fill ph-robot"></i> Агент
@@ -55,165 +87,153 @@ const MessageBubble = defineComponent({
                 </span>
             </div>
 
-            <div v-if="(msg.role === 'assistant' || msg.role === 'model') && msg.thoughts" class="w-full mb-2 space-y-2">
-                <details class="group/thought">
-                    <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
-                        <i class="ph ph-brain text-purple-400 group-open/thought:rotate-180 transition-transform"></i>
-                        <span>Процесс мышления</span>
-                        <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
-                    </summary>
-                    <div ref="thoughtsRef" class="mt-2 pl-3 border-l-2 border-purple-500/20 text-gray-400 text-xs leading-relaxed font-mono bg-gray-900/50 p-4 border border-white/5 rounded-r-lg prose prose-invert prose-xs max-w-none"
-                         v-html="renderedThoughts">
-                    </div>
-                </details>
+            <!-- Edit Mode -->
+            <div v-if="isEditing && msg.role === 'user'" class="w-full bg-gray-900 border border-white/10 rounded-xl p-3 relative max-w-full shadow-lg">
+                <textarea v-model="editContent" rows="3" class="w-full bg-transparent text-sm focus:outline-none resize-none mb-2"></textarea>
+                <div class="flex justify-end gap-2">
+                    <button @click="cancelEdit" class="px-3 py-1.5 rounded text-xs hover:bg-white/5 text-gray-400">Отмена</button>
+                    <button @click="saveEdit" class="px-3 py-1.5 rounded bg-blue-600 text-white text-xs hover:bg-blue-500">Сохранить</button>
+                </div>
             </div>
 
-            <div class="relative max-w-full overflow-hidden transition-all shadow-lg w-full"
-                    :class="[
-                    msg.role === 'user' 
-                        ? (isEditing ? 'w-full' : 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-2xl rounded-tr-sm px-5 py-3.5 border border-white/10 w-auto')
-                        : 'bg-gray-800/40 backdrop-blur-md border border-white/5 text-gray-100 rounded-2xl rounded-tl-sm px-6 py-5'
-                    ]">
+            <!-- Timeline Render -->
+            <div v-else class="flex flex-col w-full space-y-2">
+                
+                <div v-for="(item, idx) in processedTimeline" :key="idx" class="w-full">
                     
-                    <div v-if="isEditing" class="w-full bg-gray-900 border border-white/10 rounded-xl p-3">
-                        <textarea v-model="editContent" rows="3" class="w-full bg-transparent text-sm focus:outline-none resize-none mb-2"></textarea>
-                        <div class="flex justify-end gap-2">
-                            <button @click="cancelEdit" class="px-3 py-1.5 rounded text-xs hover:bg-white/5 text-gray-400">Отмена</button>
-                            <button @click="saveEdit" class="px-3 py-1.5 rounded bg-blue-600 text-white text-xs hover:bg-blue-500">Сохранить</button>
-                        </div>
+                    <!-- 1. Thoughts -->
+                    <div v-if="item.type === 'thought'" class="w-full">
+                        <details class="group/thought">
+                            <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
+                                <i class="ph ph-brain text-purple-400 group-open/thought:rotate-180 transition-transform"></i>
+                                <span>Процесс мышления</span>
+                                <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
+                            </summary>
+                            <div class="mt-2 pl-3 border-l-2 border-purple-500/20 text-gray-400 text-xs leading-relaxed font-mono bg-gray-900/50 p-4 border border-white/5 rounded-r-lg prose prose-invert prose-xs max-w-none">
+                                <MarkdownContent :content="item.content" />
+                            </div>
+                        </details>
                     </div>
 
-                    <div v-else>
-                        <div ref="contentRef" class="prose prose-invert prose-sm break-words leading-relaxed max-w-none" 
-                            :class="msg.role === 'user' ? 'text-white/95' : ''"
-                            v-html="renderedContent"></div>
+                    <!-- 2. Tool (Request + Result Pair) -->
+                    <div v-else-if="item.type === 'pair'" class="w-full">
+                        <details class="group/tools">
+                            <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
+                                <i class="ph ph-wrench text-emerald-500 group-open/tools:rotate-180 transition-transform"></i>
+                                <span>Использован инструмент: {{ item.request.title.replace('Запрос ', '') }}</span>
+                                <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
+                            </summary>
+                            <div class="mt-2 pt-2 border-t border-white/5">
+                                <div class="code-block-wrapper rounded-lg border border-white/5 bg-gray-900 overflow-hidden relative group/code">
+                                    <div class="px-3 py-1.5 bg-white/5 flex items-center justify-between text-xs text-gray-300 font-mono border-b border-white/5">
+                                        <div class="flex items-center gap-2"><i class="ph ph-terminal-window text-emerald-400"></i><span>{{ item.request.title }}</span></div>
+                                        <button onclick="window.copyCode(this)" class="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-white transition-colors cursor-pointer opacity-0 group-hover/code:opacity-100"><i class="ph ph-copy"></i><span>Копировать</span></button>
+                                    </div>
+                                    <div class="p-0 overflow-x-auto bg-[#282c34]"><pre class="text-xs font-mono m-0 p-3 whitespace-pre-wrap"><code class="hljs" style="background: transparent; padding: 0;">{{ item.request.content }}</code></pre></div>
+                                    
+                                    <div class="px-3 py-1.5 bg-white/5 flex items-center gap-2 text-xs text-gray-400 font-mono border-y border-white/5">
+                                        <i class="ph ph-arrow-elbow-down-right text-blue-400"></i><span>Результат:</span>
+                                    </div>
+                                    <div class="p-0 overflow-x-auto bg-[#1e222a]"><pre class="text-xs font-mono m-0 p-3 whitespace-pre-wrap text-gray-300"><code class="hljs" style="background: transparent; padding: 0;">{{ item.result.content }}</code></pre></div>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+
+                    <!-- 3. Tool (Single) -->
+                    <div v-else-if="item.type === 'tool'" class="w-full">
+                        <details class="group/tools">
+                            <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
+                                <i class="ph ph-wrench text-emerald-500 group-open/tools:rotate-180 transition-transform"></i>
+                                <span>Инструмент: {{ item.title }}</span>
+                                <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
+                            </summary>
+                            <div class="mt-2 pt-2 border-t border-white/5">
+                                <div class="code-block-wrapper rounded-lg border border-white/5 bg-gray-900 overflow-hidden relative group/code">
+                                    <div class="px-3 py-1.5 bg-white/5 flex items-center justify-between text-xs text-gray-300 font-mono border-b border-white/5">
+                                        <div class="flex items-center gap-2"><i class="ph ph-terminal-window text-emerald-400"></i><span>{{ item.title }}</span></div>
+                                        <button onclick="window.copyCode(this)" class="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-white transition-colors cursor-pointer opacity-0 group-hover/code:opacity-100"><i class="ph ph-copy"></i><span>Копировать</span></button>
+                                    </div>
+                                    <div class="p-0 overflow-x-auto bg-[#282c34]"><pre class="text-xs font-mono m-0 p-3 whitespace-pre-wrap"><code class="hljs" style="background: transparent; padding: 0;">{{ item.content }}</code></pre></div>
+                                </div>
+                            </div>
+                        </details>
+                    </div>
+
+                    <!-- 4. Text Content -->
+                    <div v-else-if="item.type === 'text' && (item.content.trim() || isEditing)" class="relative max-w-full overflow-hidden transition-all shadow-lg w-full"
+                        :class="[
+                        msg.role === 'user' 
+                            ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-2xl rounded-tr-sm px-5 py-3.5 border border-white/10 w-auto self-end'
+                            : 'bg-gray-800/40 backdrop-blur-md border border-white/5 text-gray-100 rounded-2xl rounded-tl-sm px-6 py-5'
+                        ]">
+                        
+                        <MarkdownContent :content="item.content" />
                         
                         <div v-if="msg.role === 'assistant' || msg.role === 'model'" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                            <button @click="copyToClipboard(rawContent)" class="p-1.5 text-gray-500 hover:text-white hover:bg-white/10 rounded transition" title="Копировать"><i class="ph ph-copy"></i></button>
+                            <button @click="copyToClipboard(item.content)" class="p-1.5 text-gray-500 hover:text-white hover:bg-white/10 rounded transition" title="Копировать"><i class="ph ph-copy"></i></button>
                         </div>
                     </div>
+
+                </div>
             </div>
 
-            <div v-if="(msg.role === 'assistant' || msg.role === 'model') && processedTools.length > 0" class="w-full mt-2">
-                <details class="group/tools" open>
-                    <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
-                        <i class="ph ph-wrench text-emerald-500 group-open/tools:rotate-180 transition-transform"></i>
-                        <span>Использованные инструменты ({{ processedTools.length }})</span>
-                        <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
-                    </summary>
-                    <div class="space-y-2 mt-2 pt-2 border-t border-white/5">
-                        
-                        <div v-for="(item, tIdx) in processedTools" :key="'tool-'+index+'-'+tIdx" class="code-block-wrapper rounded-lg border border-white/5 bg-gray-900 overflow-hidden relative group/code">
-                            
-                            <!-- PAIR -->
-                            <div v-if="item.type === 'pair'">
-                                <div class="px-3 py-1.5 bg-white/5 flex items-center justify-between text-xs text-gray-300 font-mono border-b border-white/5">
-                                    <div class="flex items-center gap-2"><i class="ph ph-terminal-window text-emerald-400"></i><span>{{ item.request.title }}</span></div>
-                                    <button onclick="window.copyCode(this)" class="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-white transition-colors cursor-pointer opacity-0 group-hover/code:opacity-100"><i class="ph ph-copy"></i><span>Копировать</span></button>
-                                </div>
-                                <div class="p-0 overflow-x-auto bg-[#282c34]"><pre class="text-xs font-mono m-0 p-3 whitespace-pre-wrap"><code class="hljs" style="background: transparent; padding: 0;">{{ item.request.content }}</code></pre></div>
-                                
-                                <div class="px-3 py-1.5 bg-white/5 flex items-center gap-2 text-xs text-gray-400 font-mono border-y border-white/5">
-                                    <i class="ph ph-arrow-elbow-down-right text-blue-400"></i><span>Результат:</span>
-                                </div>
-                                <div class="p-0 overflow-x-auto bg-[#1e222a]"><pre class="text-xs font-mono m-0 p-3 whitespace-pre-wrap text-gray-300"><code class="hljs" style="background: transparent; padding: 0;">{{ item.result.content }}</code></pre></div>
-                            </div>
-
-                            <!-- SINGLE -->
-                            <div v-else>
-                                <div class="px-3 py-1.5 bg-white/5 flex items-center justify-between text-xs text-gray-300 font-mono border-b border-white/5">
-                                    <div class="flex items-center gap-2"><i class="ph ph-terminal-window text-emerald-400"></i><span>{{ item.title }}</span></div>
-                                    <button onclick="window.copyCode(this)" class="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-white transition-colors cursor-pointer opacity-0 group-hover/code:opacity-100"><i class="ph ph-copy"></i><span>Копировать</span></button>
-                                </div>
-                                <div class="p-0 overflow-x-auto bg-[#282c34]"><pre class="text-xs font-mono m-0 p-3 whitespace-pre-wrap"><code class="hljs" style="background: transparent; padding: 0;">{{ item.content }}</code></pre></div>
-                            </div>
-
-                        </div>
-
-                    </div>
-                </details>
-            </div>
         </div>
     `,
     setup(props, { emit }) {
-        const thoughtsRef = ref(null);
-        const contentRef = ref(null);
         const isEditing = ref(false);
         const editContent = ref('');
 
-        const getMessageText = (msg) => {
-            if (msg.content) return msg.content;
-            if (msg.parts && Array.isArray(msg.parts)) {
-                // Исключаем parts, если они уже отображены как thoughts (это хак для совместимости, если бэкенд шлет и то и другое)
-                // Но лучше просто джойнить текст
-                return msg.parts.filter(p => p.text).map(p => p.text).join('');
-            }
-            return '';
+        const getFullText = () => {
+            if (!props.msg.items) return '';
+            return props.msg.items
+                .filter(i => i.type === 'text')
+                .map(i => i.content)
+                .join('\n');
         };
 
-        const renderedContent = computed(() => {
-            const text = getMessageText(props.msg);
-            if (!text) return '';
-            try { return marked.parse(text); } catch (e) { return text; }
-        });
-
-        // FIX: Ensure thoughts are treated as string, handle potential object structure if any
-        const renderedThoughts = computed(() => {
-            let t = props.msg.thoughts;
-            if (!t) return '';
-            if (typeof t !== 'string') t = JSON.stringify(t, null, 2);
-            try { return marked.parse(t); } catch (e) { return t; }
-        });
-        
-        const rawContent = computed(() => getMessageText(props.msg));
-
-        // Smart Tools Grouping
-        const processedTools = computed(() => {
-            const tools = [...(props.msg.tools || [])];
-            const res = [];
+        const processedTimeline = computed(() => {
+            const items = props.msg.items || [];
             
-            for (let i = 0; i < tools.length; i++) {
-                const t = tools[i];
-                if (t.title && t.title.startsWith("Запрос") && i + 1 < tools.length) {
-                    const next = tools[i+1];
-                    const toolName = t.title.substring(7).trim(); 
-                    if (next.title && (next.title === `Результат ${toolName}` || next.title.startsWith(`Результат`))) {
-                         res.push({ type: 'pair', request: t, result: next });
-                        i++; 
-                        continue;
+            // Если items пустой, но есть контент (например, от юзера), создаем фейковый item
+            if (items.length === 0 && props.msg.content) {
+                return [{ type: 'text', content: props.msg.content }];
+            }
+
+            const res = [];
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                if (item.type === 'tool') {
+                    if (item.title && item.title.startsWith("Запрос") && i + 1 < items.length) {
+                        const next = items[i+1];
+                        if (next.type === 'tool') {
+                            const toolName = item.title.substring(7).trim();
+                            if (next.title && (next.title === `Результат ${toolName}` || next.title.startsWith(`Результат`))) {
+                                res.push({ type: 'pair', request: item, result: next });
+                                i++; 
+                                continue;
+                            }
+                        }
                     }
                 }
-                res.push({ type: 'single', ...t });
+                res.push(item);
             }
             return res;
         });
 
-        const processMath = () => {
-            if (typeof renderMathInElement === 'undefined') return;
-            
-            const options = {
-                delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}, {left: '\(', right: '\)', display: false}, {left: '\[', right: '\]', display: true} ],
-                ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code", "option"],
-                throwOnError: false
-            };
-
-            if (contentRef.value) {
-                try { renderMathInElement(contentRef.value, options); } catch(e) {}
-            }
-            if (thoughtsRef.value) {
-                try { renderMathInElement(thoughtsRef.value, options); } catch(e) {}
-            }
+        const startEdit = () => { 
+            editContent.value = getFullText() || props.msg.content || ''; 
+            isEditing.value = true; 
         };
-
-        watch([renderedContent, renderedThoughts], async () => { await nextTick(); processMath(); });
-        onMounted(async () => { await nextTick(); processMath(); });
-
-        const startEdit = () => { editContent.value = getMessageText(props.msg); isEditing.value = true; };
         const cancelEdit = () => { isEditing.value = false; };
-        const saveEdit = () => { if (editContent.value.trim() !== getMessageText(props.msg)) { emit('edit', props.index, editContent.value); } isEditing.value = false; };
+        const saveEdit = () => { 
+            emit('edit', props.index, editContent.value); 
+            isEditing.value = false; 
+        };
+        
         const copyToClipboard = (text) => { navigator.clipboard.writeText(text); store.addToast("Текст скопирован", "success"); };
 
-        return { renderedContent, renderedThoughts, processedTools, rawContent, copyToClipboard, thoughtsRef, contentRef, isEditing, editContent, startEdit, cancelEdit, saveEdit };
+        return { processedTimeline, copyToClipboard, isEditing, editContent, startEdit, cancelEdit, saveEdit };
     }
 });
 
@@ -324,7 +344,7 @@ export default {
         };
 
         watch(() => store.messages.length, async () => { await scrollToBottom(true); });
-        watch(() => store.messages[store.messages.length - 1]?.content, () => scrollToBottom());
+        watch(() => store.messages[store.messages.length - 1]?.items?.length, () => scrollToBottom());
         
         const handleEdit = async (index, newText) => {
             store.isThinking = true;
@@ -362,8 +382,9 @@ export default {
                 editingIndex.value = null;
                 handleEdit(idx, text);
             } else {
-                inputText.value = '';
-                store.messages.push({ role: 'user', content: text });
+                // Создаем сообщение пользователя с items, чтобы computed processedTimeline отработал
+                store.messages.push({ role: 'user', content: text, items: [{type: 'text', content: text}] });
+                
                 await scrollToBottom(true);
                 try { 
                     const res = await api.sendMessage(store.currentChatId, text);
