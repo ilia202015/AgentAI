@@ -3,10 +3,7 @@ import { store } from '../store.js';
 import * as api from '../api.js';
 import { nextTick, ref, watch, onMounted, computed, defineComponent } from 'vue';
 
-// --- MARKED & HIGHLIGHT CONFIGURATION ---
-// Настраиваем Marked один раз, чтобы он сразу генерировал нужный HTML с врапперами и подсветкой.
-// Это предотвращает конфликты с Vue Virtual DOM, так как мы перестаем менять DOM вручную после рендера.
-
+// --- MARKED CONFIGURATION ---
 const renderer = new marked.Renderer();
 
 renderer.code = function(code, language) {
@@ -17,7 +14,6 @@ renderer.code = function(code, language) {
     
     const langDisplay = (language || 'text').toLowerCase();
     
-    // Возвращаем готовую HTML структуру, идентичную той, что мы пытались создать вручную
     return `
         <div class="code-block-wrapper my-4 rounded-lg border border-white/10 bg-[#282c34] overflow-hidden relative group/code">
             <div class="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5">
@@ -36,12 +32,11 @@ renderer.code = function(code, language) {
 marked.setOptions({
     renderer: renderer,
     langPrefix: 'hljs language-',
-    highlight: null, // Мы делаем хайлайт вручную в renderer.code
+    highlight: null,
     pedantic: false,
     gfm: true,
     breaks: true,
 });
-
 
 const MessageBubble = defineComponent({
     props: ['msg', 'index'],
@@ -50,7 +45,6 @@ const MessageBubble = defineComponent({
         <div ref="root" class="group flex flex-col w-[95%] mx-auto animate-fade-in-up"
             :class="msg.role === 'user' ? 'items-end' : 'items-start'">
             
-            <!-- Header (Role + Edit) -->
             <div class="flex items-center gap-2 mb-1.5 px-1 opacity-60 text-xs font-medium tracking-wide">
                 <span v-if="msg.role === 'assistant' || msg.role === 'model'" class="flex items-center gap-1.5 text-blue-400">
                         <i class="ph-fill ph-robot"></i> Агент
@@ -61,7 +55,6 @@ const MessageBubble = defineComponent({
                 </span>
             </div>
 
-            <!-- Assistant: Thoughts -->
             <div v-if="(msg.role === 'assistant' || msg.role === 'model') && msg.thoughts" class="w-full mb-2 space-y-2">
                 <details class="group/thought">
                     <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
@@ -75,7 +68,6 @@ const MessageBubble = defineComponent({
                 </details>
             </div>
 
-            <!-- Main Bubble / Edit Mode -->
             <div class="relative max-w-full overflow-hidden transition-all shadow-lg w-full"
                     :class="[
                     msg.role === 'user' 
@@ -102,7 +94,7 @@ const MessageBubble = defineComponent({
                     </div>
             </div>
 
-            <!-- Assistant: Tools -->
+            <!-- TOOLS SECTION FIX: Using unique keys and strict structure -->
             <div v-if="(msg.role === 'assistant' || msg.role === 'model') && processedTools.length > 0" class="w-full mt-2">
                 <details class="group/tools" open>
                     <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
@@ -111,36 +103,34 @@ const MessageBubble = defineComponent({
                         <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
                     </summary>
                     <div class="space-y-2 mt-2 pt-2 border-t border-white/5">
-                        <div v-for="(item, tIdx) in processedTools" :key="tIdx + '-' + item.type" class="code-block-wrapper rounded-lg border border-white/5 bg-gray-900 overflow-hidden relative group/code">
+                        
+                        <div v-for="(item, tIdx) in processedTools" :key="'tool-'+index+'-'+tIdx" class="code-block-wrapper rounded-lg border border-white/5 bg-gray-900 overflow-hidden relative group/code">
                             
-                            <!-- PAIR: Request + Result -->
-                            <template v-if="item.type === 'pair'">
-                                <!-- Request Header -->
+                            <!-- PAIR -->
+                            <div v-if="item.type === 'pair'">
                                 <div class="px-3 py-1.5 bg-white/5 flex items-center justify-between text-xs text-gray-300 font-mono border-b border-white/5">
                                     <div class="flex items-center gap-2"><i class="ph ph-terminal-window text-emerald-400"></i><span>{{ item.request.title }}</span></div>
                                     <button onclick="window.copyCode(this)" class="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-white transition-colors cursor-pointer opacity-0 group-hover/code:opacity-100"><i class="ph ph-copy"></i><span>Копировать</span></button>
                                 </div>
-                                <!-- Request Body -->
                                 <div class="p-0 overflow-x-auto bg-[#282c34]"><pre class="text-xs font-mono m-0 p-3 whitespace-pre-wrap"><code class="hljs" style="background: transparent; padding: 0;">{{ item.request.content }}</code></pre></div>
                                 
-                                <!-- Result Header -->
                                 <div class="px-3 py-1.5 bg-white/5 flex items-center gap-2 text-xs text-gray-400 font-mono border-y border-white/5">
                                     <i class="ph ph-arrow-elbow-down-right text-blue-400"></i><span>Результат:</span>
                                 </div>
-                                <!-- Result Body -->
                                 <div class="p-0 overflow-x-auto bg-[#1e222a]"><pre class="text-xs font-mono m-0 p-3 whitespace-pre-wrap text-gray-300"><code class="hljs" style="background: transparent; padding: 0;">{{ item.result.content }}</code></pre></div>
-                            </template>
+                            </div>
 
-                            <!-- SINGLE Item -->
-                            <template v-else>
+                            <!-- SINGLE -->
+                            <div v-else>
                                 <div class="px-3 py-1.5 bg-white/5 flex items-center justify-between text-xs text-gray-300 font-mono border-b border-white/5">
                                     <div class="flex items-center gap-2"><i class="ph ph-terminal-window text-emerald-400"></i><span>{{ item.title }}</span></div>
                                     <button onclick="window.copyCode(this)" class="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-white transition-colors cursor-pointer opacity-0 group-hover/code:opacity-100"><i class="ph ph-copy"></i><span>Копировать</span></button>
                                 </div>
                                 <div class="p-0 overflow-x-auto bg-[#282c34]"><pre class="text-xs font-mono m-0 p-3 whitespace-pre-wrap"><code class="hljs" style="background: transparent; padding: 0;">{{ item.content }}</code></pre></div>
-                            </template>
-                        
+                            </div>
+
                         </div>
+
                     </div>
                 </details>
             </div>
@@ -154,10 +144,7 @@ const MessageBubble = defineComponent({
         const getMessageText = (msg) => {
             if (msg.content) return msg.content;
             if (msg.parts && Array.isArray(msg.parts)) {
-                return msg.parts
-                    .filter(p => p.text)
-                    .map(p => p.text)
-                    .join('');
+                return msg.parts.filter(p => p.text).map(p => p.text).join('');
             }
             return '';
         };
@@ -182,18 +169,11 @@ const MessageBubble = defineComponent({
             
             for (let i = 0; i < tools.length; i++) {
                 const t = tools[i];
-                
-                // Heuristic for Pairing: Check Request + Result
                 if (t.title && t.title.startsWith("Запрос") && i + 1 < tools.length) {
                     const next = tools[i+1];
                     const toolName = t.title.substring(7).trim(); 
-                    
                     if (next.title && (next.title === `Результат ${toolName}` || next.title.startsWith(`Результат`))) {
-                         res.push({
-                            type: 'pair',
-                            request: t,
-                            result: next
-                        });
+                         res.push({ type: 'pair', request: t, result: next });
                         i++; 
                         continue;
                     }
@@ -204,16 +184,15 @@ const MessageBubble = defineComponent({
         });
 
         const processMath = () => {
-            if (!root.value) return;
-            // Only MathJax left here, safe to call multiple times usually
-             if (typeof renderMathInElement !== 'undefined') {
-                try {
-                    renderMathInElement(root.value, {
-                        delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}, {left: '\(', right: '\)', display: false}, {left: '\[', right: '\]', display: true} ],
-                        throwOnError: false
-                    });
-                } catch(e) { /* Ignore parsing errors */ }
-            }
+            if (!root.value || typeof renderMathInElement === 'undefined') return;
+            try {
+                // Исключаем pre/code из обработки MathJax, чтобы он не лез в код
+                renderMathInElement(root.value, {
+                    delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}, {left: '\(', right: '\)', display: false}, {left: '\[', right: '\]', display: true} ],
+                    ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code", "option"],
+                    throwOnError: false
+                });
+            } catch(e) {}
         };
 
         watch([renderedContent, renderedThoughts], async () => { await nextTick(); processMath(); });
@@ -232,7 +211,6 @@ export default {
     components: { MessageBubble },
     template: `
         <div class="flex-1 flex flex-col h-full relative z-10 min-w-0">
-            <!-- Sidebar Toggles -->
             <div class="hidden md:block absolute top-4 left-2 z-50">
                 <button @click="store.toggleSidebarDesktop()" class="p-2 rounded-lg bg-gray-900/50 backdrop-blur border border-white/10 text-gray-400 hover:text-white transition-colors shadow-sm">
                     <i class="ph-bold" :class="store.isSidebarVisibleDesktop ? 'ph-caret-left' : 'ph-caret-right'"></i>
@@ -244,7 +222,6 @@ export default {
                 </button>
             </div>
             
-            <!-- Scroll Button -->
             <div class="absolute bottom-32 right-8 z-40 transition-all duration-300"
                  :class="showScrollButton ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'">
                 <button @click="scrollToBottom(true)" 
@@ -253,11 +230,9 @@ export default {
                 </button>
             </div>
 
-            <!-- Messages Area -->
             <div class="flex-1 overflow-y-auto px-2 md:px-0 pt-16 md:pt-6 pb-48 space-y-8 scroll-smooth custom-scrollbar" 
                  ref="messagesContainer" @scroll="handleScroll">
                 
-                <!-- Welcome Screen -->
                 <div v-if="filteredMessages.length === 0" class="h-full flex flex-col items-center justify-center text-center opacity-0 animate-fade-in-up" style="animation-delay: 0.1s; opacity: 1">
                     <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-gray-800 to-gray-700 flex items-center justify-center mb-6 shadow-2xl border border-white/5">
                         <i class="ph-duotone ph-sparkle text-3xl text-blue-400"></i>
@@ -266,13 +241,11 @@ export default {
                     <p class="text-gray-500 max-w-md text-sm leading-relaxed">Я могу писать код, анализировать данные и помогать с творческими задачами.</p>
                 </div>
                 
-                <!-- Messages -->
                 <MessageBubble 
                     v-for="(msg, idx) in filteredMessages" 
                     :key="idx" :index="idx" :msg="msg" @edit="handleEdit"
                 />
 
-                <!-- Thinking Indicator -->
                 <div v-if="store.isThinking" class="w-[95%] mx-auto w-full py-2">
                    <div class="flex items-center gap-3 px-4">
                        <div class="w-6 h-6 rounded-full bg-blue-500/10 flex items-center justify-center">
@@ -283,7 +256,6 @@ export default {
                 </div>
             </div>
 
-            <!-- Input Area -->
             <div class="absolute bottom-0 left-0 w-full pb-6 pt-12 bg-gradient-to-t from-gray-950 via-gray-950/90 to-transparent z-20 pointer-events-none">
                 <div class="w-[95%] mx-auto relative group pointer-events-auto">
                     <div class="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl blur-lg opacity-0 group-focus-within:opacity-100 transition-opacity duration-500"></div>
@@ -347,7 +319,6 @@ export default {
         const handleEdit = async (index, newText) => {
             store.isThinking = true;
             try {
-                // Pass currentChatId
                 const res = await api.editMessage(store.currentChatId, index, newText);
                 if (res.error) {
                      store.isThinking = false; 
@@ -385,7 +356,6 @@ export default {
                 store.messages.push({ role: 'user', content: text });
                 await scrollToBottom(true);
                 try { 
-                    // Pass currentChatId
                     const res = await api.sendMessage(store.currentChatId, text);
                     if (res.error) {
                          store.isThinking = false; 
