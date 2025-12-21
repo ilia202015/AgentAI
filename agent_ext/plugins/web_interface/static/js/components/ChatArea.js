@@ -42,7 +42,7 @@ const MessageBubble = defineComponent({
     props: ['msg', 'index'],
     emits: ['edit'],
     template: `
-        <div ref="root" class="group flex flex-col w-[95%] mx-auto animate-fade-in-up"
+        <div class="group flex flex-col w-[95%] mx-auto animate-fade-in-up"
             :class="msg.role === 'user' ? 'items-end' : 'items-start'">
             
             <div class="flex items-center gap-2 mb-1.5 px-1 opacity-60 text-xs font-medium tracking-wide">
@@ -62,7 +62,8 @@ const MessageBubble = defineComponent({
                         <span>Процесс мышления</span>
                         <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
                     </summary>
-                    <div class="mt-2 pl-3 border-l-2 border-purple-500/20 text-gray-400 text-xs leading-relaxed font-mono bg-gray-900/50 p-4 border border-white/5 rounded-r-lg prose prose-invert prose-xs max-w-none"
+                    <!-- Ref for MathJax isolation -->
+                    <div ref="thoughtsRef" class="mt-2 pl-3 border-l-2 border-purple-500/20 text-gray-400 text-xs leading-relaxed font-mono bg-gray-900/50 p-4 border border-white/5 rounded-r-lg prose prose-invert prose-xs max-w-none"
                          v-html="renderedThoughts">
                     </div>
                 </details>
@@ -84,7 +85,8 @@ const MessageBubble = defineComponent({
                     </div>
 
                     <div v-else>
-                        <div class="prose prose-invert prose-sm break-words leading-relaxed max-w-none" 
+                        <!-- Ref for MathJax isolation -->
+                        <div ref="contentRef" class="prose prose-invert prose-sm break-words leading-relaxed max-w-none" 
                             :class="msg.role === 'user' ? 'text-white/95' : ''"
                             v-html="renderedContent"></div>
                         
@@ -94,7 +96,6 @@ const MessageBubble = defineComponent({
                     </div>
             </div>
 
-            <!-- TOOLS SECTION FIX: Using unique keys and strict structure -->
             <div v-if="(msg.role === 'assistant' || msg.role === 'model') && processedTools.length > 0" class="w-full mt-2">
                 <details class="group/tools" open>
                     <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
@@ -137,7 +138,8 @@ const MessageBubble = defineComponent({
         </div>
     `,
     setup(props, { emit }) {
-        const root = ref(null);
+        const thoughtsRef = ref(null);
+        const contentRef = ref(null);
         const isEditing = ref(false);
         const editContent = ref('');
 
@@ -184,15 +186,21 @@ const MessageBubble = defineComponent({
         });
 
         const processMath = () => {
-            if (!root.value || typeof renderMathInElement === 'undefined') return;
-            try {
-                // Исключаем pre/code из обработки MathJax, чтобы он не лез в код
-                renderMathInElement(root.value, {
-                    delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}, {left: '\(', right: '\)', display: false}, {left: '\[', right: '\]', display: true} ],
-                    ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code", "option"],
-                    throwOnError: false
-                });
-            } catch(e) {}
+            if (typeof renderMathInElement === 'undefined') return;
+            
+            const options = {
+                delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}, {left: '\(', right: '\)', display: false}, {left: '\[', right: '\]', display: true} ],
+                ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code", "option"],
+                throwOnError: false
+            };
+
+            // Apply ONLY to specific containers, avoiding tools section
+            if (contentRef.value) {
+                try { renderMathInElement(contentRef.value, options); } catch(e) {}
+            }
+            if (thoughtsRef.value) {
+                try { renderMathInElement(thoughtsRef.value, options); } catch(e) {}
+            }
         };
 
         watch([renderedContent, renderedThoughts], async () => { await nextTick(); processMath(); });
@@ -203,7 +211,7 @@ const MessageBubble = defineComponent({
         const saveEdit = () => { if (editContent.value.trim() !== getMessageText(props.msg)) { emit('edit', props.index, editContent.value); } isEditing.value = false; };
         const copyToClipboard = (text) => { navigator.clipboard.writeText(text); store.addToast("Текст скопирован", "success"); };
 
-        return { renderedContent, renderedThoughts, processedTools, rawContent, copyToClipboard, root, isEditing, editContent, startEdit, cancelEdit, saveEdit };
+        return { renderedContent, renderedThoughts, processedTools, rawContent, copyToClipboard, thoughtsRef, contentRef, isEditing, editContent, startEdit, cancelEdit, saveEdit };
     }
 });
 
