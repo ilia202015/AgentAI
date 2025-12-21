@@ -3,12 +3,45 @@ import { store } from '../store.js';
 import * as api from '../api.js';
 import { nextTick, ref, watch, onMounted, computed, defineComponent } from 'vue';
 
-let isMarkedConfigured = false;
-function ensureMarkedConfig() {
-    if (typeof marked === 'undefined' || isMarkedConfigured) return;
-    marked.setOptions({ highlight: null, langPrefix: 'language-' });
-    isMarkedConfigured = true;
-}
+// --- MARKED & HIGHLIGHT CONFIGURATION ---
+// Настраиваем Marked один раз, чтобы он сразу генерировал нужный HTML с врапперами и подсветкой.
+// Это предотвращает конфликты с Vue Virtual DOM, так как мы перестаем менять DOM вручную после рендера.
+
+const renderer = new marked.Renderer();
+
+renderer.code = function(code, language) {
+    const validLang = !!(language && hljs.getLanguage(language));
+    const highlighted = validLang 
+        ? hljs.highlight(code, { language }).value 
+        : hljs.highlightAuto(code).value;
+    
+    const langDisplay = (language || 'text').toLowerCase();
+    
+    // Возвращаем готовую HTML структуру, идентичную той, что мы пытались создать вручную
+    return `
+        <div class="code-block-wrapper my-4 rounded-lg border border-white/10 bg-[#282c34] overflow-hidden relative group/code">
+            <div class="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5">
+                <span class="text-xs font-mono text-gray-400">${langDisplay}</span>
+                <button onclick="window.copyCode(this)" class="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-white transition-colors cursor-pointer z-10 opacity-0 group-hover/code:opacity-100">
+                    <i class="ph ph-copy"></i><span>Копировать</span>
+                </button>
+            </div>
+            <div class="overflow-x-auto p-3">
+                <pre><code class="hljs language-${langDisplay}">${highlighted}</code></pre>
+            </div>
+        </div>
+    `;
+};
+
+marked.setOptions({
+    renderer: renderer,
+    langPrefix: 'hljs language-',
+    highlight: null, // Мы делаем хайлайт вручную в renderer.code
+    pedantic: false,
+    gfm: true,
+    breaks: true,
+});
+
 
 const MessageBubble = defineComponent({
     props: ['msg', 'index'],
@@ -17,6 +50,7 @@ const MessageBubble = defineComponent({
         <div ref="root" class="group flex flex-col w-[95%] mx-auto animate-fade-in-up"
             :class="msg.role === 'user' ? 'items-end' : 'items-start'">
             
+            <!-- Header (Role + Edit) -->
             <div class="flex items-center gap-2 mb-1.5 px-1 opacity-60 text-xs font-medium tracking-wide">
                 <span v-if="msg.role === 'assistant' || msg.role === 'model'" class="flex items-center gap-1.5 text-blue-400">
                         <i class="ph-fill ph-robot"></i> Агент
@@ -61,6 +95,7 @@ const MessageBubble = defineComponent({
                         <div class="prose prose-invert prose-sm break-words leading-relaxed max-w-none" 
                             :class="msg.role === 'user' ? 'text-white/95' : ''"
                             v-html="renderedContent"></div>
+                        
                         <div v-if="msg.role === 'assistant' || msg.role === 'model'" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                             <button @click="copyToClipboard(rawContent)" class="p-1.5 text-gray-500 hover:text-white hover:bg-white/10 rounded transition" title="Копировать"><i class="ph ph-copy"></i></button>
                         </div>
@@ -69,14 +104,14 @@ const MessageBubble = defineComponent({
 
             <!-- Assistant: Tools -->
             <div v-if="(msg.role === 'assistant' || msg.role === 'model') && processedTools.length > 0" class="w-full mt-2">
-                <details class="group/tools">
+                <details class="group/tools" open>
                     <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
                         <i class="ph ph-wrench text-emerald-500 group-open/tools:rotate-180 transition-transform"></i>
                         <span>Использованные инструменты ({{ processedTools.length }})</span>
                         <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
                     </summary>
                     <div class="space-y-2 mt-2 pt-2 border-t border-white/5">
-                        <div v-for="(item, tIdx) in processedTools" :key="tIdx" class="code-block-wrapper rounded-lg border border-white/5 bg-gray-900 overflow-hidden relative group/code">
+                        <div v-for="(item, tIdx) in processedTools" :key="tIdx + '-' + item.type" class="code-block-wrapper rounded-lg border border-white/5 bg-gray-900 overflow-hidden relative group/code">
                             
                             <!-- PAIR: Request + Result -->
                             <template v-if="item.type === 'pair'">
@@ -115,7 +150,6 @@ const MessageBubble = defineComponent({
         const root = ref(null);
         const isEditing = ref(false);
         const editContent = ref('');
-        ensureMarkedConfig();
 
         const getMessageText = (msg) => {
             if (msg.content) return msg.content;
@@ -143,22 +177,24 @@ const MessageBubble = defineComponent({
 
         // Smart Tools Grouping
         const processedTools = computed(() => {
-            const tools = props.msg.tools || [];
+            const tools = [...(props.msg.tools || [])];
             const res = [];
+            
             for (let i = 0; i < tools.length; i++) {
                 const t = tools[i];
-                // Check if current is Request and next is Result for same tool (simple heuristic by title)
-                // "Запрос python" and "Результат python"
+                
+                // Heuristic for Pairing: Check Request + Result
                 if (t.title && t.title.startsWith("Запрос") && i + 1 < tools.length) {
                     const next = tools[i+1];
-                    const toolName = t.title.replace("Запрос ", "");
-                    if (next.title === `Результат ${toolName}`) {
-                        res.push({
+                    const toolName = t.title.substring(7).trim(); 
+                    
+                    if (next.title && (next.title === `Результат ${toolName}` || next.title.startsWith(`Результат`))) {
+                         res.push({
                             type: 'pair',
                             request: t,
                             result: next
                         });
-                        i++; // Skip next
+                        i++; 
                         continue;
                     }
                 }
@@ -167,43 +203,21 @@ const MessageBubble = defineComponent({
             return res;
         });
 
-        const processContent = () => {
+        const processMath = () => {
             if (!root.value) return;
-            const blocks = root.value.querySelectorAll('pre code:not([data-highlighted])');
-            blocks.forEach((block) => {
-                if (typeof window.hljs !== 'undefined') { window.hljs.highlightElement(block); block.setAttribute('data-highlighted', 'yes'); }
-            });
-            if (typeof renderMathInElement !== 'undefined') {
-                renderMathInElement(root.value, {
-                    delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}, {left: '\(', right: '\)', display: false}, {left: '\[', right: '\]', display: true} ],
-                    throwOnError: false
-                });
+            // Only MathJax left here, safe to call multiple times usually
+             if (typeof renderMathInElement !== 'undefined') {
+                try {
+                    renderMathInElement(root.value, {
+                        delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}, {left: '\(', right: '\)', display: false}, {left: '\[', right: '\]', display: true} ],
+                        throwOnError: false
+                    });
+                } catch(e) { /* Ignore parsing errors */ }
             }
-            // Code block wrappers for standard markdown code blocks
-            const preElements = root.value.querySelectorAll('.prose pre:not(.processed)');
-            preElements.forEach(pre => {
-                if (pre.closest('.code-block-wrapper')) return; // Don't wrap already wrapped (our tools)
-                
-                const code = pre.querySelector('code');
-                let lang = 'plaintext';
-                if (code) { code.classList.forEach(cls => { if (cls.startsWith('language-')) lang = cls.replace('language-', ''); }); }
-                const wrapper = document.createElement('div');
-                wrapper.className = 'code-block-wrapper my-4 rounded-lg border border-white/10 bg-[#282c34] overflow-hidden relative group/code';
-                const header = document.createElement('div');
-                header.className = 'flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5';
-                header.innerHTML = `<span class="text-xs font-mono text-gray-400">${lang}</span><button onclick="window.copyCode(this)" class="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-white transition-colors cursor-pointer z-10 opacity-0 group-hover/code:opacity-100"><i class="ph ph-copy"></i><span>Копировать</span></button>`;
-                pre.parentNode.insertBefore(wrapper, pre);
-                const contentDiv = document.createElement('div');
-                contentDiv.className = 'overflow-x-auto p-3';
-                contentDiv.appendChild(pre);
-                wrapper.appendChild(header);
-                wrapper.appendChild(contentDiv);
-                pre.classList.add('processed');
-            });
         };
 
-        watch([renderedContent, renderedThoughts, processedTools], async () => { await nextTick(); processContent(); });
-        onMounted(async () => { await nextTick(); processContent(); });
+        watch([renderedContent, renderedThoughts], async () => { await nextTick(); processMath(); });
+        onMounted(async () => { await nextTick(); processMath(); });
 
         const startEdit = () => { editContent.value = getMessageText(props.msg); isEditing.value = true; };
         const cancelEdit = () => { isEditing.value = false; };
@@ -218,6 +232,7 @@ export default {
     components: { MessageBubble },
     template: `
         <div class="flex-1 flex flex-col h-full relative z-10 min-w-0">
+            <!-- Sidebar Toggles -->
             <div class="hidden md:block absolute top-4 left-2 z-50">
                 <button @click="store.toggleSidebarDesktop()" class="p-2 rounded-lg bg-gray-900/50 backdrop-blur border border-white/10 text-gray-400 hover:text-white transition-colors shadow-sm">
                     <i class="ph-bold" :class="store.isSidebarVisibleDesktop ? 'ph-caret-left' : 'ph-caret-right'"></i>
@@ -229,6 +244,7 @@ export default {
                 </button>
             </div>
             
+            <!-- Scroll Button -->
             <div class="absolute bottom-32 right-8 z-40 transition-all duration-300"
                  :class="showScrollButton ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'">
                 <button @click="scrollToBottom(true)" 
@@ -237,9 +253,11 @@ export default {
                 </button>
             </div>
 
+            <!-- Messages Area -->
             <div class="flex-1 overflow-y-auto px-2 md:px-0 pt-16 md:pt-6 pb-48 space-y-8 scroll-smooth custom-scrollbar" 
                  ref="messagesContainer" @scroll="handleScroll">
                 
+                <!-- Welcome Screen -->
                 <div v-if="filteredMessages.length === 0" class="h-full flex flex-col items-center justify-center text-center opacity-0 animate-fade-in-up" style="animation-delay: 0.1s; opacity: 1">
                     <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-gray-800 to-gray-700 flex items-center justify-center mb-6 shadow-2xl border border-white/5">
                         <i class="ph-duotone ph-sparkle text-3xl text-blue-400"></i>
@@ -248,11 +266,13 @@ export default {
                     <p class="text-gray-500 max-w-md text-sm leading-relaxed">Я могу писать код, анализировать данные и помогать с творческими задачами.</p>
                 </div>
                 
+                <!-- Messages -->
                 <MessageBubble 
                     v-for="(msg, idx) in filteredMessages" 
                     :key="idx" :index="idx" :msg="msg" @edit="handleEdit"
                 />
 
+                <!-- Thinking Indicator -->
                 <div v-if="store.isThinking" class="w-[95%] mx-auto w-full py-2">
                    <div class="flex items-center gap-3 px-4">
                        <div class="w-6 h-6 rounded-full bg-blue-500/10 flex items-center justify-center">
@@ -263,6 +283,7 @@ export default {
                 </div>
             </div>
 
+            <!-- Input Area -->
             <div class="absolute bottom-0 left-0 w-full pb-6 pt-12 bg-gradient-to-t from-gray-950 via-gray-950/90 to-transparent z-20 pointer-events-none">
                 <div class="w-[95%] mx-auto relative group pointer-events-auto">
                     <div class="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl blur-lg opacity-0 group-focus-within:opacity-100 transition-opacity duration-500"></div>

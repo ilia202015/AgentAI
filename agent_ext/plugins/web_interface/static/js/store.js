@@ -24,11 +24,18 @@ export const store = reactive({
         const type = payload.type;
         const data = payload.data;
 
-        if (this.messages.length === 0 || this.messages[this.messages.length - 1].role === 'user') {
-            this.messages.push({ role: 'assistant', content: '', thoughts: '', tools: [] });
+        // Ensure we have a message to append to
+        if (this.messages.length === 0) {
+             this.messages.push({ role: 'assistant', content: '', thoughts: '', tools: [] });
         }
         
-        const lastMsg = this.messages[this.messages.length - 1];
+        let lastMsg = this.messages[this.messages.length - 1];
+        
+        // If last message is user, create new assistant message
+        if (lastMsg.role === 'user') {
+             this.messages.push({ role: 'assistant', content: '', thoughts: '', tools: [] });
+             lastMsg = this.messages[this.messages.length - 1];
+        }
 
         if (type === 'text') {
             if (typeof data === 'string') lastMsg.content += data;
@@ -37,8 +44,9 @@ export const store = reactive({
             if (typeof data === 'string') lastMsg.thoughts = (lastMsg.thoughts || '') + data;
         }
         else if (type === 'tool') {
-            if (!lastMsg.tools) lastMsg.tools = [];
-            lastMsg.tools.push(data);
+            // Force reactivity update by reassigning the array
+            const currentTools = lastMsg.tools || [];
+            lastMsg.tools = [...currentTools, data];
         }
     },
 
