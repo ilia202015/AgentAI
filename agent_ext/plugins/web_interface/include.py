@@ -6,6 +6,7 @@ import os
 import sys
 import importlib.util
 import copy
+from google.genai import types as genai_types
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
@@ -17,13 +18,12 @@ if web_interface_dir not in sys.path:
 
 import storage
 
-# Limit queue size to prevent OOM
+# --- Queue & Emitter ---
 if not hasattr(self, 'web_queue'):
     self.web_queue = queue.Queue(maxsize=2000)
 
 def web_emit(self, msg_type, payload):
     import queue
-    
     if hasattr(self, 'web_queue'):
         cid = getattr(self, "id", "unknown")
         event = { "type": msg_type, "chatId": cid, "data": payload }
@@ -38,9 +38,9 @@ def web_emit(self, msg_type, payload):
 
 self.web_emit = types.MethodType(web_emit, self)
 
-# --- Buffer for streaming thoughts/tools ---
-if not hasattr(self, '_web_stream_buffer'):
-    self._web_stream_buffer = {"thoughts": "", "tools": []}
+# --- Buffer Stack for Thoughts (Only) ---
+if not hasattr(self, '_web_thought_stack'):
+    self._web_thought_stack = []
 
 def web_print(self, message, count_tab=-1, **kwargs):
     end = kwargs.get('end', '\n')
@@ -65,11 +65,9 @@ def web_print_thought(self, message, count_tab=-1, **kwargs):
     end = kwargs.get('end', '\n')
     msg_str = str(message)
     
-    # Buffer logic
-    if not hasattr(self, '_web_stream_buffer'):
-        self._web_stream_buffer = {"thoughts": "", "tools": []}
-    
-    self._web_stream_buffer["thoughts"] += msg_str + (end if end != '\n' else '\n')
+    # Buffer logic (Stack Top)
+    if hasattr(self, '_web_thought_stack') and self._web_thought_stack:
+        self._web_thought_stack[-1] += msg_str + (end if end != '\n' else '\n')
 
     # Console
     print(f"[{getattr(self, 'id', '?')}] (thought): ", end='')
@@ -89,15 +87,22 @@ def web_print_thought(self, message, count_tab=-1, **kwargs):
 def web_print_code(self, language, code, count_tab=-1, max_code_display_lines=6):
     tool_data = {"title": str(language), "content": str(code)}
     
-    # Buffer logic
-    if not hasattr(self, '_web_stream_buffer'):
-        self._web_stream_buffer = {"thoughts": "", "tools": []}
-    
-    self._web_stream_buffer["tools"].append(tool_data)
+    # Direct attach to last message (if it's a model message)
+    # Because tools run AFTER model message is appended to history.
+    if self.messages:
+        last_msg = self.messages[-1]
+        # Check if it looks like a model message (role 'model' or 'assistant')
+        if getattr(last_msg, 'role', '') == 'model':
+            if not hasattr(last_msg, '_web_tools'):
+                last_msg._web_tools = []
+            
+            # Avoid duplicates if print_code called multiple times for same thing?
+            # No, print_code is imperative. Just append.
+            last_msg._web_tools.append(tool_data)
     
     self.web_emit("tool", tool_data)
 
-    # Console Output (Restored)
+    # Console Output
     if count_tab == -1:
         count_tab = self.count_tab
     displayed_code = ""
@@ -139,7 +144,6 @@ def send_with_autosave(self, message):
     import storage
 
     self.busy_depth += 1
-
     try:
         result = self.__original_send(message)
         
@@ -162,8 +166,9 @@ self.__original_handle_stream = self._handle_stream
 def handle_stream_with_parsing(self, stream):
     import storage
     
-    # Reset buffer
-    self._web_stream_buffer = {"thoughts": "", "tools": []}
+    # Push new thought buffer
+    if not hasattr(self, '_web_thought_stack'): self._web_thought_stack = []
+    self._web_thought_stack.append("")
     
     def parsing_generator(gen):
         for chunk in gen:
@@ -172,26 +177,26 @@ def handle_stream_with_parsing(self, stream):
                 break
             yield chunk
 
-    result = self.__original_handle_stream(parsing_generator(stream))
-    
-    # Attach buffered
-    if self.messages and getattr(self.messages[-1], "role", "") == "model":
-        last_msg = self.messages[-1]
-        if self._web_stream_buffer["thoughts"]:
-            last_msg._web_thoughts = self._web_stream_buffer["thoughts"]
-        if self._web_stream_buffer["tools"]:
-            if hasattr(last_msg, "_web_tools"):
-                 last_msg._web_tools.extend(self._web_stream_buffer["tools"])
-            else:
-                 last_msg._web_tools = self._web_stream_buffer["tools"]
+    try:
+        result = self.__original_handle_stream(parsing_generator(stream))
+        
+        # After stream finishes, message is created and appended.
+        # Attach collected thoughts to it.
+        if self.messages and getattr(self.messages[-1], 'role', '') == 'model':
+             thoughts = self._web_thought_stack[-1]
+             if thoughts:
+                 self.messages[-1]._web_thoughts = thoughts
+
+    finally:
+        # Autosave logic
+        cid = getattr(self, "id", None)
+        if cid and cid != 'temp':
+            try: storage.save_chat_state(self)
+            except: pass
             
-    # Autosave
-    cid = getattr(self, "id", None)
-    if cid and cid != 'temp':
-        try: 
-            storage.save_chat_state(self)
-        except: 
-            pass
+        # Pop buffer
+        if self._web_thought_stack:
+            self._web_thought_stack.pop()
             
     return result
 
@@ -207,8 +212,7 @@ def setstate(self, state):
     self.__dict__.update(state)
     self.web_queue = queue.Queue()
 
-
 self.__getstate__ = types.MethodType(getstate, self)
 self.__setstate__ = types.MethodType(setstate, self)
 
-print("✅ Web Interface: Hooks installed (Gemini Native Compatible).")
+print("✅ Web Interface: Hooks installed (Direct Attachment Mode).")

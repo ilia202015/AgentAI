@@ -6,7 +6,6 @@ def serialize_message(msg):
         data = msg.copy()
     else:
         try:
-            # Чистый дамп, без самодеятельности
             data = msg.model_dump(mode='json', exclude_none=True)
         except Exception:
             try:
@@ -16,7 +15,7 @@ def serialize_message(msg):
                 if hasattr(msg, "parts"):
                     data["parts"] = [{"text": p.text} for p in msg.parts if hasattr(p, "text")]
 
-    # Добавляем ТОЛЬКО метаданные плагина
+    # Извлекаем сохраненные метаданные
     if hasattr(msg, "_web_thoughts"):
         data["thoughts"] = msg._web_thoughts
     if hasattr(msg, "_web_tools"):
@@ -31,7 +30,6 @@ def deserialize_message(data):
     thoughts = data.get("thoughts", None)
     tools = data.get("tools", None)
     
-    # Удаляем поля, которых нет в SDK
     clean_data = {k: v for k, v in data.items() if k not in ["thoughts", "tools", "content", "tool_calls"]}
     
     try:
@@ -41,12 +39,7 @@ def deserialize_message(data):
         if "parts" in clean_data:
             for p in clean_data["parts"]:
                 if "text" in p:
-                    # Legacy fix: мысль без сигнатуры превращаем в текст
-                    if p.get("thought", False) and not p.get("thought_signature"):
-                        parts.append(types.Part(text=p["text"]))
-                    else:
-                        try: parts.append(types.Part.model_validate(p))
-                        except: parts.append(types.Part(text=p["text"]))
+                    parts.append(types.Part(text=p["text"]))
                 elif "function_call" in p:
                     try: parts.append(types.Part(function_call=types.FunctionCall(**p["function_call"])))
                     except: pass
@@ -61,6 +54,7 @@ def deserialize_message(data):
 
     if thoughts: msg._web_thoughts = thoughts
     if tools: msg._web_tools = tools
+    
     return msg
 
 def serialize_history(messages):
