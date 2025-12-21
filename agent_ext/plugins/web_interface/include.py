@@ -39,9 +39,6 @@ def web_emit(self, msg_type, payload):
 self.web_emit = types.MethodType(web_emit, self)
 
 # --- Buffer for streaming thoughts/tools ---
-# Gemini SDK adds the 'model' message only AFTER streaming finishes.
-# So we need to buffer thoughts and tool outputs during streaming, 
-# and attach them to the message object once it is created.
 if not hasattr(self, '_web_stream_buffer'):
     self._web_stream_buffer = {"thoughts": "", "tools": []}
 
@@ -72,7 +69,7 @@ def web_print_thought(self, message, count_tab=-1, **kwargs):
     if not hasattr(self, '_web_stream_buffer'):
         self._web_stream_buffer = {"thoughts": "", "tools": []}
     
-    self._web_stream_buffer["thoughts"] += msg_str + (end if end != '\n' else '\n') # Approximation
+    self._web_stream_buffer["thoughts"] += msg_str + (end if end != '\n' else '\n')
 
     # Console
     print(f"[{getattr(self, 'id', '?')}] (thought): ", end='')
@@ -87,7 +84,7 @@ def web_print_thought(self, message, count_tab=-1, **kwargs):
         print('\t' * count_tab, **kwargs)
     
     # Web
-    self.web_emit("text", str(message) + str(end))
+    self.web_emit("thought", str(message) + str(end))
 
 def web_print_code(self, language, code, count_tab=-1, max_code_display_lines=6):
     tool_data = {"title": str(language), "content": str(code)}
@@ -99,6 +96,35 @@ def web_print_code(self, language, code, count_tab=-1, max_code_display_lines=6)
     self._web_stream_buffer["tools"].append(tool_data)
     
     self.web_emit("tool", tool_data)
+
+    # Console Output (Restored)
+    if count_tab == -1:
+        count_tab = self.count_tab
+    displayed_code = ""
+    if code != '':
+        lines = code.split('\n')
+        while len(lines) and lines[0] == '':
+            lines = lines[1:]
+        if len(lines):
+            while lines[-1] == '':
+                lines.pop()
+            if len(lines) > max_code_display_lines:
+                half_lines = max_code_display_lines // 2
+                displayed_code = '\n'.join(lines[:half_lines]) + '\n\t...\n' + '\n'.join(lines[-half_lines:])
+            else:
+                displayed_code = code
+            if len(displayed_code) > 500:
+                displayed_code = code[:250] + '\n\t...\n' + code[-250:]
+    
+    def raw_print(msg, tabs):
+        try:
+            print('\t' * tabs + msg.replace('\n', '\n' + '\t' * tabs))
+        except:
+            print(msg)
+
+    print("") 
+    raw_print(f"[{getattr(self, 'id', '?')}] Code ({language}):", count_tab)
+    raw_print(displayed_code + '\n', count_tab + 1)
 
 self.print = types.MethodType(web_print, self)
 self.print_thought = types.MethodType(web_print_thought, self)
@@ -136,7 +162,7 @@ self.__original_handle_stream = self._handle_stream
 def handle_stream_with_parsing(self, stream):
     import storage
     
-    # Reset buffer at start of stream
+    # Reset buffer
     self._web_stream_buffer = {"thoughts": "", "tools": []}
     
     def parsing_generator(gen):
@@ -148,22 +174,18 @@ def handle_stream_with_parsing(self, stream):
 
     result = self.__original_handle_stream(parsing_generator(stream))
     
-    # Attach buffered thoughts/tools to the last message (which should be from 'model')
+    # Attach buffered
     if self.messages and getattr(self.messages[-1], "role", "") == "model":
         last_msg = self.messages[-1]
-        
         if self._web_stream_buffer["thoughts"]:
             last_msg._web_thoughts = self._web_stream_buffer["thoughts"]
-        
         if self._web_stream_buffer["tools"]:
-            # If tool outputs already exist (e.g. from previous turns or re-runs), merge?
-            # Usually overwrite or append is safer.
             if hasattr(last_msg, "_web_tools"):
                  last_msg._web_tools.extend(self._web_stream_buffer["tools"])
             else:
                  last_msg._web_tools = self._web_stream_buffer["tools"]
             
-    # Autosave if needed
+    # Autosave
     cid = getattr(self, "id", None)
     if cid and cid != 'temp':
         try: 

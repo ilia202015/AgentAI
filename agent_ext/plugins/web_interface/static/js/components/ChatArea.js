@@ -35,7 +35,7 @@ const MessageBubble = defineComponent({
                         <span>Процесс мышления</span>
                         <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
                     </summary>
-                    <div class="mt-2 pl-3 border-l-2 border-purple-500/20 text-gray-400 text-xs leading-relaxed whitespace-pre-wrap font-mono bg-black/20 p-3 rounded-r-lg">
+                    <div class="mt-2 pl-3 border-l-2 border-purple-500/20 text-gray-400 text-xs leading-relaxed whitespace-pre-wrap font-mono bg-gray-900/50 p-4 border border-white/5 rounded-r-lg">
                         {{ msg.thoughts }}
                     </div>
                 </details>
@@ -72,7 +72,7 @@ const MessageBubble = defineComponent({
                 <details class="group/tools">
                     <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
                         <i class="ph ph-wrench text-emerald-500 group-open/tools:rotate-180 transition-transform"></i>
-                        <span>Использованные инструменты ({{ Math.ceil(msg.tools.length / 2) }})</span>
+                        <span>Использованные инструменты ({{ msg.tools.length }})</span>
                         <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
                     </summary>
                     <div class="space-y-2 mt-2 pt-2 border-t border-white/5">
