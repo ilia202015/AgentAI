@@ -76,8 +76,8 @@ const MessageBubble = defineComponent({
         <div class="group flex flex-col w-[95%] mx-auto animate-fade-in-up"
             :class="msg.role === 'user' ? 'items-end' : 'items-start'">
             
-            <!-- Header -->
-            <div class="flex items-center gap-2 mb-1.5 px-1 opacity-60 text-xs font-medium tracking-wide">
+            <!-- HEADER (Once per message group) -->
+            <div class="flex items-center gap-2 mb-1 px-1 opacity-60 text-xs font-medium tracking-wide">
                 <span v-if="msg.role === 'assistant' || msg.role === 'model'" class="flex items-center gap-1.5 text-blue-400">
                         <i class="ph-fill ph-robot"></i> Агент
                 </span>
@@ -87,7 +87,7 @@ const MessageBubble = defineComponent({
                 </span>
             </div>
 
-            <!-- Edit Mode -->
+            <!-- EDIT MODE (User only) -->
             <div v-if="isEditing && msg.role === 'user'" class="w-full bg-gray-900 border border-white/10 rounded-xl p-3 relative max-w-full shadow-lg">
                 <textarea v-model="editContent" rows="3" class="w-full bg-transparent text-sm focus:outline-none resize-none mb-2"></textarea>
                 <div class="flex justify-end gap-2">
@@ -96,10 +96,12 @@ const MessageBubble = defineComponent({
                 </div>
             </div>
 
-            <!-- Timeline Render -->
-            <div v-else class="flex flex-col w-full space-y-2">
+            <!-- TIMELINE RENDER (Mixed Content Stream) -->
+            <!-- All items share ONE vertical flex container, no internal headers -->
+            <div v-else class="flex flex-col w-full gap-1">
                 
-                <div v-for="(item, idx) in processedTimeline" :key="idx" class="w-full">
+                <div v-for="(item, idx) in processedTimeline" :key="idx" class="w-full flex flex-col" 
+                     :class="msg.role === 'user' ? 'items-end' : 'items-start'">
                     
                     <!-- 1. Thoughts -->
                     <div v-if="item.type === 'thought'" class="w-full">
@@ -372,17 +374,19 @@ export default {
 
         const send = async () => {
             if (!inputText.value.trim()) return;
-            const text = inputText.value; 
+            const text = inputText.value;
+            
+            // Clear input immediately for better UX
+            inputText.value = '';
             if (textarea.value) textarea.value.style.height = 'auto';
+            
             store.isThinking = true;
 
             if (editingIndex.value !== null) {
                 const idx = editingIndex.value;
-                inputText.value = '';
                 editingIndex.value = null;
                 handleEdit(idx, text);
             } else {
-                // Создаем сообщение пользователя с items, чтобы computed processedTimeline отработал
                 store.messages.push({ role: 'user', content: text, items: [{type: 'text', content: text}] });
                 
                 await scrollToBottom(true);
