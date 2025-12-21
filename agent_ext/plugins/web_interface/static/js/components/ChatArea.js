@@ -62,7 +62,6 @@ const MessageBubble = defineComponent({
                         <span>Процесс мышления</span>
                         <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
                     </summary>
-                    <!-- Ref for MathJax isolation -->
                     <div ref="thoughtsRef" class="mt-2 pl-3 border-l-2 border-purple-500/20 text-gray-400 text-xs leading-relaxed font-mono bg-gray-900/50 p-4 border border-white/5 rounded-r-lg prose prose-invert prose-xs max-w-none"
                          v-html="renderedThoughts">
                     </div>
@@ -85,7 +84,6 @@ const MessageBubble = defineComponent({
                     </div>
 
                     <div v-else>
-                        <!-- Ref for MathJax isolation -->
                         <div ref="contentRef" class="prose prose-invert prose-sm break-words leading-relaxed max-w-none" 
                             :class="msg.role === 'user' ? 'text-white/95' : ''"
                             v-html="renderedContent"></div>
@@ -146,6 +144,8 @@ const MessageBubble = defineComponent({
         const getMessageText = (msg) => {
             if (msg.content) return msg.content;
             if (msg.parts && Array.isArray(msg.parts)) {
+                // Исключаем parts, если они уже отображены как thoughts (это хак для совместимости, если бэкенд шлет и то и другое)
+                // Но лучше просто джойнить текст
                 return msg.parts.filter(p => p.text).map(p => p.text).join('');
             }
             return '';
@@ -157,9 +157,12 @@ const MessageBubble = defineComponent({
             try { return marked.parse(text); } catch (e) { return text; }
         });
 
+        // FIX: Ensure thoughts are treated as string, handle potential object structure if any
         const renderedThoughts = computed(() => {
-            if (!props.msg.thoughts) return '';
-            try { return marked.parse(props.msg.thoughts); } catch (e) { return props.msg.thoughts; }
+            let t = props.msg.thoughts;
+            if (!t) return '';
+            if (typeof t !== 'string') t = JSON.stringify(t, null, 2);
+            try { return marked.parse(t); } catch (e) { return t; }
         });
         
         const rawContent = computed(() => getMessageText(props.msg));
@@ -194,7 +197,6 @@ const MessageBubble = defineComponent({
                 throwOnError: false
             };
 
-            // Apply ONLY to specific containers, avoiding tools section
             if (contentRef.value) {
                 try { renderMathInElement(contentRef.value, options); } catch(e) {}
             }
