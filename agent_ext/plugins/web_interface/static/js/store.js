@@ -1,3 +1,4 @@
+
 import { reactive } from 'vue';
 
 export const store = reactive({
@@ -13,7 +14,12 @@ export const store = reactive({
     toasts: [], 
     
     setMessages(msgs) {
-        this.messages = (msgs || []).map(m => {
+        if (!msgs) {
+            this.messages = [];
+            return;
+        }
+        
+        this.messages = msgs.map(m => {
             if (m.items && Array.isArray(m.items)) {
                 return m;
             }

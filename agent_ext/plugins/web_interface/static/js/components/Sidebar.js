@@ -1,3 +1,4 @@
+
 import { store } from '../store.js';
 import * as api from '../api.js';
 import { onMounted, ref, computed, nextTick } from 'vue';
@@ -27,10 +28,14 @@ export default {
                             </div>
                             <span class="font-bold text-gray-100 tracking-tight">Agent AI</span>
                         </div>
-                        <button @click="createNew" 
-                            class="w-8 h-8 flex items-center justify-center rounded-lg border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 hover:border-white/20 transition-all duration-200" 
-                            title="Новый чат">
-                            <i class="ph-bold ph-plus"></i>
+                    </div>
+                    
+                    <!-- New Chat Button -->
+                    <div class="px-4 mb-3">
+                         <button @click="createNew" 
+                            class="w-full py-2.5 px-4 flex items-center justify-center gap-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/5 hover:border-white/10 text-gray-200 hover:text-white transition-all duration-200 shadow-sm group">
+                            <i class="ph-bold ph-plus text-blue-400 group-hover:text-blue-300"></i>
+                            <span class="text-sm font-medium">Новый чат</span>
                         </button>
                     </div>
 
@@ -80,7 +85,7 @@ export default {
                         </button>
                         <div class="flex items-center gap-3 pt-1">
                             <div class="w-2 h-2 rounded-full animate-pulse" :class="connected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500'"></div>
-                            <div class="flex flex-col"><span class="text-xs font-medium text-gray-300">Агент онлайн</span><span class="text-[10px] text-gray-600">v1.6.1 • {{ store.chats.length }} чатов</span></div>
+                            <div class="flex flex-col"><span class="text-xs font-medium text-gray-300">Агент онлайн</span><span class="text-[10px] text-gray-600">v1.6.2 • {{ store.chats.length }} чатов</span></div>
                         </div>
                     </div>
                 </div>
@@ -175,7 +180,6 @@ export default {
         const cancelRename = () => { editingId.value = null; }
         const refreshList = async () => { 
             const res = await api.fetchChats(); 
-            // fetchChats in api.js returns [] on error, so it's safeish, but let's check
             if (Array.isArray(res)) store.chats = res;
         };
         
