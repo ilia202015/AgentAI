@@ -134,7 +134,8 @@ const MessageBubble = defineComponent({
                                 <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
                             </summary>
                             <div class="mt-2 pl-3 border-l-2 border-purple-500/20 text-gray-400 text-xs leading-relaxed font-mono bg-gray-900/50 p-4 border border-white/5 rounded-r-lg prose prose-invert prose-xs max-w-none">
-                                <MarkdownContent :content="item.content" />
+                                <div v-if="msg.role === 'user'" class="whitespace-pre-wrap font-sans text-sm leading-relaxed">{{ item.content }}</div>
+                        <MarkdownContent v-else :content="item.content" />
                             </div>
                         </details>
                     </div>
@@ -192,7 +193,8 @@ const MessageBubble = defineComponent({
                             : 'bg-gray-800/40 backdrop-blur-md border border-white/5 text-gray-100 rounded-2xl rounded-tl-sm px-6 py-5'
                         ]">
                         
-                        <MarkdownContent :content="item.content" />
+                        <div v-if="msg.role === 'user'" class="whitespace-pre-wrap font-sans text-sm leading-relaxed">{{ item.content }}</div>
+                        <MarkdownContent v-else :content="item.content" />
                         
                         <div v-if="msg.role === 'assistant' || msg.role === 'model'" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                             <button @click="copyToClipboard(item.content)" class="p-1.5 text-gray-500 hover:text-white hover:bg-white/10 rounded transition" title="Копировать"><i class="ph ph-copy"></i></button>
