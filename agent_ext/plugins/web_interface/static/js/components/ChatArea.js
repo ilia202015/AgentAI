@@ -26,7 +26,26 @@ if (!window.copyCode) {
     };
 }
 
+
+// --- STYLE INJECTION FOR TEXT RENDERING ---
+const style = document.createElement('style');
+style.textContent = `
+    .prose-fix p {
+        white-space: pre-wrap; /* Сохраняет отступы и переносы */
+        margin-bottom: 0.8em;
+    }
+    .prose-fix ul, .prose-fix ol {
+        margin-bottom: 0.8em;
+    }
+    /* Fix for list items spacing */
+    .prose-fix li {
+        margin-bottom: 0.2em;
+    }
+`;
+document.head.appendChild(style);
+
 // --- MARKED CONFIGURATION ---
+
 const renderer = new marked.Renderer();
 
 renderer.code = function(code, language) {
@@ -63,13 +82,14 @@ marked.setOptions({
 
 const MarkdownContent = defineComponent({
     props: ['content'],
-    template: `<div ref="root" class="markdown-content" v-html="rendered"></div>`,
+    template: `<div ref="root" class="markdown-content prose-fix" v-html="rendered"></div>`,
     setup(props) {
         const root = ref(null);
         
         const rendered = computed(() => {
             if (!props.content) return '';
             const text = typeof props.content === 'object' ? JSON.stringify(props.content, null, 2) : props.content;
+            
             try { return marked.parse(text); } catch (e) { return text; }
         });
 
