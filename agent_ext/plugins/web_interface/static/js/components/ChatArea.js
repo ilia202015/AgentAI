@@ -415,7 +415,52 @@ export default {
                     // Merge items (live chat)
                     if (msg.items) {
                         if (!last.items) last.items = [];
-                        last.items = [...last.items, ...msg.items];
+
+                        // 1. Extract thoughts texts
+                        const prevThoughtsStr = (last.items || [])
+                            .filter(i => i.type === 'thought')
+                            .map(i => i.content)
+                            .join('\n');
+                        
+                        const newThoughtsList = msg.items.filter(i => i.type === 'thought');
+                        const newThoughtsStr = newThoughtsList.map(i => i.content).join('\n');
+                        
+                        // 2. Check for cumulative update
+                        let mergedThoughts = false;
+                        if (prevThoughtsStr && newThoughtsStr && newThoughtsStr.startsWith(prevThoughtsStr)) {
+                             // The new message contains the full history of thoughts + new content.
+                             // We should replace the old thoughts with the new one to avoid duplication and fragmentation.
+                             
+                             const firstThoughtIdx = last.items.findIndex(i => i.type === 'thought');
+                             if (firstThoughtIdx !== -1) {
+                                 // Update the first thought item with the FULL new content
+                                 last.items[firstThoughtIdx].content = newThoughtsStr;
+                                 
+                                 // Remove any other subsequent thought items from history to avoid duplicates
+                                 // (We iterate backwards to safely splice)
+                                 for (let i = last.items.length - 1; i > firstThoughtIdx; i--) {
+                                     if (last.items[i].type === 'thought') {
+                                         last.items.splice(i, 1);
+                                     }
+                                 }
+                                 mergedThoughts = true;
+                             }
+                        }
+
+                        // 3. Add non-thought items AND thought items if they weren't merged/replaced
+                        if (mergedThoughts) {
+                             // Add only non-thought items from the new message
+                             const otherItems = msg.items.filter(i => i.type !== 'thought').map(i => ({...i}));
+                             last.items.push(...otherItems);
+                        } else {
+                             // Regular append (not cumulative or mismatch)
+                             // e.g. Tool result or just next chunk
+                             const allNewItems = msg.items.map(i => ({...i}));
+                             
+                             // Optional: simple dedup for exact duplicates if they are passed chunk by chunk
+                             // (Skipping complex logic to avoid "missing last block" bug, trusting the 'replace' logic above for main cases)
+                             last.items.push(...allNewItems);
+                        }
                     }
                     
                     // Merge parts (history)
@@ -424,10 +469,11 @@ export default {
                         last.parts = [...last.parts, ...msg.parts];
                     }
 
-                    // Merge thoughts
-                    if (msg.thoughts) {
-                        last.thoughts = (last.thoughts ? last.thoughts + '\n' : '') + msg.thoughts;
-                    }
+                    // Sync thoughts string (helper for next iteration)
+                    last.thoughts = (last.items || [])
+                        .filter(i => i.type === 'thought')
+                        .map(i => i.content)
+                        .join('\n');
                     
                     // Merge content (fallback)
                     if (msg.content) {
