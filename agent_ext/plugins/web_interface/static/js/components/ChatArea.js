@@ -28,18 +28,35 @@ if (!window.copyCode) {
 
 
 // --- STYLE INJECTION FOR TEXT RENDERING ---
+// --- STYLE INJECTION FOR TEXT RENDERING ---
 const style = document.createElement('style');
 style.textContent = `
+    .prose-fix {
+        white-space: pre-wrap;       /* Сохраняем все пробелы и переносы */
+        word-wrap: break-word;       /* Переносим длинные слова */
+        overflow-wrap: break-word;   /* Современный аналог */
+        font-variant-ligatures: none; /* Иногда лигатуры мешают в коде/тексте */
+    }
+    
+    /* Специфичные фиксы для элементов внутри prose-fix, чтобы не было двойных отступов */
     .prose-fix p {
-        white-space: pre-wrap; /* Сохраняет отступы и переносы */
-        margin-bottom: 0.8em;
+        margin-bottom: 0.5em; /* Небольшой отступ между параграфами */
     }
     .prose-fix ul, .prose-fix ol {
-        margin-bottom: 0.8em;
+        margin-bottom: 0.5em;
+        padding-left: 1.5em; /* Возвращаем отступ для списков, который мог пропасть */
     }
-    /* Fix for list items spacing */
     .prose-fix li {
-        margin-bottom: 0.2em;
+        margin-bottom: 0;
+    }
+    .prose-fix pre {
+        white-space: pre; /* Для блоков кода возвращаем стандартное поведение */
+    }
+    /* KaTeX display mode fix */
+    .katex-display {
+        margin: 0.5em 0;
+        overflow-x: auto;
+        overflow-y: hidden;
     }
 `;
 document.head.appendChild(style);
@@ -77,7 +94,7 @@ marked.setOptions({
     highlight: null,
     pedantic: false,
     gfm: true,
-    breaks: true,
+    breaks: false,
 });
 
 const MarkdownContent = defineComponent({
