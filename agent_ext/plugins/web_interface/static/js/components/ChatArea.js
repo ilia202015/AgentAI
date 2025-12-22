@@ -3,6 +3,29 @@ import { store } from '../store.js';
 import * as api from '../api.js';
 import { nextTick, ref, watch, onMounted, computed, defineComponent } from 'vue';
 
+// --- GLOBAL UTILS ---
+// Ensure copyCode is available globally for the HTML strings rendered by marked
+if (!window.copyCode) {
+    window.copyCode = function(btn) {
+        const pre = btn.closest('.code-block-wrapper').querySelector('pre code');
+        if (pre) {
+            navigator.clipboard.writeText(pre.innerText);
+            
+            // Visual feedback
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="ph-bold ph-check text-green-400"></i><span class="text-green-400">Скопировано</span>';
+            btn.classList.remove('opacity-0');
+            btn.classList.add('opacity-100');
+            
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.classList.remove('opacity-100');
+                btn.classList.add('opacity-0');
+            }, 2000);
+        }
+    };
+}
+
 // --- MARKED CONFIGURATION ---
 const renderer = new marked.Renderer();
 
@@ -46,7 +69,7 @@ const MarkdownContent = defineComponent({
         
         const rendered = computed(() => {
             if (!props.content) return '';
-            const text = typeof props.content === 'string' ? props.content : JSON.stringify(props.content);
+            const text = typeof props.content === 'object' ? JSON.stringify(props.content, null, 2) : props.content;
             try { return marked.parse(text); } catch (e) { return text; }
         });
 
@@ -54,7 +77,7 @@ const MarkdownContent = defineComponent({
             if (!root.value || typeof renderMathInElement === 'undefined') return;
             try {
                 renderMathInElement(root.value, {
-                    delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}, {left: '\(', right: '\)', display: false}, {left: '\[', right: '\]', display: true} ],
+                    delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}, {left: '\\(', right: '\\)', display: false}, {left: '\\[', right: '\\]', display: true} ],
                     ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code", "option"],
                     throwOnError: false
                 });
@@ -96,8 +119,7 @@ const MessageBubble = defineComponent({
                 </div>
             </div>
 
-            <!-- TIMELINE RENDER (Mixed Content Stream) -->
-            <!-- All items share ONE vertical flex container, no internal headers -->
+            <!-- TIMELINE RENDER -->
             <div v-else class="flex flex-col w-full gap-1">
                 
                 <div v-for="(item, idx) in processedTimeline" :key="idx" class="w-full flex flex-col" 
@@ -122,7 +144,7 @@ const MessageBubble = defineComponent({
                         <details class="group/tools">
                             <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
                                 <i class="ph ph-wrench text-emerald-500 group-open/tools:rotate-180 transition-transform"></i>
-                                <span>Использован инструмент: {{ item.request.title.replace('Запрос ', '') }}</span>
+                                <span>Использован инструмент: {{ item.request.title ? item.request.title.replace('Запрос ', '') : 'Unknown' }}</span>
                                 <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
                             </summary>
                             <div class="mt-2 pt-2 border-t border-white/5">
@@ -187,30 +209,70 @@ const MessageBubble = defineComponent({
         const editContent = ref('');
 
         const getFullText = () => {
-            if (!props.msg.items) return '';
-            return props.msg.items
-                .filter(i => i.type === 'text')
-                .map(i => i.content)
-                .join('\n');
+            if (props.msg.items && props.msg.items.length) {
+                return props.msg.items.filter(i => i.type === 'text').map(i => i.content).join('\n');
+            }
+            if (props.msg.parts && props.msg.parts.length) {
+                return props.msg.parts.filter(p => p.text).map(p => p.text).join('\n');
+            }
+            return props.msg.content || '';
         };
 
         const processedTimeline = computed(() => {
-            const items = props.msg.items || [];
-            
-            // Если items пустой, но есть контент (например, от юзера), создаем фейковый item
-            if (items.length === 0 && props.msg.content) {
-                return [{ type: 'text', content: props.msg.content }];
+            let rawItems = [];
+
+            // 1. Try to use "live" items if available
+            if (props.msg.items && props.msg.items.length > 0) {
+                rawItems = props.msg.items;
+            } 
+            // 2. Reconstruct from "serialized" history (parts/thoughts)
+            else {
+                // Add thoughts first
+                if (props.msg.thoughts) {
+                    rawItems.push({ type: 'thought', content: props.msg.thoughts });
+                }
+
+                // Add Parts
+                if (props.msg.parts && Array.isArray(props.msg.parts)) {
+                    props.msg.parts.forEach(part => {
+                        if (part.text) {
+                            rawItems.push({ type: 'text', content: part.text });
+                        } else if (part.function_call) {
+                             rawItems.push({ 
+                                type: 'tool', 
+                                title: `Запрос ${part.function_call.name}`, 
+                                content: typeof part.function_call.args === 'string' 
+                                    ? part.function_call.args 
+                                    : JSON.stringify(part.function_call.args, null, 2)
+                            });
+                        } else if (part.function_response) {
+                             rawItems.push({ 
+                                type: 'tool', 
+                                title: `Результат ${part.function_response.name}`, 
+                                content: typeof part.function_response.response === 'string' 
+                                    ? part.function_response.response 
+                                    : JSON.stringify(part.function_response.response, null, 2)
+                            });
+                        }
+                    });
+                }
+                
+                // Fallback for simple legacy text
+                if (rawItems.length === 0 && props.msg.content) {
+                    rawItems.push({ type: 'text', content: props.msg.content });
+                }
             }
 
+            // 3. Post-process: Pair tools (Request + Result)
             const res = [];
-            for (let i = 0; i < items.length; i++) {
-                const item = items[i];
+            for (let i = 0; i < rawItems.length; i++) {
+                const item = rawItems[i];
                 if (item.type === 'tool') {
-                    if (item.title && item.title.startsWith("Запрос") && i + 1 < items.length) {
-                        const next = items[i+1];
+                    if (item.title && item.title.startsWith("Запрос") && i + 1 < rawItems.length) {
+                        const next = rawItems[i+1];
                         if (next.type === 'tool') {
                             const toolName = item.title.substring(7).trim();
-                            if (next.title && (next.title === `Результат ${toolName}` || next.title.startsWith(`Результат`))) {
+                            if (next.title && (next.title === `Результат ${toolName}` || next.title.startsWith('Результат'))) {
                                 res.push({ type: 'pair', request: item, result: next });
                                 i++; 
                                 continue;
@@ -224,7 +286,7 @@ const MessageBubble = defineComponent({
         });
 
         const startEdit = () => { 
-            editContent.value = getFullText() || props.msg.content || ''; 
+            editContent.value = getFullText(); 
             isEditing.value = true; 
         };
         const cancelEdit = () => { isEditing.value = false; };
@@ -325,7 +387,65 @@ export default {
         const textarea = ref(null);
         const showScrollButton = ref(false);
         const editingIndex = ref(null);
-        const filteredMessages = computed(() => store.messages.filter(m => m.role !== 'system' && m.role !== 'tool'));
+        
+        // --- NEW MERGING LOGIC ---
+        const filteredMessages = computed(() => {
+            const raw = store.messages.filter(m => m.role !== 'system' && m.role !== 'tool');
+            const merged = [];
+            
+            for (const msg of raw) {
+                // 1. Skip empty user messages
+                if (msg.role === 'user') {
+                    const hasText = msg.content && msg.content.trim();
+                    const hasItems = msg.items && msg.items.some(i => i.type === 'text' && i.content.trim());
+                    // If no text content, skip it
+                    if (!hasText && !hasItems) {
+                        continue;
+                    }
+                }
+
+                // 2. Merge adjacent assistant messages
+                const last = merged.length > 0 ? merged[merged.length - 1] : null;
+                const isAgent = role => role === 'assistant' || role === 'model';
+
+                if (last && isAgent(last.role) && isAgent(msg.role)) {
+                    // Create a merged copy to preserve original objects
+                    // We need to merge items, parts, and thoughts
+                    
+                    // Merge items (live chat)
+                    if (msg.items) {
+                        if (!last.items) last.items = [];
+                        last.items = [...last.items, ...msg.items];
+                    }
+                    
+                    // Merge parts (history)
+                    if (msg.parts) {
+                        if (!last.parts) last.parts = [];
+                        last.parts = [...last.parts, ...msg.parts];
+                    }
+
+                    // Merge thoughts
+                    if (msg.thoughts) {
+                        last.thoughts = (last.thoughts ? last.thoughts + '\n' : '') + msg.thoughts;
+                    }
+                    
+                    // Merge content (fallback)
+                    if (msg.content) {
+                        last.content = (last.content ? last.content + '\n' : '') + msg.content;
+                    }
+
+                } else {
+                    // Push a shallow copy to allow local mutation (like combining items) 
+                    // without destroying the store's structure immediately
+                    merged.push({ 
+                        ...msg, 
+                        items: msg.items ? [...msg.items] : undefined,
+                        parts: msg.parts ? [...msg.parts] : undefined
+                    });
+                }
+            }
+            return merged;
+        });
         
         const scrollToBottom = async (force = false) => { 
             await nextTick(); 
@@ -375,11 +495,8 @@ export default {
         const send = async () => {
             if (!inputText.value.trim()) return;
             const text = inputText.value;
-            
-            // Clear input immediately for better UX
             inputText.value = '';
             if (textarea.value) textarea.value.style.height = 'auto';
-            
             store.isThinking = true;
 
             if (editingIndex.value !== null) {
@@ -388,7 +505,6 @@ export default {
                 handleEdit(idx, text);
             } else {
                 store.messages.push({ role: 'user', content: text, items: [{type: 'text', content: text}] });
-                
                 await scrollToBottom(true);
                 try { 
                     const res = await api.sendMessage(store.currentChatId, text);
