@@ -3,19 +3,15 @@ import * as api from '../api.js';
 import { nextTick, ref, watch, onMounted, computed, defineComponent } from 'vue';
 
 // --- GLOBAL UTILS ---
-// Ensure copyCode is available globally for the HTML strings rendered by marked
 if (!window.copyCode) {
     window.copyCode = function(btn) {
         const pre = btn.closest('.code-block-wrapper').querySelector('pre code');
         if (pre) {
             navigator.clipboard.writeText(pre.innerText);
-            
-            // Visual feedback
             const originalHtml = btn.innerHTML;
             btn.innerHTML = '<i class="ph-bold ph-check text-green-400"></i><span class="text-green-400">Скопировано</span>';
             btn.classList.remove('opacity-0');
             btn.classList.add('opacity-100');
-            
             setTimeout(() => {
                 btn.innerHTML = originalHtml;
                 btn.classList.remove('opacity-100');
@@ -34,10 +30,34 @@ style.textContent = `
         overflow-wrap: break-word;   
         font-variant-ligatures: none; 
     }
-    .prose-fix p { margin-bottom: 0.5em; }
-    .prose-fix ul, .prose-fix ol { margin-bottom: 0.5em; padding-left: 1.5em; }
-    .prose-fix li { margin-bottom: 0; }
-    .prose-fix pre { white-space: pre; }
+    /* Basic Markdown Styles since we don't have Tailwind Typography */
+    .markdown-content h1 { font-size: 1.8em; font-weight: 700; margin-top: 1.2em; margin-bottom: 0.6em; line-height: 1.3; color: #f3f4f6; }
+    .markdown-content h2 { font-size: 1.5em; font-weight: 600; margin-top: 1.0em; margin-bottom: 0.5em; line-height: 1.3; color: #e5e7eb; border-bottom: 1px solid #374151; padding-bottom: 0.3em; }
+    .markdown-content h3 { font-size: 1.25em; font-weight: 600; margin-top: 1.0em; margin-bottom: 0.5em; line-height: 1.3; color: #d1d5db; }
+    .markdown-content h4 { font-size: 1.1em; font-weight: 600; margin-top: 0.8em; margin-bottom: 0.4em; }
+    
+    .markdown-content p { margin-bottom: 0.8em; line-height: 1.6; }
+    
+    .markdown-content ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 0.8em; }
+    .markdown-content ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 0.8em; }
+    .markdown-content li { margin-bottom: 0.3em; }
+    
+    .markdown-content a { color: #60a5fa; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.2s; }
+    .markdown-content a:hover { border-bottom-color: #60a5fa; }
+    
+    .markdown-content blockquote { border-left: 4px solid #4b5563; padding-left: 1em; color: #9ca3af; margin: 1em 0; font-style: italic; }
+    
+    .markdown-content code { background-color: rgba(99, 110, 123, 0.2); padding: 0.2em 0.4em; border-radius: 0.25em; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.9em; color: #e5e7eb; }
+    .markdown-content pre code { background-color: transparent; padding: 0; color: inherit; }
+    
+    .markdown-content table { border-collapse: collapse; width: 100%; margin: 1em 0; overflow-x: auto; display: block; }
+    .markdown-content th, .markdown-content td { border: 1px solid #374151; padding: 0.6em 1em; text-align: left; }
+    .markdown-content th { background-color: #1f2937; font-weight: 600; }
+    .markdown-content tr:nth-child(even) { background-color: rgba(255, 255, 255, 0.02); }
+    
+    .markdown-content hr { border-color: #374151; margin: 1.5em 0; }
+    .markdown-content img { max-width: 100%; border-radius: 0.5em; margin: 1em 0; }
+
     .no-ligatures { font-variant-ligatures: none; }
     .katex-display { margin: 0.5em 0; overflow-x: auto; overflow-y: hidden; }
 `;
@@ -47,33 +67,56 @@ document.head.appendChild(style);
 const renderer = new marked.Renderer();
 
 renderer.code = function(code, language) {
-    // Safety check: ensure code is a string
-    const safeCode = (typeof code === 'string') ? code : String(code || '');
+    try {
+        // Ensure code is a string to prevent "replace is not a function"
+        const safeCode = String(code || '');
+        let highlighted = safeCode;
+        let langDisplay = (language || 'text').toLowerCase();
 
-    // Basic escaping to prevent HTML injection in code blocks
-    const escaped = safeCode.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const langDisplay = (language || 'text').toLowerCase();
-    
-    return `
-        <div class="code-block-wrapper my-4 rounded-lg border border-white/10 bg-[#282c34] overflow-hidden relative group/code">
-            <div class="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5">
-                <span class="text-xs font-mono text-gray-400">${langDisplay}</span>
-                <button onclick="window.copyCode(this)" class="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-white transition-colors cursor-pointer z-10 opacity-0 group-hover/code:opacity-100">
-                    <i class="ph ph-copy"></i><span>Копировать</span>
-                </button>
+        // Highlight.js integration
+        if (window.hljs) {
+            const validLang = !!(language && hljs.getLanguage(language));
+            if (validLang) {
+                highlighted = hljs.highlight(safeCode, { language }).value;
+            } else {
+                const auto = hljs.highlightAuto(safeCode);
+                highlighted = auto.value;
+                if (auto.language) langDisplay = auto.language;
+            }
+        } else {
+            // Fallback escape if no hljs
+            highlighted = safeCode.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+        
+        return `
+            <div class="code-block-wrapper my-4 rounded-lg border border-white/10 bg-[#282c34] overflow-hidden relative group/code">
+                <div class="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5">
+                    <span class="text-xs font-mono text-gray-400">${langDisplay}</span>
+                    <button onclick="window.copyCode(this)" class="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-white transition-colors cursor-pointer z-10 opacity-0 group-hover/code:opacity-100">
+                        <i class="ph ph-copy"></i><span>Копировать</span>
+                    </button>
+                </div>
+                <div class="overflow-x-auto p-3">
+                    <pre><code class="hljs language-${langDisplay} no-ligatures text-sm">${highlighted}</code></pre>
+                </div>
             </div>
-            <div class="overflow-x-auto p-3">
-                <pre><code class="no-ligatures text-gray-300 font-mono text-sm">${escaped}</code></pre>
-            </div>
-        </div>
-    `;
+        `;
+    } catch (e) {
+        console.error("Renderer error:", e);
+        // Fallback for critical renderer failure
+        return `<pre class="text-red-400 text-xs">Code Render Error</pre>`;
+    }
+};
+
+renderer.link = function(href, title, text) {
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer" title="${title || ''}">${text}</a>`;
 };
 
 marked.setOptions({
     renderer: renderer,
     pedantic: false,
     gfm: true,
-    breaks: false,
+    breaks: true, // Enable line breaks
 });
 
 const MarkdownContent = defineComponent({
@@ -84,18 +127,18 @@ const MarkdownContent = defineComponent({
         
         const rendered = computed(() => {
             if (!props.content) return '';
-            const text = typeof props.content === 'object' ? JSON.stringify(props.content, null, 2) : props.content;
+            // Convert objects to formatted JSON string
+            const text = typeof props.content === 'object' ? JSON.stringify(props.content, null, 2) : String(props.content || '');
             
             try { 
                 return marked.parse(text); 
             } catch (e) { 
                 console.error("Markdown parse error:", e);
-                // Return text wrapped in pre to show something at least
-                return `<div class="text-red-400 text-xs mb-2">Markdown Error: ${e.message}</div><pre class="whitespace-pre-wrap font-mono text-xs">${text.replace(/</g, '&lt;')}</pre>`; 
+                const safeText = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                return `<div class="text-red-400 text-xs mb-2">Markdown Error: ${e.message}</div><pre class="whitespace-pre-wrap font-mono text-xs">${safeText}</pre>`; 
             }
         });
 
-        // Basic Math support (if katex is loaded)
         const updateMath = () => {
             if (!root.value || typeof renderMathInElement === 'undefined') return;
             try {
@@ -147,7 +190,7 @@ const MessageBubble = defineComponent({
                 <div v-for="(item, idx) in processedTimeline" :key="idx" class="w-full flex flex-col" 
                      :class="msg.role === 'user' ? 'items-end' : 'items-start'">
                     
-                    <!-- 1. Thoughts (Collapsible + Copy) -->
+                    <!-- 1. Thoughts -->
                     <div v-if="item.type === 'thought'" class="w-full">
                         <details class="group/thought">
                             <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
@@ -219,7 +262,7 @@ const MessageBubble = defineComponent({
                             ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-2xl rounded-tr-sm px-5 py-3.5 border border-white/10 w-auto self-end'
                             : 'bg-gray-800/40 backdrop-blur-md border border-white/5 text-gray-100 rounded-2xl rounded-tl-sm px-6 py-5'
                         ]">
-                        <!-- Если сообщение пользователя - показываем обычный текст для простоты, если агента - Markdown -->
+                        <!-- Если сообщение пользователя - показываем обычный текст для простоты (но обрабатываем ссылки), если агента - Markdown -->
                         <div v-if="msg.role === 'user'" class="whitespace-pre-wrap font-sans text-sm leading-relaxed">{{ item.content }}</div>
                         <MarkdownContent v-else :content="item.content" />
                         
