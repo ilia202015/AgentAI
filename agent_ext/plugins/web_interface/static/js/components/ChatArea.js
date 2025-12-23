@@ -2,21 +2,116 @@ import { store } from '../store.js';
 import * as api from '../api.js';
 import { nextTick, ref, watch, onMounted, computed, defineComponent } from 'vue';
 
+// --- GLOBAL UTILS ---
+// Ensure copyCode is available globally for the HTML strings rendered by marked
+if (!window.copyCode) {
+    window.copyCode = function(btn) {
+        const pre = btn.closest('.code-block-wrapper').querySelector('pre code');
+        if (pre) {
+            navigator.clipboard.writeText(pre.innerText);
+            
+            // Visual feedback
+            const originalHtml = btn.innerHTML;
+            btn.innerHTML = '<i class="ph-bold ph-check text-green-400"></i><span class="text-green-400">Скопировано</span>';
+            btn.classList.remove('opacity-0');
+            btn.classList.add('opacity-100');
+            
+            setTimeout(() => {
+                btn.innerHTML = originalHtml;
+                btn.classList.remove('opacity-100');
+                btn.classList.add('opacity-0');
+            }, 2000);
+        }
+    };
+}
+
 // --- STYLE INJECTION ---
 const style = document.createElement('style');
 style.textContent = `
-    .no-ligatures {
-        font-variant-ligatures: none;
+    .prose-fix {
+        white-space: pre-wrap;       
+        word-wrap: break-word;       
+        overflow-wrap: break-word;   
+        font-variant-ligatures: none; 
     }
+    .prose-fix p { margin-bottom: 0.5em; }
+    .prose-fix ul, .prose-fix ol { margin-bottom: 0.5em; padding-left: 1.5em; }
+    .prose-fix li { margin-bottom: 0; }
+    .prose-fix pre { white-space: pre; }
+    .no-ligatures { font-variant-ligatures: none; }
+    .katex-display { margin: 0.5em 0; overflow-x: auto; overflow-y: hidden; }
 `;
 document.head.appendChild(style);
 
-// --- NO FORMATTING MODE (Text Only) ---
-// Markdown, Highlight.js and Katex removed for debugging
+// --- MARKED CONFIGURATION ---
+const renderer = new marked.Renderer();
+
+renderer.code = function(code, language) {
+    // Safety check: ensure code is a string
+    const safeCode = (typeof code === 'string') ? code : String(code || '');
+
+    // Basic escaping to prevent HTML injection in code blocks
+    const escaped = safeCode.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    const langDisplay = (language || 'text').toLowerCase();
+    
+    return `
+        <div class="code-block-wrapper my-4 rounded-lg border border-white/10 bg-[#282c34] overflow-hidden relative group/code">
+            <div class="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5">
+                <span class="text-xs font-mono text-gray-400">${langDisplay}</span>
+                <button onclick="window.copyCode(this)" class="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-white transition-colors cursor-pointer z-10 opacity-0 group-hover/code:opacity-100">
+                    <i class="ph ph-copy"></i><span>Копировать</span>
+                </button>
+            </div>
+            <div class="overflow-x-auto p-3">
+                <pre><code class="no-ligatures text-gray-300 font-mono text-sm">${escaped}</code></pre>
+            </div>
+        </div>
+    `;
+};
+
+marked.setOptions({
+    renderer: renderer,
+    pedantic: false,
+    gfm: true,
+    breaks: false,
+});
 
 const MarkdownContent = defineComponent({
     props: ['content'],
-    template: `<div class="whitespace-pre-wrap font-mono text-sm leading-relaxed break-words text-gray-200 no-ligatures">{{ content }}</div>`
+    template: `<div ref="root" class="markdown-content prose-fix text-gray-200 text-sm leading-relaxed" v-html="rendered"></div>`,
+    setup(props) {
+        const root = ref(null);
+        
+        const rendered = computed(() => {
+            if (!props.content) return '';
+            const text = typeof props.content === 'object' ? JSON.stringify(props.content, null, 2) : props.content;
+            
+            try { 
+                return marked.parse(text); 
+            } catch (e) { 
+                console.error("Markdown parse error:", e);
+                // Return text wrapped in pre to show something at least
+                return `<div class="text-red-400 text-xs mb-2">Markdown Error: ${e.message}</div><pre class="whitespace-pre-wrap font-mono text-xs">${text.replace(/</g, '&lt;')}</pre>`; 
+            }
+        });
+
+        // Basic Math support (if katex is loaded)
+        const updateMath = () => {
+            if (!root.value || typeof renderMathInElement === 'undefined') return;
+            try {
+                renderMathInElement(root.value, {
+                    delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}, {left: '\\(', right: '\\)', display: false}, {left: '\\[', right: '\\]', display: true} ],
+                    ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code", "option"],
+                    throwOnError: false
+                });
+            } catch(e) {}
+        };
+
+        watch(rendered, async () => { await nextTick(); updateMath(); });
+        onMounted(async () => { await nextTick(); updateMath(); });
+
+        return { root, rendered };
+    }
 });
 
 const MessageBubble = defineComponent({
@@ -27,6 +122,7 @@ const MessageBubble = defineComponent({
         <div class="group flex flex-col w-[95%] mx-auto animate-fade-in-up"
             :class="msg.role === 'user' ? 'items-end' : 'items-start'">
             
+            <!-- HEADER -->
             <div class="flex items-center gap-2 mb-1 px-1 opacity-60 text-xs font-medium tracking-wide">
                 <span v-if="msg.role === 'assistant' || msg.role === 'model'" class="flex items-center gap-1.5 text-blue-400">
                         <i class="ph-fill ph-robot"></i> Агент
@@ -37,6 +133,7 @@ const MessageBubble = defineComponent({
                 </span>
             </div>
 
+            <!-- EDIT MODE -->
             <div v-if="isEditing && msg.role === 'user'" class="w-full bg-gray-900 border border-white/10 rounded-xl p-3 relative max-w-full shadow-lg">
                 <textarea v-model="editContent" rows="3" class="w-full bg-transparent text-sm focus:outline-none resize-none mb-2"></textarea>
                 <div class="flex justify-end gap-2">
@@ -45,6 +142,7 @@ const MessageBubble = defineComponent({
                 </div>
             </div>
 
+            <!-- TIMELINE -->
             <div v-else class="flex flex-col w-full gap-1">
                 <div v-for="(item, idx) in processedTimeline" :key="idx" class="w-full flex flex-col" 
                      :class="msg.role === 'user' ? 'items-end' : 'items-start'">
@@ -67,7 +165,7 @@ const MessageBubble = defineComponent({
                         </details>
                     </div>
 
-                    <!-- 2. Pair (Collapsible + Copy) -->
+                    <!-- 2. Pair (Raw Display for Tools) -->
                     <div v-else-if="item.type === 'pair'" class="w-full my-1">
                         <details class="group/tools">
                             <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
@@ -94,7 +192,7 @@ const MessageBubble = defineComponent({
                         </details>
                     </div>
 
-                    <!-- 3. Tool (Collapsible + Copy) -->
+                    <!-- 3. Tool (Raw Display for Tools) -->
                     <div v-else-if="item.type === 'tool'" class="w-full my-1">
                         <details class="group/tools">
                             <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
@@ -114,14 +212,16 @@ const MessageBubble = defineComponent({
                         </details>
                     </div>
 
-                    <!-- 4. Text (Copy) -->
+                    <!-- 4. Text (Markdown) -->
                     <div v-else-if="item.type === 'text' && (item.content.trim() || isEditing)" class="relative max-w-full overflow-hidden transition-all shadow-lg w-full group/text"
                         :class="[
                         msg.role === 'user' 
                             ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-2xl rounded-tr-sm px-5 py-3.5 border border-white/10 w-auto self-end'
                             : 'bg-gray-800/40 backdrop-blur-md border border-white/5 text-gray-100 rounded-2xl rounded-tl-sm px-6 py-5'
                         ]">
-                        <MarkdownContent :content="item.content" />
+                        <!-- Если сообщение пользователя - показываем обычный текст для простоты, если агента - Markdown -->
+                        <div v-if="msg.role === 'user'" class="whitespace-pre-wrap font-sans text-sm leading-relaxed">{{ item.content }}</div>
+                        <MarkdownContent v-else :content="item.content" />
                         
                         <div v-if="msg.role === 'assistant' || msg.role === 'model'" class="absolute top-2 right-2 opacity-0 group-hover/text:opacity-100 transition-opacity flex gap-1">
                             <button @click="copyToClipboard(item.content, $event)" class="p-1.5 text-gray-500 hover:text-white hover:bg-white/10 rounded transition" title="Копировать"><i class="ph ph-copy"></i></button>
