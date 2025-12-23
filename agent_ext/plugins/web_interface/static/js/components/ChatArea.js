@@ -2,7 +2,7 @@ import { store } from '../store.js';
 import * as api from '../api.js';
 import { nextTick, ref, watch, onMounted, computed, defineComponent } from 'vue';
 
-// --- NO FORMATTING MODE ---
+// --- NO FORMATTING MODE (Text Only) ---
 // Markdown, Highlight.js and Katex removed for debugging
 
 const MarkdownContent = defineComponent({
@@ -40,52 +40,83 @@ const MessageBubble = defineComponent({
                 <div v-for="(item, idx) in processedTimeline" :key="idx" class="w-full flex flex-col" 
                      :class="msg.role === 'user' ? 'items-end' : 'items-start'">
                     
-                    <!-- 1. Thoughts -->
+                    <!-- 1. Thoughts (Collapsible + Copy) -->
                     <div v-if="item.type === 'thought'" class="w-full">
-                        <div class="mt-2 pl-3 border-l-2 border-purple-500/20 text-gray-400 text-xs leading-relaxed font-mono bg-gray-900/50 p-4 border border-white/5 rounded-r-lg">
-                             <div class="font-bold text-purple-400 mb-1">Thought Process:</div>
-                             <MarkdownContent :content="item.content" />
-                        </div>
+                        <details class="group/thought">
+                            <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
+                                <i class="ph ph-brain text-purple-400 group-open/thought:rotate-180 transition-transform"></i>
+                                <span>Процесс мышления</span>
+                                <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
+                            </summary>
+                            <div class="mt-2 pl-3 border-l-2 border-purple-500/20 text-gray-400 text-xs leading-relaxed font-mono bg-gray-900/50 p-4 border border-white/5 rounded-r-lg relative group/content">
+                                 <button @click="copyToClipboard(item.content, $event)" class="absolute top-2 right-2 opacity-0 group-hover/content:opacity-100 transition-opacity p-1 text-gray-500 hover:text-white" title="Копировать">
+                                    <i class="ph ph-copy"></i>
+                                 </button>
+                                 <div class="font-bold text-purple-400 mb-1">Thought Process:</div>
+                                 <MarkdownContent :content="item.content" />
+                            </div>
+                        </details>
                     </div>
 
-                    <!-- 2. Pair -->
-                    <div v-else-if="item.type === 'pair'" class="w-full my-2">
-                         <div class="rounded-lg border border-white/10 bg-[#1e222a] overflow-hidden">
-                            <div class="px-3 py-1.5 bg-white/5 border-b border-white/5 text-xs text-emerald-400 font-mono">
-                                {{ item.request.title }}
+                    <!-- 2. Pair (Collapsible + Copy) -->
+                    <div v-else-if="item.type === 'pair'" class="w-full my-1">
+                        <details class="group/tools">
+                            <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
+                                <i class="ph ph-wrench text-emerald-500 group-open/tools:rotate-180 transition-transform"></i>
+                                <span>Использован инструмент: {{ item.request.title ? item.request.title.replace('Запрос ', '') : 'Unknown' }}</span>
+                                <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
+                            </summary>
+                            <div class="mt-2 pt-2 border-t border-white/5">
+                                <div class="rounded-t-lg border border-white/10 bg-[#1e222a] overflow-hidden relative group/req">
+                                    <div class="px-3 py-1.5 bg-white/5 border-b border-white/5 text-xs text-emerald-400 font-mono flex justify-between items-center">
+                                        <span>{{ item.request.title }}</span>
+                                        <button @click="copyToClipboard(item.request.content, $event)" class="text-gray-500 hover:text-white opacity-0 group-hover/req:opacity-100 transition-opacity"><i class="ph ph-copy"></i></button>
+                                    </div>
+                                    <div class="p-3 overflow-x-auto font-mono text-xs text-gray-300 whitespace-pre-wrap">{{ item.request.content }}</div>
+                                </div>
+                                <div class="rounded-b-lg border-x border-b border-white/10 bg-[#1e222a] overflow-hidden relative group/res">
+                                     <div class="px-3 py-1.5 bg-white/5 border-y border-white/5 text-xs text-blue-400 font-mono flex justify-between items-center">
+                                        <span>Результат</span>
+                                        <button @click="copyToClipboard(item.result.content, $event)" class="text-gray-500 hover:text-white opacity-0 group-hover/res:opacity-100 transition-opacity"><i class="ph ph-copy"></i></button>
+                                    </div>
+                                    <div class="p-3 overflow-x-auto font-mono text-xs text-gray-400 whitespace-pre-wrap">{{ item.result.content }}</div>
+                                </div>
                             </div>
-                            <div class="p-3 overflow-x-auto font-mono text-xs text-gray-300 whitespace-pre-wrap">
-                                {{ item.request.content }}
-                            </div>
-                             <div class="px-3 py-1.5 bg-white/5 border-y border-white/5 text-xs text-blue-400 font-mono">
-                                Result
-                            </div>
-                            <div class="p-3 overflow-x-auto font-mono text-xs text-gray-400 whitespace-pre-wrap">
-                                {{ item.result.content }}
-                            </div>
-                        </div>
+                        </details>
                     </div>
 
-                    <!-- 3. Tool -->
-                    <div v-else-if="item.type === 'tool'" class="w-full my-2">
-                        <div class="rounded-lg border border-white/10 bg-[#1e222a] overflow-hidden">
-                            <div class="px-3 py-1.5 bg-white/5 border-b border-white/5 text-xs text-emerald-400 font-mono">
-                                {{ item.title }}
+                    <!-- 3. Tool (Collapsible + Copy) -->
+                    <div v-else-if="item.type === 'tool'" class="w-full my-1">
+                        <details class="group/tools">
+                            <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
+                                <i class="ph ph-wrench text-emerald-500 group-open/tools:rotate-180 transition-transform"></i>
+                                <span>Инструмент: {{ item.title }}</span>
+                                <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
+                            </summary>
+                            <div class="mt-2 pt-2 border-t border-white/5">
+                                <div class="rounded-lg border border-white/10 bg-[#1e222a] overflow-hidden relative group/tool">
+                                    <div class="px-3 py-1.5 bg-white/5 border-b border-white/5 text-xs text-emerald-400 font-mono flex justify-between items-center">
+                                        <span>{{ item.title }}</span>
+                                        <button @click="copyToClipboard(item.content, $event)" class="text-gray-500 hover:text-white opacity-0 group-hover/tool:opacity-100 transition-opacity"><i class="ph ph-copy"></i></button>
+                                    </div>
+                                    <div class="p-3 overflow-x-auto font-mono text-xs text-gray-300 whitespace-pre-wrap">{{ item.content }}</div>
+                                </div>
                             </div>
-                            <div class="p-3 overflow-x-auto font-mono text-xs text-gray-300 whitespace-pre-wrap">
-                                {{ item.content }}
-                            </div>
-                        </div>
+                        </details>
                     </div>
 
-                    <!-- 4. Text -->
-                    <div v-else-if="item.type === 'text' && (item.content.trim() || isEditing)" class="relative max-w-full overflow-hidden transition-all shadow-lg w-full"
+                    <!-- 4. Text (Copy) -->
+                    <div v-else-if="item.type === 'text' && (item.content.trim() || isEditing)" class="relative max-w-full overflow-hidden transition-all shadow-lg w-full group/text"
                         :class="[
                         msg.role === 'user' 
                             ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-2xl rounded-tr-sm px-5 py-3.5 border border-white/10 w-auto self-end'
                             : 'bg-gray-800/40 backdrop-blur-md border border-white/5 text-gray-100 rounded-2xl rounded-tl-sm px-6 py-5'
                         ]">
                         <MarkdownContent :content="item.content" />
+                        
+                        <div v-if="msg.role === 'assistant' || msg.role === 'model'" class="absolute top-2 right-2 opacity-0 group-hover/text:opacity-100 transition-opacity flex gap-1">
+                            <button @click="copyToClipboard(item.content, $event)" class="p-1.5 text-gray-500 hover:text-white hover:bg-white/10 rounded transition" title="Копировать"><i class="ph ph-copy"></i></button>
+                        </div>
                     </div>
 
                 </div>
@@ -151,8 +182,19 @@ const MessageBubble = defineComponent({
         const startEdit = () => { editContent.value = getFullText(); isEditing.value = true; };
         const cancelEdit = () => { isEditing.value = false; };
         const saveEdit = () => { emit('edit', props.index, editContent.value); isEditing.value = false; };
+        const copyToClipboard = (text, event) => {
+             navigator.clipboard.writeText(text);
+             if (event && event.currentTarget) {
+                const btn = event.currentTarget;
+                const originalHtml = btn.innerHTML;
+                btn.innerHTML = '<i class="ph-bold ph-check text-emerald-400"></i>';
+                setTimeout(() => btn.innerHTML = originalHtml, 2000);
+             } else {
+                 store.addToast("Текст скопирован", "success");
+             }
+        };
 
-        return { processedTimeline, isEditing, editContent, startEdit, cancelEdit, saveEdit };
+        return { processedTimeline, isEditing, editContent, startEdit, cancelEdit, saveEdit, copyToClipboard };
     }
 });
 
