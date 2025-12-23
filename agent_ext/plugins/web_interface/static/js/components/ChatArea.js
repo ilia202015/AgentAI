@@ -2,12 +2,21 @@ import { store } from '../store.js';
 import * as api from '../api.js';
 import { nextTick, ref, watch, onMounted, computed, defineComponent } from 'vue';
 
+// --- STYLE INJECTION ---
+const style = document.createElement('style');
+style.textContent = `
+    .no-ligatures {
+        font-variant-ligatures: none;
+    }
+`;
+document.head.appendChild(style);
+
 // --- NO FORMATTING MODE (Text Only) ---
 // Markdown, Highlight.js and Katex removed for debugging
 
 const MarkdownContent = defineComponent({
     props: ['content'],
-    template: `<div class="whitespace-pre-wrap font-mono text-sm leading-relaxed break-words text-gray-200">{{ content }}</div>`
+    template: `<div class="whitespace-pre-wrap font-mono text-sm leading-relaxed break-words text-gray-200 no-ligatures">{{ content }}</div>`
 });
 
 const MessageBubble = defineComponent({
@@ -72,14 +81,14 @@ const MessageBubble = defineComponent({
                                         <span>{{ item.request.title }}</span>
                                         <button @click="copyToClipboard(item.request.content, $event)" class="text-gray-500 hover:text-white opacity-0 group-hover/req:opacity-100 transition-opacity"><i class="ph ph-copy"></i></button>
                                     </div>
-                                    <div class="p-3 overflow-x-auto font-mono text-xs text-gray-300 whitespace-pre-wrap">{{ item.request.content }}</div>
+                                    <div class="p-3 overflow-x-auto font-mono text-xs text-gray-300 whitespace-pre-wrap no-ligatures">{{ item.request.content }}</div>
                                 </div>
                                 <div class="rounded-b-lg border-x border-b border-white/10 bg-[#1e222a] overflow-hidden relative group/res">
                                      <div class="px-3 py-1.5 bg-white/5 border-y border-white/5 text-xs text-blue-400 font-mono flex justify-between items-center">
                                         <span>Результат</span>
                                         <button @click="copyToClipboard(item.result.content, $event)" class="text-gray-500 hover:text-white opacity-0 group-hover/res:opacity-100 transition-opacity"><i class="ph ph-copy"></i></button>
                                     </div>
-                                    <div class="p-3 overflow-x-auto font-mono text-xs text-gray-400 whitespace-pre-wrap">{{ item.result.content }}</div>
+                                    <div class="p-3 overflow-x-auto font-mono text-xs text-gray-400 whitespace-pre-wrap no-ligatures">{{ item.result.content }}</div>
                                 </div>
                             </div>
                         </details>
@@ -99,7 +108,7 @@ const MessageBubble = defineComponent({
                                         <span>{{ item.title }}</span>
                                         <button @click="copyToClipboard(item.content, $event)" class="text-gray-500 hover:text-white opacity-0 group-hover/tool:opacity-100 transition-opacity"><i class="ph ph-copy"></i></button>
                                     </div>
-                                    <div class="p-3 overflow-x-auto font-mono text-xs text-gray-300 whitespace-pre-wrap">{{ item.content }}</div>
+                                    <div class="p-3 overflow-x-auto font-mono text-xs text-gray-300 whitespace-pre-wrap no-ligatures">{{ item.content }}</div>
                                 </div>
                             </div>
                         </details>
