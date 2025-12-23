@@ -1,131 +1,13 @@
-
 import { store } from '../store.js';
 import * as api from '../api.js';
 import { nextTick, ref, watch, onMounted, computed, defineComponent } from 'vue';
 
-// --- GLOBAL UTILS ---
-// Ensure copyCode is available globally for the HTML strings rendered by marked
-if (!window.copyCode) {
-    window.copyCode = function(btn) {
-        const pre = btn.closest('.code-block-wrapper').querySelector('pre code');
-        if (pre) {
-            navigator.clipboard.writeText(pre.innerText);
-            
-            // Visual feedback
-            const originalHtml = btn.innerHTML;
-            btn.innerHTML = '<i class="ph-bold ph-check text-green-400"></i><span class="text-green-400">Скопировано</span>';
-            btn.classList.remove('opacity-0');
-            btn.classList.add('opacity-100');
-            
-            setTimeout(() => {
-                btn.innerHTML = originalHtml;
-                btn.classList.remove('opacity-100');
-                btn.classList.add('opacity-0');
-            }, 2000);
-        }
-    };
-}
-
-
-// --- STYLE INJECTION FOR TEXT RENDERING ---
-// --- STYLE INJECTION FOR TEXT RENDERING ---
-const style = document.createElement('style');
-style.textContent = `
-    .prose-fix {
-        white-space: pre-wrap;       /* Сохраняем все пробелы и переносы */
-        word-wrap: break-word;       /* Переносим длинные слова */
-        overflow-wrap: break-word;   /* Современный аналог */
-        font-variant-ligatures: none; /* Иногда лигатуры мешают в коде/тексте */
-    }
-    
-    /* Специфичные фиксы для элементов внутри prose-fix, чтобы не было двойных отступов */
-    .prose-fix p {
-        margin-bottom: 0.5em; /* Небольшой отступ между параграфами */
-    }
-    .prose-fix ul, .prose-fix ol {
-        margin-bottom: 0.5em;
-        padding-left: 1.5em; /* Возвращаем отступ для списков, который мог пропасть */
-    }
-    .prose-fix li {
-        margin-bottom: 0;
-    }
-    .prose-fix pre {
-        white-space: pre; /* Для блоков кода возвращаем стандартное поведение */
-    }
-    /* KaTeX display mode fix */
-    .katex-display {
-        margin: 0.5em 0;
-        overflow-x: auto;
-        overflow-y: hidden;
-    }
-`;
-document.head.appendChild(style);
-
-// --- MARKED CONFIGURATION ---
-
-const renderer = new marked.Renderer();
-
-renderer.code = function(code, language) {
-    const validLang = !!(language && hljs.getLanguage(language));
-    const highlighted = validLang 
-        ? hljs.highlight(code, { language }).value 
-        : hljs.highlightAuto(code).value;
-    
-    const langDisplay = (language || 'text').toLowerCase();
-    
-    return `
-        <div class="code-block-wrapper my-4 rounded-lg border border-white/10 bg-[#282c34] overflow-hidden relative group/code">
-            <div class="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5">
-                <span class="text-xs font-mono text-gray-400">${langDisplay}</span>
-                <button onclick="window.copyCode(this)" class="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-white transition-colors cursor-pointer z-10 opacity-0 group-hover/code:opacity-100">
-                    <i class="ph ph-copy"></i><span>Копировать</span>
-                </button>
-            </div>
-            <div class="overflow-x-auto p-3">
-                <pre><code class="hljs language-${langDisplay}">${highlighted}</code></pre>
-            </div>
-        </div>
-    `;
-};
-
-marked.setOptions({
-    renderer: renderer,
-    langPrefix: 'hljs language-',
-    highlight: null,
-    pedantic: false,
-    gfm: true,
-    breaks: false,
-});
+// --- NO FORMATTING MODE ---
+// Markdown, Highlight.js and Katex removed for debugging
 
 const MarkdownContent = defineComponent({
     props: ['content'],
-    template: `<div ref="root" class="markdown-content prose-fix" v-html="rendered"></div>`,
-    setup(props) {
-        const root = ref(null);
-        
-        const rendered = computed(() => {
-            if (!props.content) return '';
-            const text = typeof props.content === 'object' ? JSON.stringify(props.content, null, 2) : props.content;
-            
-            try { return marked.parse(text); } catch (e) { return text; }
-        });
-
-        const updateMath = () => {
-            if (!root.value || typeof renderMathInElement === 'undefined') return;
-            try {
-                renderMathInElement(root.value, {
-                    delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false}, {left: '\\(', right: '\\)', display: false}, {left: '\\[', right: '\\]', display: true} ],
-                    ignoredTags: ["script", "noscript", "style", "textarea", "pre", "code", "option"],
-                    throwOnError: false
-                });
-            } catch(e) {}
-        };
-
-        watch(rendered, async () => { await nextTick(); updateMath(); });
-        onMounted(async () => { await nextTick(); updateMath(); });
-
-        return { root, rendered };
-    }
+    template: `<div class="whitespace-pre-wrap font-mono text-sm leading-relaxed break-words text-gray-200">{{ content }}</div>`
 });
 
 const MessageBubble = defineComponent({
@@ -136,7 +18,6 @@ const MessageBubble = defineComponent({
         <div class="group flex flex-col w-[95%] mx-auto animate-fade-in-up"
             :class="msg.role === 'user' ? 'items-end' : 'items-start'">
             
-            <!-- HEADER (Once per message group) -->
             <div class="flex items-center gap-2 mb-1 px-1 opacity-60 text-xs font-medium tracking-wide">
                 <span v-if="msg.role === 'assistant' || msg.role === 'model'" class="flex items-center gap-1.5 text-blue-400">
                         <i class="ph-fill ph-robot"></i> Агент
@@ -147,7 +28,6 @@ const MessageBubble = defineComponent({
                 </span>
             </div>
 
-            <!-- EDIT MODE (User only) -->
             <div v-if="isEditing && msg.role === 'user'" class="w-full bg-gray-900 border border-white/10 rounded-xl p-3 relative max-w-full shadow-lg">
                 <textarea v-model="editContent" rows="3" class="w-full bg-transparent text-sm focus:outline-none resize-none mb-2"></textarea>
                 <div class="flex justify-end gap-2">
@@ -156,91 +36,60 @@ const MessageBubble = defineComponent({
                 </div>
             </div>
 
-            <!-- TIMELINE RENDER -->
             <div v-else class="flex flex-col w-full gap-1">
-                
                 <div v-for="(item, idx) in processedTimeline" :key="idx" class="w-full flex flex-col" 
                      :class="msg.role === 'user' ? 'items-end' : 'items-start'">
                     
                     <!-- 1. Thoughts -->
                     <div v-if="item.type === 'thought'" class="w-full">
-                        <details class="group/thought">
-                            <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
-                                <i class="ph ph-brain text-purple-400 group-open/thought:rotate-180 transition-transform"></i>
-                                <span>Процесс мышления</span>
-                                <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
-                            </summary>
-                            <div class="mt-2 pl-3 border-l-2 border-purple-500/20 text-gray-400 text-xs leading-relaxed font-mono bg-gray-900/50 p-4 border border-white/5 rounded-r-lg prose prose-invert prose-xs max-w-none">
-                                <div v-if="msg.role === 'user'" class="whitespace-pre-wrap font-sans text-sm leading-relaxed">{{ item.content }}</div>
-                        <MarkdownContent v-else :content="item.content" />
-                            </div>
-                        </details>
+                        <div class="mt-2 pl-3 border-l-2 border-purple-500/20 text-gray-400 text-xs leading-relaxed font-mono bg-gray-900/50 p-4 border border-white/5 rounded-r-lg">
+                             <div class="font-bold text-purple-400 mb-1">Thought Process:</div>
+                             <MarkdownContent :content="item.content" />
+                        </div>
                     </div>
 
-                    <!-- 2. Tool (Request + Result Pair) -->
-                    <div v-else-if="item.type === 'pair'" class="w-full">
-                        <details class="group/tools">
-                            <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
-                                <i class="ph ph-wrench text-emerald-500 group-open/tools:rotate-180 transition-transform"></i>
-                                <span>Использован инструмент: {{ item.request.title ? item.request.title.replace('Запрос ', '') : 'Unknown' }}</span>
-                                <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
-                            </summary>
-                            <div class="mt-2 pt-2 border-t border-white/5">
-                                <div class="code-block-wrapper rounded-lg border border-white/5 bg-gray-900 overflow-hidden relative group/code">
-                                    <div class="px-3 py-1.5 bg-white/5 flex items-center justify-between text-xs text-gray-300 font-mono border-b border-white/5">
-                                        <div class="flex items-center gap-2"><i class="ph ph-terminal-window text-emerald-400"></i><span>{{ item.request.title }}</span></div>
-                                        <button onclick="window.copyCode(this)" class="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-white transition-colors cursor-pointer opacity-0 group-hover/code:opacity-100"><i class="ph ph-copy"></i><span>Копировать</span></button>
-                                    </div>
-                                    <div class="p-0 overflow-x-auto bg-[#282c34]"><pre class="text-xs font-mono m-0 p-3 whitespace-pre-wrap"><code class="hljs" style="background: transparent; padding: 0;">{{ item.request.content }}</code></pre></div>
-                                    
-                                    <div class="px-3 py-1.5 bg-white/5 flex items-center gap-2 text-xs text-gray-400 font-mono border-y border-white/5">
-                                        <i class="ph ph-arrow-elbow-down-right text-blue-400"></i><span>Результат:</span>
-                                    </div>
-                                    <div class="p-0 overflow-x-auto bg-[#1e222a]"><pre class="text-xs font-mono m-0 p-3 whitespace-pre-wrap text-gray-300"><code class="hljs" style="background: transparent; padding: 0;">{{ item.result.content }}</code></pre></div>
-                                </div>
+                    <!-- 2. Pair -->
+                    <div v-else-if="item.type === 'pair'" class="w-full my-2">
+                         <div class="rounded-lg border border-white/10 bg-[#1e222a] overflow-hidden">
+                            <div class="px-3 py-1.5 bg-white/5 border-b border-white/5 text-xs text-emerald-400 font-mono">
+                                {{ item.request.title }}
                             </div>
-                        </details>
+                            <div class="p-3 overflow-x-auto font-mono text-xs text-gray-300 whitespace-pre-wrap">
+                                {{ item.request.content }}
+                            </div>
+                             <div class="px-3 py-1.5 bg-white/5 border-y border-white/5 text-xs text-blue-400 font-mono">
+                                Result
+                            </div>
+                            <div class="p-3 overflow-x-auto font-mono text-xs text-gray-400 whitespace-pre-wrap">
+                                {{ item.result.content }}
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- 3. Tool (Single) -->
-                    <div v-else-if="item.type === 'tool'" class="w-full">
-                        <details class="group/tools">
-                            <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
-                                <i class="ph ph-wrench text-emerald-500 group-open/tools:rotate-180 transition-transform"></i>
-                                <span>Инструмент: {{ item.title }}</span>
-                                <span class="opacity-50 text-[10px] ml-auto">Развернуть</span>
-                            </summary>
-                            <div class="mt-2 pt-2 border-t border-white/5">
-                                <div class="code-block-wrapper rounded-lg border border-white/5 bg-gray-900 overflow-hidden relative group/code">
-                                    <div class="px-3 py-1.5 bg-white/5 flex items-center justify-between text-xs text-gray-300 font-mono border-b border-white/5">
-                                        <div class="flex items-center gap-2"><i class="ph ph-terminal-window text-emerald-400"></i><span>{{ item.title }}</span></div>
-                                        <button onclick="window.copyCode(this)" class="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-white transition-colors cursor-pointer opacity-0 group-hover/code:opacity-100"><i class="ph ph-copy"></i><span>Копировать</span></button>
-                                    </div>
-                                    <div class="p-0 overflow-x-auto bg-[#282c34]"><pre class="text-xs font-mono m-0 p-3 whitespace-pre-wrap"><code class="hljs" style="background: transparent; padding: 0;">{{ item.content }}</code></pre></div>
-                                </div>
+                    <!-- 3. Tool -->
+                    <div v-else-if="item.type === 'tool'" class="w-full my-2">
+                        <div class="rounded-lg border border-white/10 bg-[#1e222a] overflow-hidden">
+                            <div class="px-3 py-1.5 bg-white/5 border-b border-white/5 text-xs text-emerald-400 font-mono">
+                                {{ item.title }}
                             </div>
-                        </details>
+                            <div class="p-3 overflow-x-auto font-mono text-xs text-gray-300 whitespace-pre-wrap">
+                                {{ item.content }}
+                            </div>
+                        </div>
                     </div>
 
-                    <!-- 4. Text Content -->
+                    <!-- 4. Text -->
                     <div v-else-if="item.type === 'text' && (item.content.trim() || isEditing)" class="relative max-w-full overflow-hidden transition-all shadow-lg w-full"
                         :class="[
                         msg.role === 'user' 
                             ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-2xl rounded-tr-sm px-5 py-3.5 border border-white/10 w-auto self-end'
                             : 'bg-gray-800/40 backdrop-blur-md border border-white/5 text-gray-100 rounded-2xl rounded-tl-sm px-6 py-5'
                         ]">
-                        
-                        <div v-if="msg.role === 'user'" class="whitespace-pre-wrap font-sans text-sm leading-relaxed">{{ item.content }}</div>
-                        <MarkdownContent v-else :content="item.content" />
-                        
-                        <div v-if="msg.role === 'assistant' || msg.role === 'model'" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                            <button @click="copyToClipboard(item.content)" class="p-1.5 text-gray-500 hover:text-white hover:bg-white/10 rounded transition" title="Копировать"><i class="ph ph-copy"></i></button>
-                        </div>
+                        <MarkdownContent :content="item.content" />
                     </div>
 
                 </div>
             </div>
-
         </div>
     `,
     setup(props, { emit }) {
@@ -259,50 +108,26 @@ const MessageBubble = defineComponent({
 
         const processedTimeline = computed(() => {
             let rawItems = [];
-
-            // 1. Try to use "live" items if available
             if (props.msg.items && props.msg.items.length > 0) {
                 rawItems = props.msg.items;
-            } 
-            // 2. Reconstruct from "serialized" history (parts/thoughts)
-            else {
-                // Add thoughts first
-                if (props.msg.thoughts) {
-                    rawItems.push({ type: 'thought', content: props.msg.thoughts });
-                }
-
-                // Add Parts
+            } else {
+                if (props.msg.thoughts) rawItems.push({ type: 'thought', content: props.msg.thoughts });
                 if (props.msg.parts && Array.isArray(props.msg.parts)) {
                     props.msg.parts.forEach(part => {
-                        if (part.text) {
-                            rawItems.push({ type: 'text', content: part.text });
-                        } else if (part.function_call) {
-                             rawItems.push({ 
-                                type: 'tool', 
-                                title: `Запрос ${part.function_call.name}`, 
-                                content: typeof part.function_call.args === 'string' 
-                                    ? part.function_call.args 
-                                    : JSON.stringify(part.function_call.args, null, 2)
-                            });
-                        } else if (part.function_response) {
-                             rawItems.push({ 
-                                type: 'tool', 
-                                title: `Результат ${part.function_response.name}`, 
-                                content: typeof part.function_response.response === 'string' 
-                                    ? part.function_response.response 
-                                    : JSON.stringify(part.function_response.response, null, 2)
-                            });
-                        }
+                        if (part.text) rawItems.push({ type: 'text', content: part.text });
+                        else if (part.function_call) rawItems.push({ 
+                            type: 'tool', title: `Запрос ${part.function_call.name}`, 
+                            content: typeof part.function_call.args === 'string' ? part.function_call.args : JSON.stringify(part.function_call.args, null, 2)
+                        });
+                        else if (part.function_response) rawItems.push({ 
+                            type: 'tool', title: `Результат ${part.function_response.name}`, 
+                            content: typeof part.function_response.response === 'string' ? part.function_response.response : JSON.stringify(part.function_response.response, null, 2)
+                        });
                     });
                 }
-                
-                // Fallback for simple legacy text
-                if (rawItems.length === 0 && props.msg.content) {
-                    rawItems.push({ type: 'text', content: props.msg.content });
-                }
+                if (rawItems.length === 0 && props.msg.content) rawItems.push({ type: 'text', content: props.msg.content });
             }
 
-            // 3. Post-process: Pair tools (Request + Result)
             const res = [];
             for (let i = 0; i < rawItems.length; i++) {
                 const item = rawItems[i];
@@ -313,8 +138,7 @@ const MessageBubble = defineComponent({
                             const toolName = item.title.substring(7).trim();
                             if (next.title && (next.title === `Результат ${toolName}` || next.title.startsWith('Результат'))) {
                                 res.push({ type: 'pair', request: item, result: next });
-                                i++; 
-                                continue;
+                                i++; continue;
                             }
                         }
                     }
@@ -324,19 +148,11 @@ const MessageBubble = defineComponent({
             return res;
         });
 
-        const startEdit = () => { 
-            editContent.value = getFullText(); 
-            isEditing.value = true; 
-        };
+        const startEdit = () => { editContent.value = getFullText(); isEditing.value = true; };
         const cancelEdit = () => { isEditing.value = false; };
-        const saveEdit = () => { 
-            emit('edit', props.index, editContent.value); 
-            isEditing.value = false; 
-        };
-        
-        const copyToClipboard = (text) => { navigator.clipboard.writeText(text); store.addToast("Текст скопирован", "success"); };
+        const saveEdit = () => { emit('edit', props.index, editContent.value); isEditing.value = false; };
 
-        return { processedTimeline, copyToClipboard, isEditing, editContent, startEdit, cancelEdit, saveEdit };
+        return { processedTimeline, isEditing, editContent, startEdit, cancelEdit, saveEdit };
     }
 });
 
@@ -374,10 +190,7 @@ export default {
                     <p class="text-gray-500 max-w-md text-sm leading-relaxed">Я могу писать код, анализировать данные и помогать с творческими задачами.</p>
                 </div>
                 
-                <MessageBubble 
-                    v-for="(msg, idx) in filteredMessages" 
-                    :key="idx" :index="idx" :msg="msg" @edit="handleEdit"
-                />
+                <MessageBubble v-for="(msg, idx) in filteredMessages" :key="idx" :index="idx" :msg="msg" @edit="handleEdit" />
 
                 <div v-if="store.isThinking" class="w-[95%] mx-auto w-full py-2">
                    <div class="flex items-center gap-3 px-4">
@@ -398,13 +211,10 @@ export default {
                             <button @click="cancelEdit" class="hover:text-white"><i class="ph-bold ph-x"></i></button>
                         </div>
 
-                        <textarea 
-                            v-model="inputText" 
-                            @keydown.enter.exact.prevent="send" 
+                        <textarea v-model="inputText" @keydown.enter.exact.prevent="send" 
                             :placeholder="editingIndex !== null ? 'Измените сообщение...' : 'Отправить сообщение...'"
                             rows="1" ref="textarea" @input="resizeTextarea" 
-                            class="w-full bg-transparent text-gray-100 px-4 py-4 focus:outline-none resize-none max-h-48 overflow-y-auto placeholder-gray-500 text-sm leading-relaxed"
-                        ></textarea>
+                            class="w-full bg-transparent text-gray-100 px-4 py-4 focus:outline-none resize-none max-h-48 overflow-y-auto placeholder-gray-500 text-sm leading-relaxed"></textarea>
                         
                         <div class="flex justify-between items-center px-2 pb-2">
                             <div class="flex gap-1 px-2"></div>
@@ -427,106 +237,56 @@ export default {
         const showScrollButton = ref(false);
         const editingIndex = ref(null);
         
-        // --- NEW MERGING LOGIC ---
         const filteredMessages = computed(() => {
             const raw = store.messages.filter(m => m.role !== 'system' && m.role !== 'tool');
             const merged = [];
             
             for (const msg of raw) {
-                // 1. Skip empty user messages
                 if (msg.role === 'user') {
                     const hasText = msg.content && msg.content.trim();
                     const hasItems = msg.items && msg.items.some(i => i.type === 'text' && i.content.trim());
-                    // If no text content, skip it
-                    if (!hasText && !hasItems) {
-                        continue;
-                    }
+                    if (!hasText && !hasItems) continue;
                 }
 
-                // 2. Merge adjacent assistant messages
                 const last = merged.length > 0 ? merged[merged.length - 1] : null;
                 const isAgent = role => role === 'assistant' || role === 'model';
 
                 if (last && isAgent(last.role) && isAgent(msg.role)) {
-                    // Create a merged copy to preserve original objects
-                    // We need to merge items, parts, and thoughts
-                    
-                    // Merge items (live chat)
                     if (msg.items) {
                         if (!last.items) last.items = [];
-
-                        // 1. Extract thoughts texts
-                        const prevThoughtsStr = (last.items || [])
-                            .filter(i => i.type === 'thought')
-                            .map(i => i.content)
-                            .join('\n');
-                        
+                        const prevThoughtsStr = (last.items || []).filter(i => i.type === 'thought').map(i => i.content).join('\n');
                         const newThoughtsList = msg.items.filter(i => i.type === 'thought');
                         const newThoughtsStr = newThoughtsList.map(i => i.content).join('\n');
                         
-                        // 2. Check for cumulative update
                         let mergedThoughts = false;
                         if (prevThoughtsStr && newThoughtsStr && newThoughtsStr.startsWith(prevThoughtsStr)) {
-                             // The new message contains the full history of thoughts + new content.
-                             // We should replace the old thoughts with the new one to avoid duplication and fragmentation.
-                             
                              const firstThoughtIdx = last.items.findIndex(i => i.type === 'thought');
                              if (firstThoughtIdx !== -1) {
-                                 // Update the first thought item with the FULL new content
                                  last.items[firstThoughtIdx].content = newThoughtsStr;
-                                 
-                                 // Remove any other subsequent thought items from history to avoid duplicates
-                                 // (We iterate backwards to safely splice)
                                  for (let i = last.items.length - 1; i > firstThoughtIdx; i--) {
-                                     if (last.items[i].type === 'thought') {
-                                         last.items.splice(i, 1);
-                                     }
+                                     if (last.items[i].type === 'thought') last.items.splice(i, 1);
                                  }
                                  mergedThoughts = true;
                              }
                         }
 
-                        // 3. Add non-thought items AND thought items if they weren't merged/replaced
                         if (mergedThoughts) {
-                             // Add only non-thought items from the new message
                              const otherItems = msg.items.filter(i => i.type !== 'thought').map(i => ({...i}));
                              last.items.push(...otherItems);
                         } else {
-                             // Regular append (not cumulative or mismatch)
-                             // e.g. Tool result or just next chunk
                              const allNewItems = msg.items.map(i => ({...i}));
-                             
-                             // Optional: simple dedup for exact duplicates if they are passed chunk by chunk
-                             // (Skipping complex logic to avoid "missing last block" bug, trusting the 'replace' logic above for main cases)
                              last.items.push(...allNewItems);
                         }
                     }
-                    
-                    // Merge parts (history)
                     if (msg.parts) {
                         if (!last.parts) last.parts = [];
                         last.parts = [...last.parts, ...msg.parts];
                     }
-
-                    // Sync thoughts string (helper for next iteration)
-                    last.thoughts = (last.items || [])
-                        .filter(i => i.type === 'thought')
-                        .map(i => i.content)
-                        .join('\n');
-                    
-                    // Merge content (fallback)
-                    if (msg.content) {
-                        last.content = (last.content ? last.content + '\n' : '') + msg.content;
-                    }
+                    last.thoughts = (last.items || []).filter(i => i.type === 'thought').map(i => i.content).join('\n');
+                    if (msg.content) last.content = (last.content ? last.content + '\n' : '') + msg.content;
 
                 } else {
-                    // Push a shallow copy to allow local mutation (like combining items) 
-                    // without destroying the store's structure immediately
-                    merged.push({ 
-                        ...msg, 
-                        items: msg.items ? [...msg.items] : undefined,
-                        parts: msg.parts ? [...msg.parts] : undefined
-                    });
+                    merged.push({ ...msg, items: msg.items ? [...msg.items] : undefined, parts: msg.parts ? [...msg.parts] : undefined });
                 }
             }
             return merged;
@@ -557,11 +317,7 @@ export default {
             store.isThinking = true;
             try {
                 const res = await api.editMessage(store.currentChatId, index, newText);
-                if (res.error) {
-                     store.isThinking = false; 
-                     store.addToast(res.error, "error");
-                     return;
-                }
+                if (res.error) { store.isThinking = false; store.addToast(res.error, "error"); return; }
                 store.addToast("Сообщение обновлено", "success");
             } catch (e) {
                 store.isThinking = false;
@@ -569,12 +325,7 @@ export default {
             }
         };
 
-        const startEditing = (idx, content) => {
-            editingIndex.value = idx;
-            inputText.value = content;
-            if (textarea.value) { textarea.value.focus(); resizeTextarea(); }
-        };
-
+        const startEditing = (idx, content) => { editingIndex.value = idx; inputText.value = content; if (textarea.value) { textarea.value.focus(); resizeTextarea(); } };
         const cancelEdit = () => { editingIndex.value = null; inputText.value = ''; resizeTextarea(); };
 
         const send = async () => {
@@ -593,19 +344,12 @@ export default {
                 await scrollToBottom(true);
                 try { 
                     const res = await api.sendMessage(store.currentChatId, text);
-                    if (res.error) {
-                         store.isThinking = false; 
-                         store.addToast(res.error, "error");
-                    }
+                    if (res.error) { store.isThinking = false; store.addToast(res.error, "error"); }
                 } 
                 catch (e) { store.isThinking = false; store.addToast("Ошибка отправки", "error"); }
             }
         };
-        const stop = async () => { 
-            store.isThinking = false; 
-            store.addToast("Остановка...", "info");
-            await api.stopGeneration(store.currentChatId); 
-        };
+        const stop = async () => { store.isThinking = false; store.addToast("Остановка...", "info"); await api.stopGeneration(store.currentChatId); };
 
         onMounted(() => scrollToBottom(true));
 
