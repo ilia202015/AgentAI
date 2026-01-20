@@ -38,11 +38,11 @@ export async function renameChat(id, name) {
     return res.json();
 }
 
-export async function sendMessage(chatId, text) {
+export async function sendMessage(chatId, text, images = []) {
     const res = await fetch(`${API_BASE}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chatId: chatId, message: text })
+        body: JSON.stringify({ chatId: chatId, message: text, images: images })
     });
     return res.json();
 }

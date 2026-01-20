@@ -42,7 +42,7 @@ style.textContent = `
     .markdown-content ul { list-style-type: disc; padding-left: 1.2em; margin-bottom: 0.5em; }
     .markdown-content ol { list-style-type: decimal; padding-left: 1.2em; margin-bottom: 0.5em; }
     .markdown-content li { margin-bottom: 0.1em; }
-    .markdown-content li > p { margin-bottom: 0.1em; } /* Fix paragraph inside list item spacing */
+    .markdown-content li > p { margin-bottom: 0.1em; } 
     
     .markdown-content a { color: #60a5fa; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.2s; }
     .markdown-content a:hover { border-bottom-color: #60a5fa; }
@@ -69,7 +69,6 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-// --- MARKED CONFIGURATION ---
 const renderer = new marked.Renderer();
 
 renderer.code = function(code, language) {
@@ -81,7 +80,7 @@ renderer.code = function(code, language) {
         if (window.hljs) {
             const validLang = !!(language && hljs.getLanguage(language));
             if (validLang) {
-                highlighted = hljs.highlight(safeCode, { language }).value;
+                highlighted = hljs.highlight(safeCode, { language: language }).value;
             } else {
                 const auto = hljs.highlightAuto(safeCode);
                 highlighted = auto.value;
@@ -96,7 +95,8 @@ renderer.code = function(code, language) {
                 <div class="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5">
                     <span class="text-xs font-mono text-gray-400">${langDisplay}</span>
                     <button onclick="window.copyCode(this)" class="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-white transition-colors cursor-pointer z-10 opacity-0 group-hover/code:opacity-100">
-                        <i class="ph ph-copy"></i><span>Копировать</span>
+                        <i class="ph-bold ph-copy"></i>
+                        <span>Копировать</span>
                     </button>
                 </div>
                 <div class="overflow-x-auto p-3">
@@ -110,12 +110,10 @@ renderer.code = function(code, language) {
     }
 };
 
-// Override link renderer
 renderer.link = function(href, title, text) {
     return `<a href="${href}" target="_blank" rel="noopener noreferrer" title="${title || ''}">${text}</a>`;
 };
 
-// Override table renderer for scrolling wrapper
 renderer.table = function(header, body) {
     if (body) body = '<tbody>' + body + '</tbody>';
     return '<div style="overflow-x: auto; margin: 0.6em 0;"><table class="min-w-full">\n'
@@ -259,6 +257,13 @@ const MessageBubble = defineComponent({
                         </details>
                     </div>
 
+                    <!-- Images -->
+                    <div v-else-if="item.type === 'images'" class="flex flex-wrap gap-2 my-1" :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
+                        <div v-for="(img, idx) in item.content" :key="idx" class="relative group/image">
+                            <img :src="img" class="max-w-[300px] max-h-[300px] rounded-lg border border-white/10 object-cover" />
+                        </div>
+                    </div>
+
                     <div v-else-if="item.type === 'text' && (item.content.trim() || isEditing)" class="relative max-w-full overflow-hidden transition-all shadow-lg w-full group/text"
                         :class="[
                         msg.role === 'user' 
@@ -311,6 +316,11 @@ const MessageBubble = defineComponent({
                     });
                 }
                 if (rawItems.length === 0 && props.msg.content) rawItems.push({ type: 'text', content: props.msg.content });
+                
+                // Images from old format if any (though usually items are preferred)
+                if (props.msg.images) {
+                    rawItems.push({ type: 'images', content: props.msg.images });
+                }
             }
 
             const res = [];
@@ -406,6 +416,16 @@ export default {
                             <span>Редактирование сообщения...</span>
                             <button @click="cancelEdit" class="hover:text-white"><i class="ph-bold ph-x"></i></button>
                         </div>
+                        
+                        <!-- Attachments Preview -->
+                        <div v-if="attachments.length > 0" class="flex gap-2 p-2 px-4 overflow-x-auto custom-scrollbar border-b border-white/5">
+                            <div v-for="(img, idx) in attachments" :key="idx" class="relative group/img flex-shrink-0">
+                                <img :src="img" class="h-16 w-16 object-cover rounded-lg border border-white/10">
+                                <button @click="removeAttachment(idx)" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-md opacity-0 group-hover/img:opacity-100 transition-opacity transform scale-75 hover:scale-100">
+                                    <i class="ph-bold ph-x text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
 
                         <textarea v-model="inputText" @keydown.enter.exact.prevent="send" 
                             :placeholder="editingIndex !== null ? 'Измените сообщение...' : 'Отправить сообщение...'"
@@ -413,11 +433,16 @@ export default {
                             class="w-full bg-transparent text-gray-100 px-4 py-4 focus:outline-none resize-none max-h-48 overflow-y-auto placeholder-gray-500 text-sm leading-relaxed"></textarea>
                         
                         <div class="flex justify-between items-center px-2 pb-2">
-                            <div class="flex gap-1 px-2"></div>
+                            <div class="flex gap-1 px-2">
+                                <button @click="triggerFileSelect" class="p-2 text-gray-400 hover:text-blue-400 transition-colors rounded-lg hover:bg-white/5" title="Прикрепить изображение">
+                                    <i class="ph-bold ph-paperclip"></i>
+                                </button>
+                                <input type="file" ref="fileInput" multiple accept="image/*" class="hidden" @change="handleFileSelect">
+                            </div>
                             <button v-if="store.isThinking" @click="stop" class="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all duration-200 flex items-center justify-center gap-2 border border-red-500/20" title="Остановить генерацию"><i class="ph-fill ph-stop text-lg"></i></button>
-                            <button v-else @click="send" :disabled="!inputText.trim()" 
+                            <button v-else @click="send" :disabled="!inputText.trim() && attachments.length === 0" 
                                 class="p-2 rounded-lg transition-all duration-200 flex items-center justify-center gap-2" 
-                                :class="inputText.trim() ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25 hover:bg-blue-500' : 'bg-white/5 text-gray-600 cursor-not-allowed'">
+                                :class="(inputText.trim() || attachments.length > 0) ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25 hover:bg-blue-500' : 'bg-white/5 text-gray-600 cursor-not-allowed'">
                                 <i :class="editingIndex !== null ? 'ph-fill ph-check' : 'ph-fill ph-paper-plane-right'" class="text-lg"></i>
                             </button>
                         </div>
@@ -432,6 +457,8 @@ export default {
         const textarea = ref(null);
         const showScrollButton = ref(false);
         const editingIndex = ref(null);
+        const fileInput = ref(null);
+        const attachments = ref([]);
         
         const filteredMessages = computed(() => {
             const raw = store.messages.filter(m => m.role !== 'system' && m.role !== 'tool');
@@ -441,13 +468,15 @@ export default {
                 if (msg.role === 'user') {
                     const hasText = msg.content && msg.content.trim();
                     const hasItems = msg.items && msg.items.some(i => i.type === 'text' && i.content.trim());
-                    if (!hasText && !hasItems) continue;
+                    const hasImages = msg.images && msg.images.length > 0;
+                    if (!hasText && !hasItems && !hasImages) continue;
                 }
 
                 const last = merged.length > 0 ? merged[merged.length - 1] : null;
                 const isAgent = role => role === 'assistant' || role === 'model';
 
                 if (last && isAgent(last.role) && isAgent(msg.role)) {
+                    // Merging logic for agent messages (unchanged)
                     if (msg.items) {
                         if (!last.items) last.items = [];
                         const prevThoughtsStr = (last.items || []).filter(i => i.type === 'thought').map(i => i.content).join('\n');
@@ -482,7 +511,7 @@ export default {
                     if (msg.content) last.content = (last.content ? last.content + '\n' : '') + msg.content;
 
                 } else {
-                    merged.push({ ...msg, items: msg.items ? [...msg.items] : undefined, parts: msg.parts ? [...msg.parts] : undefined });
+                    merged.push({ ...msg, items: msg.items ? [...msg.items] : undefined, parts: msg.parts ? [...msg.parts] : undefined, images: msg.images ? [...msg.images] : undefined });
                 }
             }
             return merged;
@@ -524,10 +553,37 @@ export default {
         const startEditing = (idx, content) => { editingIndex.value = idx; inputText.value = content; if (textarea.value) { textarea.value.focus(); resizeTextarea(); } };
         const cancelEdit = () => { editingIndex.value = null; inputText.value = ''; resizeTextarea(); };
 
+        const triggerFileSelect = () => fileInput.value && fileInput.value.click();
+        
+        const handleFileSelect = (event) => {
+            const files = event.target.files;
+            if (!files) return;
+            
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                if (!file.type.startsWith('image/')) continue;
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    attachments.value.push(e.target.result);
+                };
+                reader.readAsDataURL(file);
+            }
+            event.target.value = ''; // Reset
+        };
+        
+        const removeAttachment = (index) => {
+            attachments.value.splice(index, 1);
+        };
+
         const send = async () => {
-            if (!inputText.value.trim()) return;
+            if (!inputText.value.trim() && attachments.value.length === 0) return;
+            
             const text = inputText.value;
+            const imgs = [...attachments.value];
+            
             inputText.value = '';
+            attachments.value = [];
             if (textarea.value) textarea.value.style.height = 'auto';
             store.isThinking = true;
 
@@ -536,10 +592,16 @@ export default {
                 editingIndex.value = null;
                 handleEdit(idx, text);
             } else {
-                store.messages.push({ role: 'user', content: text, items: [{type: 'text', content: text}] });
+                const msg = { role: 'user', content: text, items: [{type: 'text', content: text}] };
+                if (imgs.length > 0) {
+                    msg.images = imgs;
+                    msg.items.push({ type: 'images', content: imgs });
+                }
+
+                store.messages.push(msg);
                 await scrollToBottom(true);
                 try { 
-                    const res = await api.sendMessage(store.currentChatId, text);
+                    const res = await api.sendMessage(store.currentChatId, text, imgs);
                     if (res.error) { store.isThinking = false; store.addToast(res.error, "error"); }
                 } 
                 catch (e) { store.isThinking = false; store.addToast("Ошибка отправки", "error"); }
@@ -549,6 +611,6 @@ export default {
 
         onMounted(() => scrollToBottom(true));
 
-        return { store, inputText, send, stop, filteredMessages, messagesContainer, textarea, resizeTextarea, showScrollButton, scrollToBottom, handleScroll, handleEdit, startEditing, editingIndex, cancelEdit };
+        return { store, inputText, send, stop, filteredMessages, messagesContainer, textarea, resizeTextarea, showScrollButton, scrollToBottom, handleScroll, handleEdit, startEditing, editingIndex, cancelEdit, fileInput, attachments, triggerFileSelect, handleFileSelect, removeAttachment };
     }
 }

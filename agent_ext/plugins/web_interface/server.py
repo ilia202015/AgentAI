@@ -186,7 +186,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
     # Handlers
     def api_send(self, data):
         if is_print_debug:
-            print(f"api_send({data})")
+            print(f"api_send(chatId={data.get('chatId')}, msg_len={len(data.get('message', ''))}, images={len(data.get('images', []))})")
 
         cid = data.get("chatId")
         if not cid: 
@@ -201,9 +201,14 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         
         agent.stop_requested = False
 
-        threading.Thread(target=agent.send, args=({"role": "user", "content": data.get("message")},)).start()
-        self.send_json({"status": "processing"})
+        msg_payload = {
+            "role": "user", 
+            "content": data.get("message", ""),
+            "images": data.get("images", [])
+        }
 
+        threading.Thread(target=agent.send, args=(msg_payload,)).start()
+        self.send_json({"status": "processing"})
     def api_create_chat(self):
         if is_print_debug:
             print(f"api_create_chat()")
