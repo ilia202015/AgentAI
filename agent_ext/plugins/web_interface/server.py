@@ -209,6 +209,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
 
         threading.Thread(target=agent.send, args=(msg_payload,)).start()
         self.send_json({"status": "processing"})
+        
     def api_create_chat(self):
         if is_print_debug:
             print(f"api_create_chat()")
