@@ -140,6 +140,9 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             elif path.startswith("/api/"): 
                 query = parse_qs(parsed.query)
                 self.handle_api_get(path, query)
+            elif path.startswith("/chat_images"):
+                query = parse_qs(parsed.query)
+                self.serve_chat_image(query)
             else: 
                 self.serve_static(path.lstrip("/"))
         except Exception as e:
@@ -207,7 +210,17 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             "images": data.get("images", [])
         }
 
-        threading.Thread(target=agent.send, args=(msg_payload,)).start()
+        def run_and_save():
+            try:
+                agent.send(msg_payload)
+            finally:
+                if cid != 'temp':
+                    try:
+                        storage.save_chat_state(agent)
+                    except Exception as e:
+                        print(f"Auto-save failed for {cid}: {e}")
+
+        threading.Thread(target=run_and_save).start()
         self.send_json({"status": "processing"})
         
     def api_create_chat(self):
@@ -221,7 +234,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         if 'web_queue' in resp: del resp['web_queue']
         
         if serialization:
-            resp['messages'] = serialization.serialize_history(new_chat.messages)
+            resp['messages'] = serialization.serialize_history_for_web(new_chat.messages, chat_id=getattr(new_chat, 'id', None))
             
         self.send_json(resp)
 
@@ -249,7 +262,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             if 'web_queue' in resp: del resp['web_queue']
             
             if serialization:
-                resp['messages'] = serialization.serialize_history(chat.messages)
+                resp['messages'] = serialization.serialize_history_for_web(chat.messages, chat_id=cid)
             
             self.send_json({"status": "loaded", "chat": resp})
         else: 
@@ -287,6 +300,39 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_json(storage.list_chats(self.clone_root_chat))
         else: 
             self.send_json({})
+
+    
+
+    def serve_chat_image(self, query):
+        try:
+            chat_id = query.get("chat_id", [None])[0]
+            filename = query.get("file", [None])[0]
+            
+            if not chat_id or not filename:
+                return self.send_json_error(400, "Missing params")
+                
+            # Security check
+            if ".." in filename or "/" in filename or "\\" in filename:
+                return self.send_json_error(403, "Invalid filename")
+                
+            file_path = os.path.join(agent_ext_dir, "chats", chat_id, "images", filename)
+            
+            if os.path.exists(file_path):
+                self.send_response(200)
+                mime, _ = mimetypes.guess_type(file_path)
+                self.send_header("Content-Type", mime or "application/octet-stream")
+                self._send_cors_headers()
+                
+                with open(file_path, 'rb') as f:
+                    content = f.read()
+                    
+                self.send_header("Content-Length", str(len(content)))
+                self.end_headers()
+                self.wfile.write(content)
+            else:
+                self.send_json_error(404, "Image not found")
+        except Exception as e:
+            self.send_json_error(500, str(e))
 
     def serve_static(self, path):
         full = os.path.abspath(os.path.join(STATIC_DIR, path))

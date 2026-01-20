@@ -305,6 +305,7 @@ const MessageBubble = defineComponent({
                 if (props.msg.parts && Array.isArray(props.msg.parts)) {
                     props.msg.parts.forEach(part => {
                         if (part.text) rawItems.push({ type: 'text', content: part.text });
+                        else if (part.image_url) rawItems.push({ type: 'images', content: [part.image_url] });
                         else if (part.function_call) rawItems.push({ 
                             type: 'tool', title: `Запрос ${part.function_call.name}`, 
                             content: typeof part.function_call.args === 'string' ? part.function_call.args : JSON.stringify(part.function_call.args, null, 2)
@@ -469,7 +470,7 @@ export default {
                     const hasText = msg.content && msg.content.trim();
                     const hasItems = msg.items && msg.items.some(i => i.type === 'text' && i.content.trim());
                     const hasImages = msg.images && msg.images.length > 0;
-                    if (!hasText && !hasItems && !hasImages) continue;
+                    if (!hasText && !hasItems && !hasImages && !(msg.parts && msg.parts.length > 0)) continue;
                 }
 
                 const last = merged.length > 0 ? merged[merged.length - 1] : null;

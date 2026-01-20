@@ -1,3 +1,4 @@
+import shutil
 import os
 import json
 import uuid
@@ -175,7 +176,7 @@ def save_chat_state(chat):
     # Serialize messages for JSON
     messages_json = chat.messages
     if serialization:
-        messages_json = serialization.serialize_history(chat.messages)
+        messages_json = serialization.serialize_history(chat.messages, chat_id=chat.id)
     
     base_data = {
         "id": chat.id,
@@ -243,6 +244,15 @@ def delete_chat(id):
     if os.path.exists(json_path):
         os.remove(json_path)
         deleted = True
+        
+    # NEW: Delete images folder
+    images_dir = os.path.join(CHATS_DIR, f"{id}")
+    if os.path.exists(images_dir):
+        try:
+            shutil.rmtree(images_dir)
+            deleted = True
+        except Exception as e:
+            print(f"Error removing chat dir {id}: {e}")
         
     return deleted
 
