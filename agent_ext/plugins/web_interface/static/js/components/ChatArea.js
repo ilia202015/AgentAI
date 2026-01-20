@@ -30,36 +30,42 @@ style.textContent = `
         overflow-wrap: break-word;   
         font-variant-ligatures: none; 
     }
-    /* Basic Markdown Styles since we don't have Tailwind Typography */
-    .markdown-content h1 { font-size: 1.8em; font-weight: 700; margin-top: 1.2em; margin-bottom: 0.6em; line-height: 1.3; color: #f3f4f6; }
-    .markdown-content h2 { font-size: 1.5em; font-weight: 600; margin-top: 1.0em; margin-bottom: 0.5em; line-height: 1.3; color: #e5e7eb; border-bottom: 1px solid #374151; padding-bottom: 0.3em; }
-    .markdown-content h3 { font-size: 1.25em; font-weight: 600; margin-top: 1.0em; margin-bottom: 0.5em; line-height: 1.3; color: #d1d5db; }
-    .markdown-content h4 { font-size: 1.1em; font-weight: 600; margin-top: 0.8em; margin-bottom: 0.4em; }
     
-    .markdown-content p { margin-bottom: 0.8em; line-height: 1.6; }
+    /* Typography & Spacing Updates */
+    .markdown-content h1 { font-size: 1.6em; font-weight: 700; margin-top: 0.8em; margin-bottom: 0.4em; line-height: 1.3; color: #f3f4f6; }
+    .markdown-content h2 { font-size: 1.4em; font-weight: 600; margin-top: 0.8em; margin-bottom: 0.4em; line-height: 1.3; color: #e5e7eb; border-bottom: 1px solid #374151; padding-bottom: 0.2em; }
+    .markdown-content h3 { font-size: 1.2em; font-weight: 600; margin-top: 0.6em; margin-bottom: 0.3em; line-height: 1.3; color: #d1d5db; }
+    .markdown-content h4 { font-size: 1.1em; font-weight: 600; margin-top: 0.5em; margin-bottom: 0.2em; }
     
-    .markdown-content ul { list-style-type: disc; padding-left: 1.5em; margin-bottom: 0.8em; }
-    .markdown-content ol { list-style-type: decimal; padding-left: 1.5em; margin-bottom: 0.8em; }
-    .markdown-content li { margin-bottom: 0.3em; }
+    .markdown-content p { margin-bottom: 0.5em; line-height: 1.5; }
+    
+    .markdown-content ul { list-style-type: disc; padding-left: 1.2em; margin-bottom: 0.5em; }
+    .markdown-content ol { list-style-type: decimal; padding-left: 1.2em; margin-bottom: 0.5em; }
+    .markdown-content li { margin-bottom: 0.1em; }
+    .markdown-content li > p { margin-bottom: 0.1em; } /* Fix paragraph inside list item spacing */
     
     .markdown-content a { color: #60a5fa; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.2s; }
     .markdown-content a:hover { border-bottom-color: #60a5fa; }
     
-    .markdown-content blockquote { border-left: 4px solid #4b5563; padding-left: 1em; color: #9ca3af; margin: 1em 0; font-style: italic; }
+    .markdown-content blockquote { border-left: 3px solid #4b5563; padding-left: 0.8em; color: #9ca3af; margin: 0.5em 0; font-style: italic; }
     
-    .markdown-content code { background-color: rgba(99, 110, 123, 0.2); padding: 0.2em 0.4em; border-radius: 0.25em; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.9em; color: #e5e7eb; }
+    .markdown-content code { background-color: rgba(99, 110, 123, 0.2); padding: 0.1em 0.3em; border-radius: 0.2em; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 0.85em; color: #e5e7eb; }
     .markdown-content pre code { background-color: transparent; padding: 0; color: inherit; }
     
-    .markdown-content table { border-collapse: collapse; width: 100%; margin: 1em 0; overflow-x: auto; display: block; }
-    .markdown-content th, .markdown-content td { border: 1px solid #374151; padding: 0.6em 1em; text-align: left; }
+    /* Tables */
+    .markdown-content table { border-collapse: collapse; width: 100%; display: table; }
+    .markdown-content th, .markdown-content td { border: 1px solid #374151; padding: 0.4em 0.8em; text-align: left; font-size: 0.9em; }
     .markdown-content th { background-color: #1f2937; font-weight: 600; }
     .markdown-content tr:nth-child(even) { background-color: rgba(255, 255, 255, 0.02); }
     
-    .markdown-content hr { border-color: #374151; margin: 1.5em 0; }
-    .markdown-content img { max-width: 100%; border-radius: 0.5em; margin: 1em 0; }
+    .markdown-content hr { border-color: #374151; margin: 1em 0; }
+    .markdown-content img { max-width: 100%; border-radius: 0.5em; margin: 0.5em 0; }
 
     .no-ligatures { font-variant-ligatures: none; }
     .katex-display { margin: 0.5em 0; overflow-x: auto; overflow-y: hidden; }
+    
+    /* Code Block Wrapper Spacing */
+    .code-block-wrapper { margin: 0.6em 0 !important; }
 `;
 document.head.appendChild(style);
 
@@ -68,12 +74,10 @@ const renderer = new marked.Renderer();
 
 renderer.code = function(code, language) {
     try {
-        // Ensure code is a string to prevent "replace is not a function"
         const safeCode = String(code || '');
         let highlighted = safeCode;
         let langDisplay = (language || 'text').toLowerCase();
 
-        // Highlight.js integration
         if (window.hljs) {
             const validLang = !!(language && hljs.getLanguage(language));
             if (validLang) {
@@ -84,12 +88,11 @@ renderer.code = function(code, language) {
                 if (auto.language) langDisplay = auto.language;
             }
         } else {
-            // Fallback escape if no hljs
             highlighted = safeCode.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         }
         
         return `
-            <div class="code-block-wrapper my-4 rounded-lg border border-white/10 bg-[#282c34] overflow-hidden relative group/code">
+            <div class="code-block-wrapper my-2 rounded-lg border border-white/10 bg-[#282c34] overflow-hidden relative group/code">
                 <div class="flex items-center justify-between px-3 py-1.5 bg-white/5 border-b border-white/5">
                     <span class="text-xs font-mono text-gray-400">${langDisplay}</span>
                     <button onclick="window.copyCode(this)" class="flex items-center gap-1.5 text-[10px] text-gray-500 hover:text-white transition-colors cursor-pointer z-10 opacity-0 group-hover/code:opacity-100">
@@ -97,26 +100,34 @@ renderer.code = function(code, language) {
                     </button>
                 </div>
                 <div class="overflow-x-auto p-3">
-                    <pre><code class="hljs language-${langDisplay} no-ligatures text-sm">${highlighted}</code></pre>
+                    <pre><code class="hljs language-${langDisplay} no-ligatures text-sm" style="background: transparent; padding: 0;">${highlighted}</code></pre>
                 </div>
             </div>
         `;
     } catch (e) {
         console.error("Renderer error:", e);
-        // Fallback for critical renderer failure
         return `<pre class="text-red-400 text-xs">Code Render Error</pre>`;
     }
 };
 
+// Override link renderer
 renderer.link = function(href, title, text) {
     return `<a href="${href}" target="_blank" rel="noopener noreferrer" title="${title || ''}">${text}</a>`;
+};
+
+// Override table renderer for scrolling wrapper
+renderer.table = function(header, body) {
+    if (body) body = '<tbody>' + body + '</tbody>';
+    return '<div style="overflow-x: auto; margin: 0.6em 0;"><table class="min-w-full">\n'
+        + '<thead>\n' + header + '</thead>\n'
+        + body + '</table></div>\n';
 };
 
 marked.setOptions({
     renderer: renderer,
     pedantic: false,
     gfm: true,
-    breaks: true, // Enable line breaks
+    breaks: true,
 });
 
 const MarkdownContent = defineComponent({
@@ -127,7 +138,6 @@ const MarkdownContent = defineComponent({
         
         const rendered = computed(() => {
             if (!props.content) return '';
-            // Convert objects to formatted JSON string
             const text = typeof props.content === 'object' ? JSON.stringify(props.content, null, 2) : String(props.content || '');
             
             try { 
@@ -165,7 +175,6 @@ const MessageBubble = defineComponent({
         <div class="group flex flex-col w-[95%] mx-auto animate-fade-in-up"
             :class="msg.role === 'user' ? 'items-end' : 'items-start'">
             
-            <!-- HEADER -->
             <div class="flex items-center gap-2 mb-1 px-1 opacity-60 text-xs font-medium tracking-wide">
                 <span v-if="msg.role === 'assistant' || msg.role === 'model'" class="flex items-center gap-1.5 text-blue-400">
                         <i class="ph-fill ph-robot"></i> Агент
@@ -176,7 +185,6 @@ const MessageBubble = defineComponent({
                 </span>
             </div>
 
-            <!-- EDIT MODE -->
             <div v-if="isEditing && msg.role === 'user'" class="w-full bg-gray-900 border border-white/10 rounded-xl p-3 relative max-w-full shadow-lg">
                 <textarea v-model="editContent" rows="3" class="w-full bg-transparent text-sm focus:outline-none resize-none mb-2"></textarea>
                 <div class="flex justify-end gap-2">
@@ -185,12 +193,10 @@ const MessageBubble = defineComponent({
                 </div>
             </div>
 
-            <!-- TIMELINE -->
             <div v-else class="flex flex-col w-full gap-1">
                 <div v-for="(item, idx) in processedTimeline" :key="idx" class="w-full flex flex-col" 
                      :class="msg.role === 'user' ? 'items-end' : 'items-start'">
                     
-                    <!-- 1. Thoughts -->
                     <div v-if="item.type === 'thought'" class="w-full">
                         <details class="group/thought">
                             <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
@@ -208,7 +214,6 @@ const MessageBubble = defineComponent({
                         </details>
                     </div>
 
-                    <!-- 2. Pair (Raw Display for Tools) -->
                     <div v-else-if="item.type === 'pair'" class="w-full my-1">
                         <details class="group/tools">
                             <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
@@ -235,7 +240,6 @@ const MessageBubble = defineComponent({
                         </details>
                     </div>
 
-                    <!-- 3. Tool (Raw Display for Tools) -->
                     <div v-else-if="item.type === 'tool'" class="w-full my-1">
                         <details class="group/tools">
                             <summary class="list-none cursor-pointer flex items-center gap-2 text-xs text-gray-500 hover:text-gray-300 transition-colors py-1 select-none">
@@ -255,14 +259,12 @@ const MessageBubble = defineComponent({
                         </details>
                     </div>
 
-                    <!-- 4. Text (Markdown) -->
                     <div v-else-if="item.type === 'text' && (item.content.trim() || isEditing)" class="relative max-w-full overflow-hidden transition-all shadow-lg w-full group/text"
                         :class="[
                         msg.role === 'user' 
                             ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-2xl rounded-tr-sm px-5 py-3.5 border border-white/10 w-auto self-end'
                             : 'bg-gray-800/40 backdrop-blur-md border border-white/5 text-gray-100 rounded-2xl rounded-tl-sm px-6 py-5'
                         ]">
-                        <!-- Если сообщение пользователя - показываем обычный текст для простоты (но обрабатываем ссылки), если агента - Markdown -->
                         <div v-if="msg.role === 'user'" class="whitespace-pre-wrap font-sans text-sm leading-relaxed">{{ item.content }}</div>
                         <MarkdownContent v-else :content="item.content" />
                         
