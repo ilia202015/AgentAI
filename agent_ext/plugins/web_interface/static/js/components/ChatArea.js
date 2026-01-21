@@ -77,6 +77,10 @@ document.head.appendChild(style);
 const renderer = new marked.Renderer();
 
 renderer.code = function(code, language) {
+    if (typeof code === 'object' && code !== null && 'text' in code) {
+        language = code.lang;
+        code = code.text;
+    }
     try {
         const safeCode = String(code || '');
         let highlighted = safeCode;
@@ -120,6 +124,10 @@ renderer.link = function(href, title, text) {
 };
 
 renderer.table = function(header, body) {
+    if (typeof header === 'object' && header !== null && 'header' in header) {
+        body = header.body;
+        header = header.header;
+    }
     if (body) body = '<tbody>' + body + '</tbody>';
     return '<div style="overflow-x: auto; margin: 0.6em 0;"><table class="min-w-full">\n'
         + '<thead>\n' + header + '</thead>\n'
