@@ -438,6 +438,9 @@ export default {
                                 <button @click="triggerFileSelect" class="p-2 text-gray-400 hover:text-blue-400 transition-colors rounded-lg hover:bg-white/5" title="Прикрепить изображение">
                                     <i class="ph-bold ph-paperclip"></i>
                                 </button>
+                                <button @click="captureScreen" class="p-2 text-gray-400 hover:text-blue-400 transition-colors rounded-lg hover:bg-white/5" title="Сделать скриншот экрана">
+                                    <i class="ph-bold ph-monitor"></i>
+                                </button>
                                 <input type="file" ref="fileInput" multiple accept="image/*" class="hidden" @change="handleFileSelect">
                             </div>
                             <button v-if="store.isThinking" @click="stop" class="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all duration-200 flex items-center justify-center gap-2 border border-red-500/20" title="Остановить генерацию"><i class="ph-fill ph-stop text-lg"></i></button>
@@ -589,6 +592,44 @@ export default {
             processFiles(event.target.files);
             event.target.value = ''; // Reset
         };
+
+        const captureScreen = async () => {
+            try {
+                const stream = await navigator.mediaDevices.getDisplayMedia({ 
+                    video: { cursor: "always" }, 
+                    audio: false 
+                });
+                
+                // Создаем video элемент для захвата кадра
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
+                
+                // Ждем пока видео будет готово
+                await new Promise(resolve => video.onloadedmetadata = resolve);
+                // Небольшая задержка для стабилизации
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                const dataURL = canvas.toDataURL('image/png');
+                attachments.value.push(dataURL);
+                
+                // Останавливаем поток
+                stream.getTracks().forEach(track => track.stop());
+                
+            } catch (err) {
+                console.error("Error capturing screen:", err);
+                if (err.name !== 'NotAllowedError') {
+                    store.addToast("Ошибка захвата экрана", "error");
+                }
+            }
+        };
         
         const handlePaste = (event) => {
             const items = (event.clipboardData || window.clipboardData).items;
@@ -651,6 +692,6 @@ export default {
 
         onMounted(() => scrollToBottom(true));
 
-        return { store, inputText, send, stop, filteredMessages, messagesContainer, textarea, resizeTextarea, showScrollButton, scrollToBottom, handleScroll, handleEdit, startEditing, editingIndex, cancelEdit, fileInput, attachments, triggerFileSelect, handleFileSelect, removeAttachment, handlePaste, onDragOver, handleDrop, isDragging };
+        return { store, inputText, send, stop, filteredMessages, messagesContainer, textarea, resizeTextarea, showScrollButton, scrollToBottom, handleScroll, handleEdit, startEditing, editingIndex, cancelEdit, fileInput, attachments, triggerFileSelect, handleFileSelect, removeAttachment, handlePaste, onDragOver, handleDrop, isDragging, captureScreen };
     }
 }
