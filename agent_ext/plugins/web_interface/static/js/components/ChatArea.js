@@ -1,6 +1,6 @@
 import { store } from '../store.js';
 import * as api from '../api.js';
-import { nextTick, ref, watch, onMounted, computed, defineComponent } from 'vue';
+import { nextTick, ref, watch, onMounted, onUnmounted, computed, defineComponent } from 'vue';
 
 // --- GLOBAL UTILS ---
 if (!window.copyCode) {
@@ -31,6 +31,11 @@ style.textContent = `
         font-variant-ligatures: none; 
     }
     
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes zoomIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
+    .animate-zoom-in { animation: zoomIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
     /* Typography & Spacing Updates */
     .markdown-content h1 { font-size: 1.6em; font-weight: 700; margin-top: 0.8em; margin-bottom: 0.4em; line-height: 1.3; color: #f3f4f6; }
     .markdown-content h2 { font-size: 1.4em; font-weight: 600; margin-top: 0.8em; margin-bottom: 0.4em; line-height: 1.3; color: #e5e7eb; border-bottom: 1px solid #374151; padding-bottom: 0.2em; }
@@ -168,7 +173,7 @@ const MarkdownContent = defineComponent({
 const MessageBubble = defineComponent({
     components: { MarkdownContent },
     props: ['msg', 'index'],
-    emits: ['edit'],
+    emits: ['edit', 'zoom'],
     template: `
         <div class="group flex flex-col w-[95%] mx-auto animate-fade-in-up"
             :class="msg.role === 'user' ? 'items-end' : 'items-start'">
@@ -260,7 +265,7 @@ const MessageBubble = defineComponent({
                     <!-- Images -->
                     <div v-else-if="item.type === 'images'" class="flex flex-wrap gap-2 my-1" :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
                         <div v-for="(img, idx) in item.content" :key="idx" class="relative group/image">
-                            <img :src="img" class="max-w-[300px] max-h-[300px] rounded-lg border border-white/10 object-cover" />
+                            <img :src="img" @click="$emit('zoom', img)" class="max-w-[300px] max-h-[300px] rounded-lg border border-white/10 object-cover cursor-zoom-in hover:opacity-90 transition-opacity" />
                         </div>
                     </div>
 
@@ -397,7 +402,7 @@ export default {
                     <p class="text-gray-500 max-w-md text-sm leading-relaxed">Я могу писать код, анализировать данные и помогать с творческими задачами.</p>
                 </div>
                 
-                <MessageBubble v-for="(msg, idx) in filteredMessages" :key="idx" :index="idx" :msg="msg" @edit="handleEdit" />
+                <MessageBubble v-for="(msg, idx) in filteredMessages" :key="idx" :index="idx" :msg="msg" @edit="handleEdit" @zoom="zoomImage" />
 
                 <div v-if="store.isThinking" class="w-[95%] mx-auto w-full py-2">
                    <div class="flex items-center gap-3 px-4">
@@ -421,7 +426,7 @@ export default {
                         <!-- Attachments Preview -->
                         <div v-if="attachments.length > 0" class="flex gap-2 p-2 px-4 overflow-x-auto custom-scrollbar border-b border-white/5">
                             <div v-for="(img, idx) in attachments" :key="idx" class="relative group/img flex-shrink-0">
-                                <img :src="img" class="h-16 w-16 object-cover rounded-lg border border-white/10">
+                                <img :src="img" @click="zoomImage(img)" class="h-16 w-16 object-cover rounded-lg border border-white/10 cursor-zoom-in hover:opacity-80 transition-opacity">
                                 <button @click="removeAttachment(idx)" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-md opacity-0 group-hover/img:opacity-100 transition-opacity transform scale-75 hover:scale-100">
                                     <i class="ph-bold ph-x text-xs"></i>
                                 </button>
@@ -466,6 +471,16 @@ export default {
                     <p class="text-gray-400 text-sm mt-2">Поддерживаются изображения</p>
                 </div>
             </div>
+
+            <!-- Image Lightbox (Teleported to body to cover Sidebar) -->
+            <Teleport to="body">
+                <div v-if="zoomedImage" class="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4 animate-fade-in backdrop-blur-sm" @click="closeZoom">
+                    <button @click="closeZoom" class="absolute top-4 right-4 text-white/70 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10">
+                        <i class="ph-bold ph-x text-xl"></i>
+                    </button>
+                    <img :src="zoomedImage" class="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-zoom-in" @click.stop />
+                </div>
+            </Teleport>
         </div>
     `,
     setup() {
@@ -477,6 +492,7 @@ export default {
         const fileInput = ref(null);
         const attachments = ref([]);
         const isDragging = ref(false);
+        const zoomedImage = ref(null);
         
         const filteredMessages = computed(() => {
             const raw = store.messages.filter(m => m.role !== 'system' && m.role !== 'tool');
@@ -600,14 +616,11 @@ export default {
                     audio: false 
                 });
                 
-                // Создаем video элемент для захвата кадра
                 const video = document.createElement('video');
                 video.srcObject = stream;
                 video.play();
                 
-                // Ждем пока видео будет готово
                 await new Promise(resolve => video.onloadedmetadata = resolve);
-                // Небольшая задержка для стабилизации
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
                 const canvas = document.createElement('canvas');
@@ -620,7 +633,6 @@ export default {
                 const dataURL = canvas.toDataURL('image/png');
                 attachments.value.push(dataURL);
                 
-                // Останавливаем поток
                 stream.getTracks().forEach(track => track.stop());
                 
             } catch (err) {
@@ -690,8 +702,23 @@ export default {
         };
         const stop = async () => { store.isThinking = false; store.addToast("Остановка...", "info"); await api.stopGeneration(store.currentChatId); };
 
-        onMounted(() => scrollToBottom(true));
+        // Zoom logic
+        const zoomImage = (src) => { zoomedImage.value = src; };
+        const closeZoom = () => { zoomedImage.value = null; };
+        
+        const handleKeydown = (e) => {
+            if (e.key === 'Escape' && zoomedImage.value) closeZoom();
+        };
 
-        return { store, inputText, send, stop, filteredMessages, messagesContainer, textarea, resizeTextarea, showScrollButton, scrollToBottom, handleScroll, handleEdit, startEditing, editingIndex, cancelEdit, fileInput, attachments, triggerFileSelect, handleFileSelect, removeAttachment, handlePaste, onDragOver, handleDrop, isDragging, captureScreen };
+        onMounted(() => { 
+            scrollToBottom(true);
+            window.addEventListener('keydown', handleKeydown);
+        });
+        
+        onUnmounted(() => {
+            window.removeEventListener('keydown', handleKeydown);
+        });
+
+        return { store, inputText, send, stop, filteredMessages, messagesContainer, textarea, resizeTextarea, showScrollButton, scrollToBottom, handleScroll, handleEdit, startEditing, editingIndex, cancelEdit, fileInput, attachments, triggerFileSelect, handleFileSelect, removeAttachment, handlePaste, onDragOver, handleDrop, isDragging, captureScreen, zoomedImage, zoomImage, closeZoom };
     }
 }
