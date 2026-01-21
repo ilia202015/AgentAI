@@ -34,19 +34,48 @@ export const store = reactive({
                 m.tools.forEach(t => items.push({ type: 'tool', ...t }));
             }
             
-            let textContent = '';
-            if (m.content) textContent = m.content;
-            else if (m.parts && Array.isArray(m.parts)) {
-                textContent = m.parts.map(p => p.text || '').join('');
+            // NEW PARSING LOGIC
+            if (m.parts && Array.isArray(m.parts)) {
+                m.parts.forEach(p => {
+                    if (p.text) {
+                        // Try to merge with previous text item
+                        const last = items.length > 0 ? items[items.length - 1] : null;
+                        if (last && last.type === 'text') {
+                            last.content += p.text;
+                        } else {
+                            items.push({ type: 'text', content: p.text });
+                        }
+                    } else if (p.image_url) {
+                        items.push({ type: 'images', content: [p.image_url] });
+                    } else if (p.function_call) {
+                         items.push({ 
+                            type: 'tool', 
+                            title: `Запрос ${p.function_call.name}`, 
+                            content: typeof p.function_call.args === 'string' ? p.function_call.args : JSON.stringify(p.function_call.args, null, 2)
+                        });
+                    } else if (p.function_response) {
+                        items.push({ 
+                            type: 'tool', 
+                            title: `Результат ${p.function_response.name}`, 
+                            content: typeof p.function_response.response === 'string' ? p.function_response.response : JSON.stringify(p.function_response.response, null, 2)
+                        });
+                    }
+                });
+            } else if (m.content) {
+                 items.push({ type: 'text', content: m.content });
             }
             
-            if (textContent.trim()) {
-                items.push({ type: 'text', content: textContent });
+            // Fallback for user messages or empty parts
+            if (items.length === 0 && m.content) {
+                 items.push({ type: 'text', content: m.content });
             }
             
-            // Если сообщение от пользователя и нет items, создаем текстовый item
-            if (m.role === 'user' && items.length === 0 && textContent) {
-                 items.push({ type: 'text', content: textContent });
+            // Legacy images support
+            if (m.images && Array.isArray(m.images) && m.images.length > 0) {
+                 const hasImages = items.some(i => i.type === 'images');
+                 if (!hasImages) {
+                      items.push({ type: 'images', content: m.images });
+                 }
             }
 
             return {
