@@ -219,17 +219,23 @@ def save_chat_state(chat):
     pkl_path = os.path.join(CHATS_DIR, f"{chat.id}.pkl")
     try:
         with open(pkl_path, 'wb') as f:            
-            client = chat.client
+            # Safe attribute access
+            client = getattr(chat, 'client', None)
             chat.client = None
-            busy_depth = chat.busy_depth
+            
+            busy_depth = getattr(chat, 'busy_depth', 0)
             chat.busy_depth = 0
 
             dill.dump(chat, f)
 
             chat.busy_depth = busy_depth
-            chat.client = client
+            if client:
+                chat.client = client
     except Exception as e:
         print(f"❌ Error saving dill: {e}")
+        # Restore attributes in case of error
+        chat.busy_depth = getattr(chat, 'busy_depth', 0) # Should be original value roughly
+        if client: chat.client = client
     
     return chat
 

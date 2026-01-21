@@ -173,6 +173,32 @@ class Chat:
         except Exception as e:
             print(f"❌ Критическая ошибка при загрузке изменений: {e}")
 
+
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        # Удаляем несериализуемые объекты
+        # client: содержит локи и сетевые соединения
+        if 'client' in state:
+            del state['client']
+        
+        # local_env оставляем (по требованию), 
+        # но ответственность за его содержимое лежит на пользователе.
+        return state
+
+    def __setstate__(self, state):
+        self.__dict__.update(state)
+        try:
+            from google import genai
+            if hasattr(self, 'ai_key') and self.ai_key:
+                 self.client = genai.Client(api_key=self.ai_key)
+            elif hasattr(self, '_load_config'):
+                 self._load_config()
+                 if hasattr(self, 'ai_key'):
+                    self.client = genai.Client(api_key=self.ai_key)
+        except Exception as e:
+            print(f"Error restoring Chat client: {e}")
+
     # === TOOLS IMPLEMENTATION ===
 
     def chat_tool(self, name, message):
