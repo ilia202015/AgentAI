@@ -481,6 +481,7 @@ class Chat:
     def _handle_stream(self, stream):
         response_parts = []
         tool_calls_buffer = []
+        full_response_text = ""
         
         try:
             for chunk in stream:
@@ -499,6 +500,7 @@ class Chat:
                             self.print_thought(part.text, flush=True, end='')
                         else:
                             self.print(part.text, flush=True, end='')
+                        full_response_text += part.text
                     
                     if part.function_call:
                         tool_calls_buffer.append(part.function_call)
@@ -510,7 +512,7 @@ class Chat:
             if tool_calls_buffer:
                 return self._execute_tool_calls(tool_calls_buffer)
 
-            return "" 
+            return full_response_text 
 
         except Exception as e:
             e_trace = traceback.format_exc()
