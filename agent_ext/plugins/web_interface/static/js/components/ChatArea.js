@@ -25,7 +25,7 @@ if (!window.copyCode) {
 const style = document.createElement('style');
 style.textContent = `
     .prose-fix {
-        white-space: pre-wrap;       
+        white-space: normal;       
         word-wrap: break-word;       
         overflow-wrap: break-word;   
         font-variant-ligatures: none; 
@@ -77,10 +77,6 @@ document.head.appendChild(style);
 const renderer = new marked.Renderer();
 
 renderer.code = function(code, language) {
-    if (typeof code === 'object' && code !== null && 'text' in code) {
-        language = code.lang;
-        code = code.text;
-    }
     try {
         const safeCode = String(code || '');
         let highlighted = safeCode;
@@ -124,12 +120,8 @@ renderer.link = function(href, title, text) {
 };
 
 renderer.table = function(header, body) {
-    if (typeof header === 'object' && header !== null && 'header' in header) {
-        body = header.body;
-        header = header.header;
-    }
     if (body) body = '<tbody>' + body + '</tbody>';
-    return '<div style="overflow-x: auto; margin: 0.6em 0;"><table class="min-w-full">\n'
+    return '<div class="overflow-x-auto my-4 border border-gray-700 rounded-lg"><table class="min-w-full text-sm">\n'
         + '<thead>\n' + header + '</thead>\n'
         + body + '</table></div>\n';
 };
