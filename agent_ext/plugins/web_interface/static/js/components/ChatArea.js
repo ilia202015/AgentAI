@@ -366,7 +366,7 @@ const MessageBubble = defineComponent({
 export default {
     components: { MessageBubble },
     template: `
-        <div class="flex-1 flex flex-col h-full relative z-10 min-w-0">
+        <div class="flex-1 flex flex-col h-full relative z-10 min-w-0" @dragover.prevent="onDragOver" @dragenter.prevent="onDragOver">
             <div class="hidden md:block absolute top-4 left-2 z-50">
                 <button @click="store.toggleSidebarDesktop()" class="p-2 rounded-lg bg-gray-900/50 backdrop-blur border border-white/10 text-gray-400 hover:text-white transition-colors shadow-sm">
                     <i class="ph-bold" :class="store.isSidebarVisibleDesktop ? 'ph-caret-left' : 'ph-caret-right'"></i>
@@ -428,7 +428,7 @@ export default {
                             </div>
                         </div>
 
-                        <textarea v-model="inputText" @keydown.enter.exact.prevent="send" 
+                        <textarea v-model="inputText" @keydown.enter.exact.prevent="send" @paste="handlePaste"
                             :placeholder="editingIndex !== null ? 'Измените сообщение...' : 'Отправить сообщение...'"
                             rows="1" ref="textarea" @input="resizeTextarea" 
                             class="w-full bg-transparent text-gray-100 px-4 py-4 focus:outline-none resize-none max-h-48 overflow-y-auto placeholder-gray-500 text-sm leading-relaxed"></textarea>
@@ -450,6 +450,19 @@ export default {
                     </div>
                 </div>
             </div>
+            
+            <!-- Drag and Drop Overlay -->
+            <div v-if="isDragging" 
+                 @dragleave.prevent.stop="isDragging = false" 
+                 @drop.prevent.stop="handleDrop" 
+                 @dragover.prevent
+                 class="absolute inset-0 z-50 bg-gray-900/90 backdrop-blur-sm flex items-center justify-center m-2 rounded-xl border-2 border-dashed border-blue-500">
+                <div class="text-center pointer-events-none">
+                    <i class="ph-duotone ph-upload-simple text-6xl text-blue-500 mb-4 animate-bounce"></i>
+                    <h3 class="text-xl font-bold text-white">Отпустите файлы здесь</h3>
+                    <p class="text-gray-400 text-sm mt-2">Поддерживаются изображения</p>
+                </div>
+            </div>
         </div>
     `,
     setup() {
@@ -460,6 +473,7 @@ export default {
         const editingIndex = ref(null);
         const fileInput = ref(null);
         const attachments = ref([]);
+        const isDragging = ref(false);
         
         const filteredMessages = computed(() => {
             const raw = store.messages.filter(m => m.role !== 'system' && m.role !== 'tool');
@@ -556,8 +570,7 @@ export default {
 
         const triggerFileSelect = () => fileInput.value && fileInput.value.click();
         
-        const handleFileSelect = (event) => {
-            const files = event.target.files;
+        const processFiles = (files) => {
             if (!files) return;
             
             for (let i = 0; i < files.length; i++) {
@@ -570,9 +583,35 @@ export default {
                 };
                 reader.readAsDataURL(file);
             }
+        };
+
+        const handleFileSelect = (event) => {
+            processFiles(event.target.files);
             event.target.value = ''; // Reset
         };
         
+        const handlePaste = (event) => {
+            const items = (event.clipboardData || window.clipboardData).items;
+            let hasImages = false;
+            const files = [];
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].kind === 'file' && items[i].type.startsWith('image/')) {
+                    files.push(items[i].getAsFile());
+                    hasImages = true;
+                }
+            }
+            if (hasImages) {
+                processFiles(files);
+            }
+        };
+
+        const onDragOver = () => { isDragging.value = true; };
+        
+        const handleDrop = (event) => {
+            isDragging.value = false;
+            processFiles(event.dataTransfer.files);
+        };
+
         const removeAttachment = (index) => {
             attachments.value.splice(index, 1);
         };
@@ -612,6 +651,6 @@ export default {
 
         onMounted(() => scrollToBottom(true));
 
-        return { store, inputText, send, stop, filteredMessages, messagesContainer, textarea, resizeTextarea, showScrollButton, scrollToBottom, handleScroll, handleEdit, startEditing, editingIndex, cancelEdit, fileInput, attachments, triggerFileSelect, handleFileSelect, removeAttachment };
+        return { store, inputText, send, stop, filteredMessages, messagesContainer, textarea, resizeTextarea, showScrollButton, scrollToBottom, handleScroll, handleEdit, startEditing, editingIndex, cancelEdit, fileInput, attachments, triggerFileSelect, handleFileSelect, removeAttachment, handlePaste, onDragOver, handleDrop, isDragging };
     }
 }
