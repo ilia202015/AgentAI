@@ -76,16 +76,30 @@ document.head.appendChild(style);
 
 const renderer = new marked.Renderer();
 
+// --- CODE RENDERER (v12+ Compatible) ---
 renderer.code = function(code, language) {
+    let text = '';
+    let lang = '';
+    
+    // Check if argument is a Token object (v12+)
+    if (typeof code === 'object' && code !== null && 'text' in code) {
+        text = code.text;
+        lang = code.lang;
+    } else {
+        // Legacy string arguments
+        text = code;
+        lang = language;
+    }
+
     try {
-        const safeCode = String(code || '');
+        const safeCode = String(text || '');
         let highlighted = safeCode;
-        let langDisplay = (language || 'text').toLowerCase();
+        let langDisplay = (lang || 'text').toLowerCase();
 
         if (window.hljs) {
-            const validLang = !!(language && hljs.getLanguage(language));
+            const validLang = !!(lang && hljs.getLanguage(lang));
             if (validLang) {
-                highlighted = hljs.highlight(safeCode, { language: language }).value;
+                highlighted = hljs.highlight(safeCode, { language: lang }).value;
             } else {
                 const auto = hljs.highlightAuto(safeCode);
                 highlighted = auto.value;
@@ -115,15 +129,62 @@ renderer.code = function(code, language) {
     }
 };
 
+// --- LINK RENDERER ---
 renderer.link = function(href, title, text) {
-    return `<a href="${href}" target="_blank" rel="noopener noreferrer" title="${title || ''}">${text}</a>`;
+    // Legacy/Object check not strictly needed for link if we don't access complex props,
+    // but v12 passes token object as first arg too.
+    let linkHref = href;
+    let linkTitle = title;
+    let linkText = text;
+
+    if (typeof href === 'object' && href !== null) {
+        linkHref = href.href;
+        linkTitle = href.title;
+        linkText = href.text; 
+    }
+    
+    return `<a href="${linkHref}" target="_blank" rel="noopener noreferrer" title="${linkTitle || ''}">${linkText}</a>`;
 };
 
+// --- TABLE RENDERER (v12+ Compatible) ---
 renderer.table = function(header, body) {
-    if (body) body = '<tbody>' + body + '</tbody>';
-    return '<div class="overflow-x-auto my-4 border border-gray-700 rounded-lg"><table class="min-w-full text-sm">\n'
-        + '<thead>\n' + header + '</thead>\n'
-        + body + '</table></div>\n';
+    // 1. Legacy string mode check
+    if (typeof header === 'string') {
+         if (body) body = '<tbody>' + body + '</tbody>';
+         return '<div class="overflow-x-auto my-4 border border-gray-700 rounded-lg"><table class="min-w-full text-sm">\n'
+            + '<thead>\n' + header + '</thead>\n'
+            + body + '</table></div>\n';
+    }
+
+    // 2. v12+ Token Object mode
+    const token = header;
+    if (!token || !token.header || !token.rows) return '';
+
+    // Helper to parse inline tokens inside cells
+    // IMPORTANT: 'this' refers to the renderer instance, which has access to parser
+    const parse = (tokens) => {
+        return this.parser.parseInline(tokens);
+    };
+
+    const headerHtml = token.header.map((cell, i) => {
+        const align = token.align[i] ? ` align="${token.align[i]}"` : '';
+        return `<th${align} class="border border-gray-700 px-4 py-2 bg-gray-800 font-semibold text-left">${parse(cell.tokens)}</th>`;
+    }).join('');
+
+    const rowsHtml = token.rows.map(row => {
+        const cells = row.map((cell, i) => {
+            const align = token.align[i] ? ` align="${token.align[i]}"` : '';
+            return `<td${align} class="border border-gray-700 px-4 py-2">${parse(cell.tokens)}</td>`;
+        }).join('');
+        return `<tr class="even:bg-white/5">${cells}</tr>`;
+    }).join('');
+
+    return `<div class="overflow-x-auto my-4 border border-gray-700 rounded-lg">
+        <table class="min-w-full text-sm border-collapse">
+            <thead><tr>${headerHtml}</tr></thead>
+            <tbody>${rowsHtml}</tbody>
+        </table>
+    </div>`;
 };
 
 marked.setOptions({
