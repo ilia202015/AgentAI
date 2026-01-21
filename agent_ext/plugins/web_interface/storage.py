@@ -39,28 +39,54 @@ def get_current_config():
         print(f"Error reading config: {e}")
     return {}
 
-def list_chats(get_chat):
+def list_chats(get_chat=None):
+    """
+    Reads chat list directly from JSON files.
+    get_chat argument is kept for compatibility but ignored.
+    """
     ensure_chats_dir()
     chats = []
-    ids = set()
-    for filename in os.listdir(CHATS_DIR):
-        if filename.endswith(".pkl") or filename.endswith(".json"):
-            ids.add(filename.rsplit('.', 1)[0])
-            
-    for id in ids:
-        try:
-            chat, _ = load_chat_state(id, get_chat)
-            
-            if chat:
-                chats.append({
-                    "id": chat.id,
-                    "name": chat.name,
-                    "updated_at": chat.updated_at,
-                    "preview": _get_preview(chat.messages)
-                })
-        except Exception as e:
-            print(f"list_chats() error for {id}: {e}")
     
+    # We rely on .json files for listing because they are faster to read and stable.
+    try:
+        files = [f for f in os.listdir(CHATS_DIR) if f.endswith(".json")]
+    except OSError:
+        return []
+
+    for filename in files:
+        chat_id = filename[:-5]
+        json_path = os.path.join(CHATS_DIR, filename)
+        
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            if not isinstance(data, dict):
+                continue
+                
+            name = data.get("name", "New Chat")
+            updated_at = data.get("updated_at", "")
+            # Если даты нет, берем время модификации файла
+            if not updated_at:
+                try:
+                    mtime = os.path.getmtime(json_path)
+                    updated_at = datetime.datetime.fromtimestamp(mtime).isoformat()
+                except: pass
+
+            messages = data.get("messages", [])
+            preview = _get_preview(messages)
+            
+            chats.append({
+                "id": chat_id,
+                "name": name,
+                "updated_at": updated_at,
+                "preview": preview
+            })
+        except Exception as e:
+            # Не ломаем весь список из-за одного битого файла
+            print(f"Error listing chat {chat_id}: {e}")
+
+    # Сортировка по дате обновления (новые сверху)
     chats.sort(key=lambda x: x.get("updated_at", ""), reverse=True)
     return chats
 

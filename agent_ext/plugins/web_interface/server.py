@@ -297,7 +297,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             print(f"handle_api_get({path}, {query})")
 
         if path == "/api/chats": 
-            self.send_json(storage.list_chats(self.clone_root_chat))
+            self.send_json(storage.list_chats())
         else: 
             self.send_json({})
 
