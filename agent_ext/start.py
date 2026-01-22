@@ -101,6 +101,7 @@ def load_plugins():
             for root, dirs, files in os.walk(plugin_path):
                 # Фильтрация папок
                 if "prompts" in dirs: dirs.remove("prompts")
+                if "libs" in dirs: dirs.remove("libs")
                 if "__pycache__" in dirs: dirs.remove("__pycache__")
                 if "node_modules" in dirs: dirs.remove("node_modules") # На всякий случай
                 
