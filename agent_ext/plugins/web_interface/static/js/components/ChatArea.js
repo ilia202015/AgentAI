@@ -187,6 +187,56 @@ renderer.table = function(header, body) {
     </div>`;
 };
 
+
+
+
+
+
+// --- LATEX EXTENSION ---
+// Protects LaTeX formulas from Markdown parsing
+const latexExtension = {
+    name: 'latex',
+    level: 'inline', 
+    start(src) { 
+        return src.match(/\$\$|\$|\\\[|\\\(/)?.index; 
+    },
+    tokenizer(src, tokens) {
+        // 1. Block Math: $$...$$
+        const blockRule = /^\$\$([\s\S]+?)\$\$/;
+        const matchBlock = blockRule.exec(src);
+        if (matchBlock) {
+            return { type: 'latex', raw: matchBlock[0], text: matchBlock[0], displayMode: true };
+        }
+
+        // 2. Block Math Alt: \\[...\\]
+        const blockAltRule = /^\\\[([\s\S]+?)\\\]/;
+        const matchBlockAlt = blockAltRule.exec(src);
+        if (matchBlockAlt) {
+            return { type: 'latex', raw: matchBlockAlt[0], text: matchBlockAlt[0], displayMode: true };
+        }
+
+        // 3. Inline Math Alt: \\(...\\)
+        const inlineAltRule = /^\\\(([\s\S]+?)\\\)/;
+        const matchInlineAlt = inlineAltRule.exec(src);
+        if (matchInlineAlt) {
+            return { type: 'latex', raw: matchInlineAlt[0], text: matchInlineAlt[0], displayMode: false };
+        }
+
+        // 4. Inline Math: $...$
+        const inlineRule = /^\$([^$\n]+?)\$/;
+        const matchInline = inlineRule.exec(src);
+        if (matchInline) {
+            return { type: 'latex', raw: matchInline[0], text: matchInline[0], displayMode: false };
+        }
+    },
+    renderer(token) {
+        return token.text; 
+    }
+};
+
+marked.use({ extensions: [latexExtension] });
+
+
 marked.setOptions({
     renderer: renderer,
     pedantic: false,
