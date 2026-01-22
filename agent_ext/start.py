@@ -59,7 +59,7 @@ def load_plugins():
             level = root.replace(current_dir, '').count(os.sep)
             indent = ' ' * 4 * level
             folder_name = os.path.basename(root)
-            if folder_name: # чтобы не писать пустую строку для корня, если вдруг
+            if folder_name:
                 additional_info += f"{indent}{folder_name}/\n"
             else:
                  additional_info += f". (root)/\n"
@@ -73,8 +73,11 @@ def load_plugins():
 
     # Применение изменений к промпту
     chat.system_prompt += additional_info
-    if chat.messages and chat.messages[0]["role"] == "system":
+    
+    # Для совместимости, если вдруг messages уже заполнены
+    if chat.messages and isinstance(chat.messages[0], dict) and chat.messages[0].get("role") == "system":
         chat.messages[0]["content"] = chat.system_prompt
+        
     print("✅ Системный промпт обновлен (добавлены код загрузчика, конфиг и структура файлов).")
     # ==============================================================================
 
@@ -93,18 +96,30 @@ def load_plugins():
             prompts_dir = os.path.join(plugin_path, "prompts")
             include_path = os.path.join(plugin_path, "include.py")
             
-            # Предварительное чтение файлов, если они существуют
-            include_code = ""
-            if os.path.exists(include_path):
-                with open(include_path, 'r', encoding='utf-8') as f:
-                    include_code = f.read()
+            # --- Сбор всех файлов плагина ---
+            plugin_files_dump = ""
+            for root, dirs, files in os.walk(plugin_path):
+                # Фильтрация папок
+                if "prompts" in dirs: dirs.remove("prompts")
+                if "__pycache__" in dirs: dirs.remove("__pycache__")
+                if "node_modules" in dirs: dirs.remove("node_modules") # На всякий случай
+                
+                for file in files:
+                    if file.endswith(".pyc") or file == ".DS_Store": continue
+                    
+                    abs_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(abs_path, plugin_path).replace("\\", "/")
+                    
+                    try:
+                        with open(abs_path, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                        plugin_files_dump += f"\n{plugin_name}/{rel_path}:\n{content}\n"
+                    except Exception:
+                        pass # Пропускаем бинарники и ошибки
+            # --------------------------------
 
-            init_code = ""
-            if os.path.exists(init_path):
-                with open(init_path, 'r', encoding='utf-8') as f:
-                    init_code = f.read()
-
-            # 1. Загрузка промптов
+            # 1. Загрузка промптов (System Prompt Addition + Custom Prompts)
+            system_prompt_addition = ""
             if os.path.exists(prompts_dir):
                 for prompt_file in os.listdir(prompts_dir):
                     p_path = os.path.join(prompts_dir, prompt_file)
@@ -113,24 +128,33 @@ def load_plugins():
                             content = f.read()
                         
                         if prompt_file == "system":
-                            chat.system_prompt += f"\n\nПлагин {plugin_name}:\n" + content
-                            if include_code:
-                                chat.system_prompt += f"\n{plugin_name}/include.py:\n" + include_code
-                            if init_code:
-                                chat.system_prompt += f"\n{plugin_name}/init.py:\n" + init_code
-                            
-                            # Обновляем системное сообщение в истории сообщений (обычно это первое сообщение)
-                            if chat.messages and chat.messages[0]["role"] == "system":
-                                chat.messages[0]["content"] = chat.system_prompt
-                            print(f"  - Системный промпт обновлен")
+                            system_prompt_addition = content
                         else:
                             chat.prompts[prompt_file] = content
                             print(f"  - Промпт '{prompt_file}' загружен")
 
-            # 2. Выполнение include.py внутри чата
-            if os.path.exists(include_path) and include_code:
-                print(f"include.py: result = {chat.python_tool(include_code)}")
-                print(f"  - include.py выполнен")
+            # Формируем итоговую добавку в System Prompt для данного плагина
+            full_plugin_info = f"\n\n=== Плагин {plugin_name} ===\n"
+            if system_prompt_addition:
+                full_plugin_info += f"[System Prompt из prompts/system]:\n{system_prompt_addition}\n"
+            if plugin_files_dump:
+                full_plugin_info += f"[Файлы плагина]:\n{plugin_files_dump}"
+            
+            chat.system_prompt += full_plugin_info
+            
+            # Обновляем системное сообщение если оно есть (обычно в Google GenAI messages пустые при старте, но на всякий случай)
+            if chat.messages and isinstance(chat.messages[0], dict) and chat.messages[0].get("role") == "system":
+                chat.messages[0]["content"] = chat.system_prompt
+            
+            print(f"  - Системный промпт обновлен (файлы плагина добавлены)")
+
+            # 2. Выполнение include.py (функционал)
+            if os.path.exists(include_path):
+                with open(include_path, 'r', encoding='utf-8') as f:
+                    include_code_exec = f.read()
+                if include_code_exec:
+                    print(f"include.py: result = {chat.python_tool(include_code_exec)}")
+                    print(f"  - include.py выполнен")
                 
             # 3. Инициализация через init.py
             if os.path.exists(init_path):
@@ -163,4 +187,3 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n💥 Критическая ошибка в плагине console_output: {e}")
         traceback.print_exc()
-    
