@@ -10,6 +10,7 @@ import pyperclip
 import webbrowser
 import os
 import sys
+import ctypes
 
 # Добавляем путь к библиотекам UFO
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -25,6 +26,41 @@ except ImportError:
 # Настройка pyautogui
 pyautogui.FAILSAFE = True 
 pyautogui.PAUSE = 0.3 
+
+# VK коды для Windows (раскладка-независимые)
+VK_CODES = {
+    'ctrl': 0x11,
+    'alt': 0x12,
+    'shift': 0x10,
+    'win': 0x5B,
+    'a': 0x41,
+    'c': 0x43,
+    'v': 0x56,
+    'x': 0x58,
+    'z': 0x5A,
+    'backspace': 0x08,
+    'enter': 0x0D,
+    'delete': 0x2E
+}
+
+def win_hotkey(*keys):
+    """Выполняет нажатие горячих клавиш через WinAPI (игнорирует текущую раскладку)."""
+    if platform.system() != "Windows":
+        pyautogui.hotkey(*keys)
+        return
+
+    codes = [VK_CODES.get(k.lower(), None) for k in keys]
+    if None in codes:
+        # Если код не найден, фолбэк на pyautogui (может не сработать на RU)
+        pyautogui.hotkey(*keys)
+        return
+
+    # Нажать
+    for code in codes:
+        ctypes.windll.user32.keybd_event(code, 0, 0, 0)
+    # Отпустить
+    for code in reversed(codes):
+        ctypes.windll.user32.keybd_event(code, 0, 2, 0)
 
 def get_screen_size():
     return pyautogui.size()
@@ -85,16 +121,18 @@ def execute_action(action_name, args):
             ufo_utils.smart_type(x, y, text, clear=clear)
         
         if clear:
-            mod = 'command' if platform.system() == 'Darwin' else 'ctrl'
-            pyautogui.hotkey(mod, 'a')
+            mod = 'ctrl' # На Windows ctrl всегда работает для команд
+            if platform.system() == 'Darwin': mod = 'command'
+            win_hotkey(mod, 'a')
             pyautogui.press('backspace')
             time.sleep(0.2)
 
         if text:
             try:
                 pyperclip.copy(text)
-                mod = 'command' if platform.system() == 'Darwin' else 'ctrl'
-                pyautogui.hotkey(mod, 'v')
+                mod = 'ctrl'
+                if platform.system() == 'Darwin': mod = 'command'
+                win_hotkey(mod, 'v')
             except:
                 pyautogui.write(text, interval=0.02)
         
@@ -107,12 +145,12 @@ def execute_action(action_name, args):
         keys_str = args.get("keys", "")
         if not keys_str: return {"error": "No keys provided"}
         keys = [k.strip().lower() for k in keys_str.split('+')]
-        mapped = []
-        for k in keys:
-            if k == 'control': mapped.append('ctrl')
-            elif k in ['command', 'meta']: mapped.append('win')
-            else: mapped.append(k)
-        pyautogui.hotkey(*mapped)
+        
+        # Обрабатываем через WinAPI для стабильности
+        mod_map = {'control': 'ctrl', 'command': 'win', 'meta': 'win'}
+        clean_keys = [mod_map.get(k, k) for k in keys]
+        
+        win_hotkey(*clean_keys)
         return {"output": f"Pressed keys: {keys_str}"}
 
     elif action_name == "scroll_document":
