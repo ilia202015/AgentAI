@@ -44,15 +44,27 @@ const App = {
                 try {
                     const payload = JSON.parse(event.data);
                     
-                    // --- Parallel Chat Logic ---
-                    // Payload now has { type, chatId, data }
-                    
                     if (payload && payload.chatId) {
-                        // Only process events for the currently open chat
+                        // Обработка уведомлений (даже если чат не в фокусе)
+                        if (payload.type === 'notification') {
+                            if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                                const n = new Notification(payload.data.title || "Agent AI", {
+                                    body: payload.data.body || "",
+                                    tag: 'agent-notification'
+                                });
+                                n.onclick = () => {
+                                    window.focus();
+                                    store.currentChatId = payload.chatId;
+                                    // Можно добавить fetch чата если он не загружен
+                                };
+                            }
+                        }
+
+                        // Обновление интерфейса текущего чата
                         if (store.currentChatId === payload.chatId) {
                             if (payload.type === 'finish') {
                                 store.isThinking = false;
-                            } else {
+                            } else if (payload.type !== 'notification') {
                                 store.appendChunk(payload);
                             }
                         }
@@ -70,7 +82,12 @@ const App = {
 
         initSSE();
         
-        setTimeout(() => store.addToast('Агент готов к работе (Parallel Mode)', 'success'), 1000);
+        // Запрос разрешений на уведомления
+        if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+            Notification.requestPermission();
+        }
+        
+        setTimeout(() => store.addToast('Агент готов к работе', 'success'), 1000);
 
         return { store };
     }

@@ -42,8 +42,10 @@ class ComputerUseChat(Chat):
         self.print(f"🖥️ Computer Use Agent начал работу: {task_description}")
         
         # Запуск индикации и мониторинга
-        tools.overlay.start()
-        tools.monitor.update_last_pos()
+        if hasattr(tools, 'overlay'):
+            tools.overlay.start()
+        if hasattr(tools, 'monitor'):
+            tools.monitor.update_last_pos()
         
         final_report = "Задача завершена."
         
@@ -82,8 +84,8 @@ class ComputerUseChat(Chat):
             for i in range(turn_limit):
                 self.print(f"\n--- Ход {i+1} ---")
                 
-                # Проверка вмешательства пользователя перед каждым ходом
-                if tools.monitor.check():
+                # Проверка вмешательства пользователя
+                if hasattr(tools, 'monitor') and tools.monitor.check():
                     self.print("⚠️ Обнаружено вмешательство пользователя! Прерывание работы.")
                     final_report = "Работа прервана пользователем (движение мыши или ввод)."
                     break
@@ -126,10 +128,9 @@ class ComputerUseChat(Chat):
                     fname = fc.name
                     args = fc.args
                     
-                    # --- Обработка подтверждения безопасности (Safety Acknowledgement) ---
                     safety_ack = False
                     if args and 'safety_decision' in args:
-                        self.print(f"🛡️ Обнаружено решение по безопасности: {args['safety_decision'].get('explanation', '')}. Автоматическое подтверждение.")
+                        self.print(f"🛡️ Обнаружено решение по безопасности: {args['safety_decision'].get('explanation', '')}.")
                         safety_ack = True
                     
                     self.print(f"⚡ Выполнение: {fname}({json.dumps(args, ensure_ascii=False)})")
@@ -179,7 +180,7 @@ class ComputerUseChat(Chat):
 
                 self.messages.append(types.Content(role="user", parts=fr_parts))
                 
-                # Очистка истории скриншотов для экономии токенов
+                # Очистка скриншотов
                 screenshot_turns = []
                 for idx, msg in enumerate(self.messages):
                     if msg.role == "user" and msg.parts:
@@ -197,7 +198,18 @@ class ComputerUseChat(Chat):
                 final_report = "Превышен лимит ходов."
                 
         finally:
-            tools.overlay.stop()
-            tools.show_completion_notification(message=final_report)
+            if hasattr(tools, 'overlay'):
+                tools.overlay.stop()
+            
+            # Отправка браузерного уведомления
+            if hasattr(self, 'web_emit'):
+                self.web_emit("notification", {
+                    "title": "Computer Use завершен",
+                    "body": final_report
+                })
+            
+            # Оставляем системное как запасной вариант (опционально)
+            # if hasattr(tools, 'show_completion_notification'):
+            #    tools.show_completion_notification(message=final_report)
             
         return final_report
