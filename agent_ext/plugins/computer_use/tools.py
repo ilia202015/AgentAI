@@ -1,4 +1,3 @@
-
 import pyautogui
 import mss
 import mss.tools
@@ -8,10 +7,24 @@ import time
 import platform
 import json
 import pyperclip
+import webbrowser
+import os
+import sys
+
+# Добавляем путь к библиотекам UFO
+current_dir = os.path.dirname(os.path.abspath(__file__))
+libs_path = os.path.join(current_dir, "libs")
+if libs_path not in sys.path:
+    sys.path.append(libs_path)
+
+try:
+    import ufo_utils
+except ImportError:
+    ufo_utils = None
 
 # Настройка pyautogui
 pyautogui.FAILSAFE = True 
-pyautogui.PAUSE = 0.5 
+pyautogui.PAUSE = 0.3 
 
 def get_screen_size():
     return pyautogui.size()
@@ -25,119 +38,123 @@ def take_screenshot():
         img.save(output, format="PNG")
         return output.getvalue()
 
-def denormalize_coords(x, y, width, height):
-    return int(x / 1000 * width), int(y / 1000 * height)
+def denormalize(x, y):
+    if x is None or y is None: return 0, 0
+    w, h = pyautogui.size()
+    return int(float(x) / 1000 * w), int(float(y) / 1000 * h)
 
 def execute_action(action_name, args):
     screen_width, screen_height = get_screen_size()
     
     if action_name == "open_web_browser":
-        import webbrowser
         url = args.get("url", "https://google.com")
         webbrowser.open(url)
-        return {"output": f"Browser opened with {url}"}
+        time.sleep(2)
+        return {"output": f"Browser opened: {url}"}
 
     elif action_name == "click_at":
-        x = args.get("x")
-        y = args.get("y")
-        if x is None or y is None: raise ValueError("Missing x or y")
-        real_x, real_y = denormalize_coords(x, y, screen_width, screen_height)
-        pyautogui.click(real_x, real_y)
-        return {"output": "Clicked"}
+        x, y = denormalize(args.get("x"), args.get("y"))
+        if ufo_utils and ufo_utils.smart_click(x, y):
+            return {"output": f"System click performed at {x}, {y}"}
+        pyautogui.click(x, y)
+        return {"output": f"Clicked at {x}, {y}"}
 
     elif action_name == "hover_at":
-        x = args.get("x")
-        y = args.get("y")
-        if x is None or y is None: raise ValueError("Missing x or y")
-        real_x, real_y = denormalize_coords(x, y, screen_width, screen_height)
-        pyautogui.moveTo(real_x, real_y)
-        return {"output": "Hovered"}
+        x, y = denormalize(args.get("x"), args.get("y"))
+        pyautogui.moveTo(x, y, duration=0.2)
+        return {"output": f"Hovered at {x}, {y}"}
 
     elif action_name == "drag_and_drop":
-        x = args.get("x")
-        y = args.get("y")
-        dest_x = args.get("destination_x")
-        dest_y = args.get("destination_y")
-        
-        if any(v is None for v in [x, y, dest_x, dest_y]):
-            raise ValueError("Missing coordinates for drag_and_drop")
-            
-        real_x, real_y = denormalize_coords(x, y, screen_width, screen_height)
-        real_dest_x, real_dest_y = denormalize_coords(dest_x, dest_y, screen_width, screen_height)
-        
-        pyautogui.moveTo(real_x, real_y)
-        time.sleep(0.3)
-        pyautogui.dragTo(real_dest_x, real_dest_y, button='left', duration=0.8)
-        return {"output": "Dragged and dropped"}
+        x, y = denormalize(args.get("x"), args.get("y"))
+        dx, dy = denormalize(args.get("destination_x"), args.get("destination_y"))
+        pyautogui.moveTo(x, y)
+        time.sleep(0.2)
+        pyautogui.dragTo(dx, dy, button='left', duration=0.5)
+        return {"output": f"Dragged from {x},{y} to {dx},{dy}"}
 
     elif action_name == "type_text_at":
-        x = args.get("x")
-        y = args.get("y")
-        text = args.get("text")
+        x, y = denormalize(args.get("x"), args.get("y"))
+        text = args.get("text", "")
         press_enter = args.get("press_enter", True)
+        clear = args.get("clear_before_typing", True)
         
-        # 1. Клик для фокуса
-        if x is not None and y is not None:
-            real_x, real_y = denormalize_coords(x, y, screen_width, screen_height)
-            pyautogui.click(real_x, real_y)
-            time.sleep(0.8) # Увеличенная задержка для фокуса
+        pyautogui.click(x, y)
+        time.sleep(0.5)
         
-        modifier = 'command' if platform.system() == 'Darwin' else 'ctrl'
+        if ufo_utils:
+            ufo_utils.smart_type(x, y, text, clear=clear)
         
-        # 2. Очистка поля
-        pyautogui.hotkey(modifier, 'a')
-        time.sleep(0.1)
-        pyautogui.press('backspace')
-        time.sleep(0.2)
+        if clear:
+            mod = 'command' if platform.system() == 'Darwin' else 'ctrl'
+            pyautogui.hotkey(mod, 'a')
+            pyautogui.press('backspace')
+            time.sleep(0.2)
 
-        # 3. Ввод текста
         if text:
-            # Если текст ASCII и короткий - печатаем посимвольно (надежнее для поисковых подсказок)
-            is_ascii = all(ord(c) < 128 for c in text)
-            if is_ascii and len(text) < 100:
-                 pyautogui.write(text, interval=0.05)
-            else:
-                # Иначе через буфер обмена (Unicode / длинный текст)
-                try:
-                    pyperclip.copy(text)
-                    time.sleep(0.5) 
-                    pyautogui.hotkey(modifier, 'v')
-                    time.sleep(0.5) 
-                except Exception as e:
-                    print(f"Clipboard paste failed: {e}")
-                    pyautogui.write(text, interval=0.05)
+            try:
+                pyperclip.copy(text)
+                mod = 'command' if platform.system() == 'Darwin' else 'ctrl'
+                pyautogui.hotkey(mod, 'v')
+            except:
+                pyautogui.write(text, interval=0.02)
         
-        # 4. Нажатие Enter
         if press_enter:
-            time.sleep(0.5)
+            time.sleep(0.2)
             pyautogui.press('enter')
-            
-        return {"output": "Typed text"}
-        
+        return {"output": f"Typed text at {x}, {y}"}
+
     elif action_name == "key_combination":
-        keys_str = args.get("keys")
-        if not keys_str: raise ValueError("Missing keys")
-        keys = keys_str.lower().split('+')
-        mapped_keys = []
+        keys_str = args.get("keys", "")
+        if not keys_str: return {"error": "No keys provided"}
+        keys = [k.strip().lower() for k in keys_str.split('+')]
+        mapped = []
         for k in keys:
-            if k == 'control': mapped_keys.append('ctrl')
-            elif k == 'meta': mapped_keys.append('win' if platform.system() == 'Windows' else 'command')
-            else: mapped_keys.append(k)
-        pyautogui.hotkey(*mapped_keys)
-        return {"output": f"Pressed {keys_str}"}
+            if k == 'control': mapped.append('ctrl')
+            elif k in ['command', 'meta']: mapped.append('win')
+            else: mapped.append(k)
+        pyautogui.hotkey(*mapped)
+        return {"output": f"Pressed keys: {keys_str}"}
 
     elif action_name == "scroll_document":
         direction = args.get("direction", "down")
-        amount = 600 
-        if direction == "down": pyautogui.scroll(-amount)
-        elif direction == "up": pyautogui.scroll(amount)
-        elif direction == "left": pyautogui.hscroll(-amount)
-        elif direction == "right": pyautogui.hscroll(amount)
-        return {"output": f"Scrolled {direction}"}
-        
+        if direction == "down": pyautogui.press('pagedown')
+        elif direction == "up": pyautogui.press('pageup')
+        elif direction == "left": pyautogui.press('left')
+        elif direction == "right": pyautogui.press('right')
+        return {"output": f"Scrolled document {direction}"}
+
+    elif action_name == "scroll_at":
+        x, y = denormalize(args.get("x"), args.get("y"))
+        direction = args.get("direction", "down")
+        magnitude = args.get("magnitude", 500)
+        pyautogui.moveTo(x, y)
+        amount = magnitude if direction == "up" else -magnitude
+        pyautogui.scroll(amount)
+        return {"output": f"Scrolled {direction} at {x}, {y}"}
+
     elif action_name == "wait_5_seconds":
         time.sleep(5)
-        return {"output": "Waited"}
+        return {"output": "Waited 5 seconds"}
 
-    else:
-        return {"output": f"Action {action_name} executed (simulated/fallback)"}
+    elif action_name == "go_back":
+        pyautogui.hotkey('alt', 'left')
+        return {"output": "Navigated back"}
+
+    elif action_name == "go_forward":
+        pyautogui.hotkey('alt', 'right')
+        return {"output": "Navigated forward"}
+
+    elif action_name == "search":
+        webbrowser.open("https://www.google.com")
+        return {"output": "Search engine opened"}
+
+    elif action_name == "navigate":
+        url = args.get("url")
+        if url:
+            if not url.startswith(('http://', 'https://')):
+                url = 'https://' + url
+            webbrowser.open(url)
+            return {"output": f"Navigated to {url}"}
+        return {"error": "URL is missing"}
+
+    return {"error": f"Unknown action: {action_name}"}
