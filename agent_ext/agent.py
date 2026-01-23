@@ -69,8 +69,8 @@ class Chat:
         #self.model, self.model_rpm = "gemini-2.5-flash", 10
 
         # tier 1
-        self.model, self.model_rpm = "gemini-3-pro-preview", 25
-        #self.model, self.model_rpm = "gemini-3-flash-preview", 1000
+        #self.model, self.model_rpm = "gemini-3-pro-preview", 25
+        self.model, self.model_rpm = "gemini-3-flash-preview", 1000
         #self.model, self.model_rpm = "gemini-2.5-pro", 150
 
         self._load_config()
