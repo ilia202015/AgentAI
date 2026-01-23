@@ -299,21 +299,7 @@ class Chat:
         except Exception as e:
             return f"Ошибка выполнения:\n\n{traceback.format_exc()}"
         
-    def save_code_changes_tool(self, code):
-        try:
-            is_valid, message = self.validate_python_code(code)
-            if not is_valid:
-                return f"Ошибка валидации: {message}. Изменения не сохранены."
-            file_path = "agent_ext/saved_code_changes.py"
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-            with open(file_path, 'a', encoding='utf-8') as f:
-                f.write(f"\n# Saved on: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
-                f.write(code)
-                f.write("\n" + "#" * 80 + "\n")
-            return "Изменения в коде успешно сохранены. Они будут автоматически применены при следующем запуске агента."
-        except Exception as e:
-            return f"Критическая ошибка при сохранении изменений: {e}"
-    
+
     def check_tool_args(self, args, tool_args):
         for arg in args:
             if arg not in tool_args:
