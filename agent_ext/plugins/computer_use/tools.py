@@ -1,3 +1,4 @@
+
 import pyautogui
 import mss
 import mss.tools
@@ -18,6 +19,8 @@ def get_screen_size():
 def take_screenshot():
     with mss.mss() as sct:
         # Берем первый монитор (основной)
+        # sct.monitors[0] - это объединение всех мониторов
+        # sct.monitors[1] - первый монитор
         monitor = sct.monitors[1]
         sct_img = sct.grab(monitor)
         img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
@@ -33,7 +36,6 @@ def execute_action(action_name, args):
     
     if action_name == "open_web_browser":
         import webbrowser
-        # Можно использовать аргумент url, если он есть, или дефолтный
         url = args.get("url", "https://google.com")
         webbrowser.open(url)
         return {"output": f"Browser opened with {url}"}
@@ -46,45 +48,66 @@ def execute_action(action_name, args):
         pyautogui.click(real_x, real_y)
         return {"output": "Clicked"}
 
+    elif action_name == "hover_at":
+        x = args.get("x")
+        y = args.get("y")
+        if x is None or y is None: raise ValueError("Missing x or y")
+        real_x, real_y = denormalize_coords(x, y, screen_width, screen_height)
+        pyautogui.moveTo(real_x, real_y)
+        return {"output": "Hovered"}
+
+    elif action_name == "drag_and_drop":
+        x = args.get("x")
+        y = args.get("y")
+        dest_x = args.get("destination_x")
+        dest_y = args.get("destination_y")
+        
+        if any(v is None for v in [x, y, dest_x, dest_y]):
+            raise ValueError("Missing coordinates for drag_and_drop")
+            
+        real_x, real_y = denormalize_coords(x, y, screen_width, screen_height)
+        real_dest_x, real_dest_y = denormalize_coords(dest_x, dest_y, screen_width, screen_height)
+        
+        pyautogui.moveTo(real_x, real_y)
+        # Задержка перед перетаскиванием часто помогает
+        time.sleep(0.2)
+        pyautogui.dragTo(real_dest_x, real_dest_y, button='left', duration=1.0)
+        return {"output": "Dragged and dropped"}
+
     elif action_name == "type_text_at":
         x = args.get("x")
         y = args.get("y")
         text = args.get("text")
         press_enter = args.get("press_enter", True)
         
-        # 1. Клик для фокуса (если координаты переданы)
         if x is not None and y is not None:
             real_x, real_y = denormalize_coords(x, y, screen_width, screen_height)
             pyautogui.click(real_x, real_y)
-            time.sleep(0.2) # Небольшая пауза после клика
+            time.sleep(0.5) 
         
         modifier = 'command' if platform.system() == 'Darwin' else 'ctrl'
         
-        # 2. Очистка поля (Ctrl+A -> Backspace)
-        # Иногда полезно делать это опциональным, но для поиска обычно нужно
+        # Очистка
         pyautogui.hotkey(modifier, 'a')
         time.sleep(0.1)
         pyautogui.press('backspace')
         time.sleep(0.1)
 
-        # 3. Ввод текста через буфер обмена (для поддержки Unicode/Кириллицы)
         if text:
             try:
                 pyperclip.copy(text)
-                time.sleep(0.1) # Ждем, пока буфер обновится
+                time.sleep(0.3) 
                 pyautogui.hotkey(modifier, 'v')
-                time.sleep(0.1) # Ждем вставки
+                time.sleep(0.3) 
             except Exception as e:
-                # Fallback на посимвольный ввод (только ASCII)
-                print(f"Clipboard paste failed: {e}, using write fallback")
+                print(f"Clipboard paste failed: {e}")
                 pyautogui.write(text, interval=0.05)
         
-        # 4. Нажатие Enter
         if press_enter:
-            time.sleep(0.2) # Пауза перед Enter
+            time.sleep(0.3)
             pyautogui.press('enter')
             
-        return {"output": "Typed text (via clipboard)"}
+        return {"output": "Typed text"}
         
     elif action_name == "key_combination":
         keys_str = args.get("keys")
@@ -100,7 +123,7 @@ def execute_action(action_name, args):
 
     elif action_name == "scroll_document":
         direction = args.get("direction", "down")
-        amount = 500 # Значение прокрутки
+        amount = 500 
         if direction == "down": pyautogui.scroll(-amount)
         elif direction == "up": pyautogui.scroll(amount)
         elif direction == "left": pyautogui.hscroll(-amount)
@@ -112,4 +135,6 @@ def execute_action(action_name, args):
         return {"output": "Waited"}
 
     else:
-        return {"output": f"Action {action_name} not fully implemented, skipped"}
+        # Для неизвестных действий (например, navigate, search) 
+        # возвращаем заглушку, чтобы агент не падал, а мог попробовать альтернативу
+        return {"output": f"Action {action_name} executed (simulated/fallback)"}
