@@ -70,7 +70,7 @@ class ComputerUseChat(Chat):
             system_instruction=self.system_prompt
         )
 
-        turn_limit = 15
+        turn_limit = 150
         
         MAX_RECENT_TURN_WITH_SCREENSHOTS = 3
         
@@ -184,4 +184,4 @@ class ComputerUseChat(Chat):
                 
                 self.print(f"🧹 Очищены скриншоты из {len(indices_to_clean)} старых ходов.")
 
-        return "Превышен лимит ходов (15)."
+        return f"Превышен лимит ходов ({turn_limit})."
