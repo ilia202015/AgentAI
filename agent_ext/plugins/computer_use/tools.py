@@ -18,9 +18,6 @@ def get_screen_size():
 
 def take_screenshot():
     with mss.mss() as sct:
-        # Берем первый монитор (основной)
-        # sct.monitors[0] - это объединение всех мониторов
-        # sct.monitors[1] - первый монитор
         monitor = sct.monitors[1]
         sct_img = sct.grab(monitor)
         img = Image.frombytes("RGB", sct_img.size, sct_img.bgra, "raw", "BGRX")
@@ -69,9 +66,8 @@ def execute_action(action_name, args):
         real_dest_x, real_dest_y = denormalize_coords(dest_x, dest_y, screen_width, screen_height)
         
         pyautogui.moveTo(real_x, real_y)
-        # Задержка перед перетаскиванием часто помогает
-        time.sleep(0.2)
-        pyautogui.dragTo(real_dest_x, real_dest_y, button='left', duration=1.0)
+        time.sleep(0.3)
+        pyautogui.dragTo(real_dest_x, real_dest_y, button='left', duration=0.8)
         return {"output": "Dragged and dropped"}
 
     elif action_name == "type_text_at":
@@ -80,31 +76,40 @@ def execute_action(action_name, args):
         text = args.get("text")
         press_enter = args.get("press_enter", True)
         
+        # 1. Клик для фокуса
         if x is not None and y is not None:
             real_x, real_y = denormalize_coords(x, y, screen_width, screen_height)
             pyautogui.click(real_x, real_y)
-            time.sleep(0.5) 
+            time.sleep(0.8) # Увеличенная задержка для фокуса
         
         modifier = 'command' if platform.system() == 'Darwin' else 'ctrl'
         
-        # Очистка
+        # 2. Очистка поля
         pyautogui.hotkey(modifier, 'a')
         time.sleep(0.1)
         pyautogui.press('backspace')
-        time.sleep(0.1)
+        time.sleep(0.2)
 
+        # 3. Ввод текста
         if text:
-            try:
-                pyperclip.copy(text)
-                time.sleep(0.3) 
-                pyautogui.hotkey(modifier, 'v')
-                time.sleep(0.3) 
-            except Exception as e:
-                print(f"Clipboard paste failed: {e}")
-                pyautogui.write(text, interval=0.05)
+            # Если текст ASCII и короткий - печатаем посимвольно (надежнее для поисковых подсказок)
+            is_ascii = all(ord(c) < 128 for c in text)
+            if is_ascii and len(text) < 100:
+                 pyautogui.write(text, interval=0.05)
+            else:
+                # Иначе через буфер обмена (Unicode / длинный текст)
+                try:
+                    pyperclip.copy(text)
+                    time.sleep(0.5) 
+                    pyautogui.hotkey(modifier, 'v')
+                    time.sleep(0.5) 
+                except Exception as e:
+                    print(f"Clipboard paste failed: {e}")
+                    pyautogui.write(text, interval=0.05)
         
+        # 4. Нажатие Enter
         if press_enter:
-            time.sleep(0.3)
+            time.sleep(0.5)
             pyautogui.press('enter')
             
         return {"output": "Typed text"}
@@ -123,7 +128,7 @@ def execute_action(action_name, args):
 
     elif action_name == "scroll_document":
         direction = args.get("direction", "down")
-        amount = 500 
+        amount = 600 
         if direction == "down": pyautogui.scroll(-amount)
         elif direction == "up": pyautogui.scroll(amount)
         elif direction == "left": pyautogui.hscroll(-amount)
@@ -135,6 +140,4 @@ def execute_action(action_name, args):
         return {"output": "Waited"}
 
     else:
-        # Для неизвестных действий (например, navigate, search) 
-        # возвращаем заглушку, чтобы агент не падал, а мог попробовать альтернативу
         return {"output": f"Action {action_name} executed (simulated/fallback)"}
