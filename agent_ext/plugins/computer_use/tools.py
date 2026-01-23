@@ -12,17 +12,6 @@ import os
 import sys
 import ctypes
 
-# Добавляем путь к библиотекам UFO
-current_dir = os.path.dirname(os.path.abspath(__file__))
-libs_path = os.path.join(current_dir, "libs")
-if libs_path not in sys.path:
-    sys.path.append(libs_path)
-
-try:
-    import ufo_utils
-except ImportError:
-    ufo_utils = None
-
 # Настройка pyautogui
 pyautogui.FAILSAFE = True 
 pyautogui.PAUSE = 0.3 
@@ -51,14 +40,11 @@ def win_hotkey(*keys):
 
     codes = [VK_CODES.get(k.lower(), None) for k in keys]
     if None in codes:
-        # Если код не найден, фолбэк на pyautogui (может не сработать на RU)
         pyautogui.hotkey(*keys)
         return
 
-    # Нажать
     for code in codes:
         ctypes.windll.user32.keybd_event(code, 0, 0, 0)
-    # Отпустить
     for code in reversed(codes):
         ctypes.windll.user32.keybd_event(code, 0, 2, 0)
 
@@ -90,8 +76,6 @@ def execute_action(action_name, args):
 
     elif action_name == "click_at":
         x, y = denormalize(args.get("x"), args.get("y"))
-        if ufo_utils and ufo_utils.smart_click(x, y):
-            return {"output": f"System click performed at {x}, {y}"}
         pyautogui.click(x, y)
         return {"output": f"Clicked at {x}, {y}"}
 
@@ -117,11 +101,8 @@ def execute_action(action_name, args):
         pyautogui.click(x, y)
         time.sleep(0.5)
         
-        if ufo_utils:
-            ufo_utils.smart_type(x, y, text, clear=clear)
-        
         if clear:
-            mod = 'ctrl' # На Windows ctrl всегда работает для команд
+            mod = 'ctrl'
             if platform.system() == 'Darwin': mod = 'command'
             win_hotkey(mod, 'a')
             pyautogui.press('backspace')
@@ -145,11 +126,8 @@ def execute_action(action_name, args):
         keys_str = args.get("keys", "")
         if not keys_str: return {"error": "No keys provided"}
         keys = [k.strip().lower() for k in keys_str.split('+')]
-        
-        # Обрабатываем через WinAPI для стабильности
         mod_map = {'control': 'ctrl', 'command': 'win', 'meta': 'win'}
         clean_keys = [mod_map.get(k, k) for k in keys]
-        
         win_hotkey(*clean_keys)
         return {"output": f"Pressed keys: {keys_str}"}
 
