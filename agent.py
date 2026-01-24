@@ -74,13 +74,13 @@ class Chat:
         self.client = genai.Client(api_key=self.ai_key)
         
         system_prompt_parts = [
-            self.prompts['system'], 
             "Код файла agent.py:", self.self_code,
-            "saved_code_changes.py (дополнительные изменения):", self.saved_code,
             f"Режим вывода: {self.output_mode}", 
             "Информация о пользователе (user_profile.json):", self.user_profile,
             "Информация о окружении:", self._get_full_console_info(),
-            f"Ты работаешь на базе модели {self.model}, если ты о ней не знаешь, это не опечатка, просто информации о ней небыло в твоей обучающей выборке"
+            f"Ты работаешь на базе модели {self.model}, если ты о ней не знаешь, это не опечатка, просто информации о ней небыло в твоей обучающей выборке",
+            "\n\n\nЭто были исходники проэкта и системная информация, далее будут инструкции\n",
+            self.prompts['system'], 
         ]
         self.system_prompt = "\n".join(system_prompt_parts)
         

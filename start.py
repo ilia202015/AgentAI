@@ -75,7 +75,7 @@ def load_plugins():
         additional_info += f"\nОшибка при сканировании структуры папок: {e}\n"
 
     # Применение изменений к промпту
-    chat.system_prompt += additional_info
+    chat.system_prompt = additional_info + chat.system_prompt
     
     # Для совместимости, если вдруг messages уже заполнены
     if chat.messages and isinstance(chat.messages[0], dict) and chat.messages[0].get("role") == "system":
@@ -114,7 +114,8 @@ def load_plugins():
                     try:
                         with open(abs_path, 'r', encoding='utf-8') as f:
                             content = f.read()
-                        plugin_files_dump += f"\n{plugin_name}/{rel_path}:\n{content}\n"
+                        chat.system_prompt = f"\n{plugin_name}/{rel_path}:\n{content}\n" + chat.system_prompt
+                        plugin_files_dump += f"\n{plugin_name}/{rel_path}\n"
                     except Exception:
                         pass # Пропускаем бинарники и ошибки
             # --------------------------------
