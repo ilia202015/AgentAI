@@ -19,13 +19,13 @@ is_print_debug = True
 # Setup paths
 current_dir = os.path.dirname(os.path.abspath(__file__)) 
 plugins_dir = os.path.dirname(current_dir)
-agent_ext_dir = os.path.dirname(plugins_dir)
+root_dir = os.path.dirname(plugins_dir)
 
 if current_dir not in sys.path: sys.path.append(current_dir)
-if agent_ext_dir not in sys.path: sys.path.append(agent_ext_dir)
+if root_dir not in sys.path: sys.path.append(root_dir)
 
 # LOGGING
-LOG_FILE = os.path.join(agent_ext_dir, "server_debug.log")
+LOG_FILE = os.path.join(root_dir, "server_debug.log")
 def log_debug(msg):
     try:
         with open(LOG_FILE, "a", encoding="utf-8") as f:
@@ -351,7 +351,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             if ".." in filename or "/" in filename or "\\" in filename:
                 return self.send_json_error(403, "Invalid filename")
                 
-            file_path = os.path.join(agent_ext_dir, "chats", chat_id, "images", filename)
+            file_path = os.path.join(root_dir, "chats", chat_id, "images", filename)
             
             if os.path.exists(file_path):
                 self.send_response(200)

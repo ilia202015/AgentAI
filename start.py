@@ -12,7 +12,7 @@ try:
     from agent import Chat
 except ImportError:
     # Если запускаем не из agent_ext, а из корня
-    sys.path.append(os.path.join(current_dir, "agent_ext"))
+    sys.path.append(os.path.join(current_dir, "."))
     from agent import Chat
 
 def load_plugins():
@@ -38,7 +38,7 @@ def load_plugins():
     # 1. Код самого start.py
     try:
         with open(__file__, 'r', encoding='utf-8') as f:
-            additional_info += f"\nКод agent_ext/start.py:\n{f.read()}\n"
+            additional_info += f"\nКод start.py:\n{f.read()}\n"
     except Exception as e:
         additional_info += f"\nОшибка чтения start.py: {e}\n"
 
@@ -50,7 +50,7 @@ def load_plugins():
         additional_info += f"\nОшибка чтения plugin_config.json: {e}\n"
 
     # 3. Структура папок и файлов
-    additional_info += "\nСтруктура файлов (относительно agent_ext):\n"
+    additional_info += "\nСтруктура файлов (относительно корня):\n"
     try:
         for root, dirs, files in os.walk(current_dir):
             # Исключаем ненужные папки

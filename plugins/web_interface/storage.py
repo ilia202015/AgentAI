@@ -23,8 +23,8 @@ except ImportError:
 
 is_print_debug = False
 
-CHATS_DIR = "agent_ext/chats"
-CONFIG_PATH = "agent_ext/plugin_config.json"
+CHATS_DIR = "chats"
+CONFIG_PATH = "plugin_config.json"
 
 def ensure_chats_dir():
     if not os.path.exists(CHATS_DIR):

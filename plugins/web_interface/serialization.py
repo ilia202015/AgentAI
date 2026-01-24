@@ -8,7 +8,7 @@ def _save_image(chat_id, data_bytes, mime_type):
     if not chat_id:
         return None
         
-    base_dir = "agent_ext/chats"
+    base_dir = "chats"
     chat_dir = os.path.join(base_dir, str(chat_id), "images")
     os.makedirs(chat_dir, exist_ok=True)
     
@@ -28,7 +28,7 @@ def _save_image(chat_id, data_bytes, mime_type):
     return f"chats/{chat_id}/images/{filename}"
 
 def _load_image(path):
-    full_path = os.path.join("agent_ext", path)
+    full_path = os.path.join(".", path)
     if os.path.exists(full_path):
         with open(full_path, "rb") as f:
             return f.read()

@@ -57,7 +57,7 @@ class Chat:
         return "\n".join(report)
 
     def __init__(self, output_mode="user", count_tab=0, print_to_console=False):
-        self.agent_dir = "agent_ext"
+        self.agent_dir = "."
         self.output_mode = output_mode
         self.count_tab = count_tab
         self.print_to_console = print_to_console
@@ -124,7 +124,7 @@ class Chat:
         with open(f"{self.agent_dir}/user_profile.json", 'r', encoding="utf8") as f:
             self.user_profile = f.read()
         
-        self_code_path = "agent_ext/agent.py" if os.path.exists("agent_ext/agent.py") else __file__
+        self_code_path = "agent.py" if os.path.exists("agent.py") else __file__
         with open(self_code_path, 'r', encoding="utf8") as f:
             self.self_code = f.read()
         
@@ -135,9 +135,9 @@ class Chat:
         with open(saved_changes_path, 'r', encoding="utf8") as f:
             self.saved_code = f.read()
 
-        with open("agent_ext/keys/google.key", "r") as f:
+        with open("keys/google.key", "r") as f:
             self.google_search_key = f.read().strip()
-        with open("agent_ext/keys/search_engine.id", "r") as f:
+        with open("keys/search_engine.id", "r") as f:
             self.search_engine_id = f.read().strip()
 
     def _get_tools_dicts(self):
@@ -227,7 +227,7 @@ class Chat:
 
     def user_profile_tool(self, data):
         try:
-            profile_file = "agent_ext/user_profile.json"
+            profile_file = "user_profile.json"
             data = json.loads(data)
             with open(profile_file, 'r', encoding="utf8") as f:
                 user_profile = json.load(f)

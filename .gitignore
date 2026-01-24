@@ -26,7 +26,6 @@ env/
 ENV/
 
 # API keys and secrets
-*.id
 *.key
 api.key
 github.key
@@ -45,17 +44,9 @@ agent_min.log
 .DS_Store
 Thumbs.db
 
-chat.txt
-logs.txt
+user_profile.json
+todo
 
-# User profile data
-agent_med/user_profile.json
 
-# DnevnikRuAPI repository
-agent_med/gemini.key_num
-agent_med/saved_code_changes.py
-
-agent_ext/keys/*
-
-vanya/
-chats/*
+# Chat history
+chats/
