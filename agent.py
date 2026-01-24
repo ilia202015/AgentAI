@@ -277,15 +277,15 @@ class Chat:
 
 
     def sandbox_tool(self, action):
-    def sandbox_tool(self, action):
+        sandbox_dir = "sandbox"
+        log_file = "sandbox_agent.log"
+        full_log_path = os.path.join(sandbox_dir, log_file)
         import subprocess, sys, os, shutil, socket, re, json
         
         if 'sandbox_state' not in self.local_env:
             self.local_env['sandbox_state'] = {'process': None, 'port': None, 'pid': None}
         
         state = self.local_env['sandbox_state']
-        sandbox_dir = "sandbox"
-        log_file = "sandbox_agent.log"
         
         if action == "create":
             if os.path.exists(sandbox_dir):
@@ -329,6 +329,16 @@ class Chat:
             )
             state['process'] = proc
             state['pid'] = proc.pid
+
+            actual_port = "Неизвестен"
+            while True:
+                with open(full_log_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                    match = re.search(r"http://127.0.0.1:(\d+)", content)
+                    if match:
+                        actual_port = match.group(1)
+                        break
+
             return f"Запущена (PID: {proc.pid})."
 
         elif action == "info":
@@ -340,7 +350,6 @@ class Chat:
                 else: status = f"Завершен ({poll})"
             
             actual_port = "Неизвестен"
-            full_log_path = os.path.join(sandbox_dir, log_file)
             logs = ""
             if os.path.exists(full_log_path):
                 with open(full_log_path, 'r', encoding='utf-8', errors='ignore') as f:
