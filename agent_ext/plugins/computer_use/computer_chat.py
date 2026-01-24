@@ -47,7 +47,7 @@ class ComputerUseChat(Chat):
         if hasattr(tools, 'monitor'):
             tools.monitor.update_last_pos()
         
-        final_report = "Задача завершена."
+        final_report = ""
         
         try:
             try:
@@ -87,7 +87,7 @@ class ComputerUseChat(Chat):
                 # Проверка вмешательства пользователя
                 if hasattr(tools, 'monitor') and tools.monitor.check():
                     self.print("⚠️ Обнаружено вмешательство пользователя! Прерывание работы.")
-                    final_report = "Работа прервана пользователем (движение мыши или ввод)."
+                    final_report += "\nРабота прервана пользователем (движение мыши или ввод)."
                     break
 
                 try:
@@ -97,11 +97,11 @@ class ComputerUseChat(Chat):
                         config=config
                     )
                 except Exception as e:
-                    final_report = f"Ошибка API: {e}"
+                    final_report += f"\nОшибка API: {e}"
                     break
 
                 if not response.candidates:
-                    final_report = "Ошибка: Пустой ответ от модели."
+                    final_report += "\nОшибка: Пустой ответ от модели."
                     break
 
                 candidate = response.candidates[0]
@@ -110,6 +110,7 @@ class ComputerUseChat(Chat):
                 if candidate.content.parts:
                     for part in candidate.content.parts:
                         if part.text:
+                            final_report += part.text
                             self.print(f"🤖 {part.text}")
                             if hasattr(self, 'web_emit'):
                                 self.web_emit("thought", part.text)
@@ -119,7 +120,6 @@ class ComputerUseChat(Chat):
                 function_calls = [p.function_call for p in candidate.content.parts if p.function_call]
                 
                 if not function_calls:
-                    final_report = "Задача завершена."
                     break
 
                 # Исполнение
@@ -195,7 +195,7 @@ class ComputerUseChat(Chat):
                                  p.function_response.parts = None
             
             if i >= turn_limit - 1:
-                final_report = "Превышен лимит ходов."
+                final_report += "\nПревышен лимит ходов."
                 
         finally:
             if hasattr(tools, 'overlay'):
