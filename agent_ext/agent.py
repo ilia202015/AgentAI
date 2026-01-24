@@ -64,14 +64,11 @@ class Chat:
         self.chats = {}
         self.last_send_time = 0
         
-        # free
-        #self.model, self.model_rpm = "gemini-2.5-pro", 2
-        #self.model, self.model_rpm = "gemini-2.5-flash", 10
-
-        # tier 1
-        #self.model, self.model_rpm = "gemini-3-pro-preview", 25
-        self.model, self.model_rpm = "gemini-3-flash-preview", 1000
-        #self.model, self.model_rpm = "gemini-2.5-pro", 150
+        self.models = [ #(name, rpm)
+            ("gemini-3-pro-preview", 25),
+            ("gemini-3-flash-preview", 1000)
+        ]
+        self.model, self.model_rpm = self.models[0]
 
         self._load_config()
         self.client = genai.Client(api_key=self.ai_key)
