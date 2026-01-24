@@ -277,6 +277,7 @@ class Chat:
 
 
     def sandbox_tool(self, action):
+    def sandbox_tool(self, action):
         import subprocess, sys, os, shutil, socket, re, json
         
         if 'sandbox_state' not in self.local_env:
@@ -364,6 +365,7 @@ class Chat:
                 subprocess.run(f"powershell -Command \"Remove-Item -Path '{sandbox_dir}' -Recurse -Force\"", shell=True)
                 return "Удалена."
             return "Не найдена."
+
 
     def validate_python_code(self, code):
         try:
