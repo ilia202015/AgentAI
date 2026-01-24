@@ -81,7 +81,7 @@ export default {
                     <!-- Footer -->
                     <div class="p-4 border-t border-white/5 bg-black/20 backdrop-blur-sm space-y-3">
                         <!-- Model Selector -->
-                        <div v-if="store.currentChatId && store.currentChatId !== 'temp'" class="px-1 py-1">
+                        <div v-if="store.currentChatId" class="px-1 py-1">
                             <label class="text-[10px] text-gray-500 ml-1 mb-1 block">Модель чата:</label>
                             <select v-model="selectedModel" @change="updateModel" 
                                 class="w-full bg-gray-900 border border-white/10 rounded-lg py-1.5 px-2 text-xs text-gray-300 focus:outline-none focus:border-blue-500/50">
@@ -162,7 +162,8 @@ export default {
             }
             store.currentChatId = 'temp';
             store.setMessages([]);
-            selectedModel.value = '';
+            selectedModel.value = 'gemini-3-flash-preview';
+            store.currentModel = 'gemini-3-flash-preview';
             if (window.innerWidth < 768) store.closeSidebarMobile();
         };
         

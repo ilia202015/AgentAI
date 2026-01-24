@@ -218,7 +218,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             finally:
                 if cid != 'temp':
                     try:
-                        storage.save_chat_state(agent)
+                        if cid != 'temp': storage.save_chat_state(agent)
                     except Exception as e:
                         print(f"Auto-save failed for {cid}: {e}")
 
@@ -321,7 +321,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 if m == model_name: rpm = r
             agent.model = model_name
             agent.model_rpm = rpm
-            storage.save_chat_state(agent)
+            if cid != 'temp': storage.save_chat_state(agent)
             self.send_json({"status": "model_changed", "model": model_name})
         else:
             self.send_json_error(404, "Chat not found")
