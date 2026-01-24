@@ -301,3 +301,10 @@ def rename_chat(id, new_name, get_chat):
         return False
     
     return True
+
+def clear_chat_context(id):
+    pkl_path = os.path.join(CHATS_DIR, f"{id}.pkl")
+    if os.path.exists(pkl_path):
+        os.remove(pkl_path)
+        return True
+    return False

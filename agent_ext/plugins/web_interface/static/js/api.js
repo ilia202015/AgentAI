@@ -71,3 +71,22 @@ export async function startTempChat() {
     const res = await fetch(`${API_BASE}/temp`, { method: 'POST' });
     return res.json();
 }
+
+export async function fetchModels() {
+    const res = await fetch(`${API_BASE}/models`);
+    return await res.json();
+}
+
+export async function changeModel(chatId, modelName) {
+    const res = await fetch(`${API_BASE}/chats/${chatId}/model`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: modelName })
+    });
+    return await res.json();
+}
+
+export async function clearContext(chatId) {
+    const res = await fetch(`${API_BASE}/chats/${chatId}/clear-context`, { method: 'POST' });
+    return await res.json();
+}

@@ -291,7 +291,7 @@ const MessageBubble = defineComponent({
             
             <div class="flex items-center gap-2 mb-1 px-1 opacity-60 text-xs font-medium tracking-wide">
                 <span v-if="msg.role === 'assistant' || msg.role === 'model'" class="flex items-center gap-1.5 text-blue-400">
-                        <i class="ph-fill ph-robot"></i> Агент
+                        <i class="ph-fill ph-robot"></i> Агент<span class="ml-2 px-1.5 py-0.5 rounded-md bg-white/5 text-[9px] font-mono border border-white/5 opacity-50">{{ msg.model || store.currentModel }}</span>
                 </span>
                 <span v-else class="text-gray-400 flex items-center gap-2">
                     <span>Вы</span>
@@ -475,7 +475,7 @@ const MessageBubble = defineComponent({
              }
         };
 
-        return { processedTimeline, isEditing, editContent, startEdit, cancelEdit, saveEdit, copyToClipboard };
+        return { store, processedTimeline, isEditing, editContent, startEdit, cancelEdit, saveEdit, copyToClipboard };
     }
 });
 

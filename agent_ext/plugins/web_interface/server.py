@@ -161,6 +161,8 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             elif path.endswith("/load"): self.api_load_chat(path)
             elif path.endswith("/save"): self.api_save_chat(path)
             elif path.endswith("/edit"): self.api_edit_message(path, data)
+            elif path.endswith("/clear-context"): self.api_clear_context(path)
+            elif path.endswith("/model"): self.api_change_model(path, data)
             else: self.send_json_error(404, "Endpoint not found")
         except Exception as e:
             self.send_json_error(500, str(e))
@@ -292,12 +294,46 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
              self.active_chats[cid].stop_requested = True
         self.send_json({"status": "ok"})
 
+
+    def api_clear_context(self, path):
+        cid = path.split("/")[-2]
+        if storage.clear_chat_context(cid):
+            if cid in self.active_chats:
+                # Пересоздаем агент из JSON
+                new_agent, _ = storage.load_chat_state(cid, self.clone_root_chat)
+                if new_agent:
+                    new_agent.client = self.ai_client
+                    self.active_chats[cid] = new_agent
+            self.send_json({"status": "context_cleared"})
+        else:
+            self.send_json_error(404, "PKL not found")
+
+    def api_change_model(self, path, data):
+        cid = path.split("/")[-2]
+        model_name = data.get("model")
+        if not model_name: return self.send_json_error(400, "No model")
+        
+        agent = self.get_agent_for_chat(cid)
+        if agent:
+            # Находим RPM для модели
+            rpm = 25
+            for m, r in agent.models:
+                if m == model_name: rpm = r
+            agent.model = model_name
+            agent.model_rpm = rpm
+            storage.save_chat_state(agent)
+            self.send_json({"status": "model_changed", "model": model_name})
+        else:
+            self.send_json_error(404, "Chat not found")
+
     def handle_api_get(self, path, query):
         if is_print_debug:
             print(f"handle_api_get({path}, {query})")
 
         if path == "/api/chats": 
             self.send_json(storage.list_chats())
+        elif path == "/api/models":
+            self.send_json(self.root_chat.models)
         else: 
             self.send_json({})
 

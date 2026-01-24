@@ -68,7 +68,7 @@ class Chat:
             ("gemini-3-pro-preview", 25),
             ("gemini-3-flash-preview", 1000)
         ]
-        self.model, self.model_rpm = self.models[0]
+        self.model, self.model_rpm = self.models[1]
 
         self._load_config()
         self.client = genai.Client(api_key=self.ai_key)

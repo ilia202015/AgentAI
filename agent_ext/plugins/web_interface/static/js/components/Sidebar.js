@@ -1,7 +1,7 @@
 
 import { store } from '../store.js';
 import * as api from '../api.js';
-import { onMounted, ref, computed, nextTick } from 'vue';
+import { onMounted, ref, computed, nextTick, watch } from 'vue';
 
 export default {
     template: `
@@ -18,7 +18,7 @@ export default {
                     store.isSidebarVisibleDesktop ? 'md:w-[280px]' : 'md:w-0 md:border-none md:overflow-hidden'
                  ]">
                 
-                <div class="flex flex-col h-full w-[280px]"> <!-- Inner container fixed width to prevent content squishing -->
+                <div class="flex flex-col h-full w-[280px]"> 
                     
                     <!-- Header -->
                     <div class="p-5 flex justify-between items-center">
@@ -71,6 +71,7 @@ export default {
                             <div class="text-[11px] truncate opacity-50 leading-relaxed font-light">{{ chat.preview }}</div>
                             
                             <div class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-gray-900/80 backdrop-blur rounded-lg p-1 shadow-xl border border-white/10" :class="editingId === chat.id ? 'hidden' : ''">
+                                <button @click.stop="clearContext(chat.id)" class="p-1.5 hover:text-amber-400 hover:bg-white/10 rounded-md transition-colors" title="Очистить контекст (удалить PKL)"><i class="ph ph-eraser"></i></button>
                                 <button @click.stop="startRename(chat)" class="p-1.5 hover:text-blue-400 hover:bg-white/10 rounded-md transition-colors" title="Переименовать"><i class="ph ph-pencil-simple"></i></button>
                                 <button @click.stop="deleteChat(chat.id)" class="p-1.5 hover:text-red-400 hover:bg-white/10 rounded-md transition-colors" title="Удалить"><i class="ph ph-trash"></i></button>
                             </div>
@@ -79,12 +80,21 @@ export default {
                     
                     <!-- Footer -->
                     <div class="p-4 border-t border-white/5 bg-black/20 backdrop-blur-sm space-y-3">
+                        <!-- Model Selector -->
+                        <div v-if="store.currentChatId && store.currentChatId !== 'temp'" class="px-1 py-1">
+                            <label class="text-[10px] text-gray-500 ml-1 mb-1 block">Модель чата:</label>
+                            <select v-model="selectedModel" @change="updateModel" 
+                                class="w-full bg-gray-900 border border-white/10 rounded-lg py-1.5 px-2 text-xs text-gray-300 focus:outline-none focus:border-blue-500/50">
+                                <option v-for="m in store.models" :key="m[0]" :value="m[0]">{{ m[0] }}</option>
+                            </select>
+                        </div>
+
                         <button @click="startTemp" class="w-full flex items-center gap-3 p-2 rounded-lg transition-all duration-200" :class="store.currentChatId === 'temp' ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' : 'hover:bg-white/5 text-gray-400 border border-transparent'">
                             <div class="w-6 h-6 rounded flex items-center justify-center bg-purple-500/20"><i class="ph-bold ph-ghost text-purple-400"></i></div>
                             <div class="flex flex-col items-start"><span class="text-xs font-medium">Временный чат</span><span class="text-[9px] opacity-60">Без сохранения истории</span></div>
                         </button>
                         <div class="flex items-center gap-3 pt-1">
-                            <div class="w-2 h-2 rounded-full animate-pulse" :class="connected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500'"></div>
+                            <div class="w-2 h-2 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)] bg-emerald-500"></div>
                             <div class="flex flex-col"><span class="text-xs font-medium text-gray-300">Агент онлайн</span><span class="text-[10px] text-gray-600">v1.6.2 • {{ store.chats.length }} чатов</span></div>
                         </div>
                     </div>
@@ -94,6 +104,7 @@ export default {
     `,
     setup() {
         const searchQuery = ref('');
+        const selectedModel = ref('');
         const editingId = ref(null);
         const editName = ref('');
         const editInput = ref(null);
@@ -103,6 +114,34 @@ export default {
             const q = searchQuery.value.toLowerCase();
             return store.chats.filter(c => (c.name || '').toLowerCase().includes(q) || (c.preview || '').toLowerCase().includes(q));
         });
+
+        const refreshModels = async () => {
+            const res = await api.fetchModels();
+            if (Array.isArray(res)) store.models = res;
+        };
+
+        const updateModel = async () => {
+            if (store.currentChatId && selectedModel.value) {
+                const res = await api.changeModel(store.currentChatId, selectedModel.value);
+                if (res.status === 'model_changed') {
+                    store.addToast('Модель изменена', 'success');
+                    store.currentModel = selectedModel.value;
+                }
+            }
+        };
+
+        const clearContext = async (id) => {
+            if (confirm('Это удалит переменные и окружение Python, но сохранит историю. Продолжить?')) {
+                const res = await api.clearContext(id);
+                if (res.status === 'context_cleared') {
+                    store.addToast('Контекст очищен', 'success');
+                    if (store.currentChatId === id) {
+                         const data = await api.loadChat(id);
+                         store.setMessages(data.chat.messages);
+                    }
+                }
+            }
+        };
 
         const createNew = async () => {
             const chat = await api.createChat();
@@ -123,6 +162,7 @@ export default {
             }
             store.currentChatId = 'temp';
             store.setMessages([]);
+            selectedModel.value = '';
             if (window.innerWidth < 768) store.closeSidebarMobile();
         };
         
@@ -140,8 +180,6 @@ export default {
         
         const selectChat = async (id) => {
             if (editingId.value) return; 
-            
-            // Если уже выбран этот чат, ничего не делаем
             if (store.currentChatId === id) return;
 
             try {
@@ -152,6 +190,10 @@ export default {
                 }
                 store.currentChatId = id;
                 store.setMessages(data.chat.messages);
+                if (data.chat && data.chat.model) {
+                    selectedModel.value = data.chat.model;
+                    store.currentModel = data.chat.model;
+                }
             } catch (e) { 
                 console.error(e); 
                 store.addToast("Ошибка соединения", 'error'); 
@@ -161,7 +203,8 @@ export default {
 
         const startRename = async (chat) => {
             editingId.value = chat.id; editName.value = chat.name;
-            await nextTick(); const el = document.querySelector('input[class*="bg-gray-950"]'); if (el) el.focus();
+            await nextTick();
+            if (editInput.value) editInput.value.focus();
         };
 
         const saveRename = async (chat) => {
@@ -177,7 +220,9 @@ export default {
             }
             editingId.value = null;
         };
+
         const cancelRename = () => { editingId.value = null; }
+
         const refreshList = async () => { 
             const res = await api.fetchChats(); 
             if (Array.isArray(res)) store.chats = res;
@@ -185,11 +230,27 @@ export default {
         
         const checkCurrent = async () => {
              const current = await api.fetchCurrentChat();
-             if (current && current.id) { store.currentChatId = current.id; store.setMessages(current.messages); }
+             if (current && current.id) { 
+                 store.currentChatId = current.id; 
+                 store.setMessages(current.messages);
+                 if (current.model) {
+                     selectedModel.value = current.model;
+                     store.currentModel = current.model;
+                 }
+             }
         }
         
-        onMounted(async () => { await refreshList(); await checkCurrent(); });
+        onMounted(async () => { 
+            await refreshList(); 
+            await refreshModels();
+            await checkCurrent(); 
+        });
         
-        return { store, createNew, deleteChat, selectChat, startTemp, connected: true, searchQuery, filteredChats, editingId, editName, startRename, saveRename, cancelRename, editInput };
+        return { 
+            store, createNew, deleteChat, selectChat, startTemp, 
+            searchQuery, filteredChats, editingId, editName, 
+            startRename, saveRename, cancelRename, editInput,
+            selectedModel, updateModel, clearContext
+        };
     }
 }

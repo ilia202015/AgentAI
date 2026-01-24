@@ -6,6 +6,8 @@ export const store = reactive({
     chats: [],
     messages: [],
     isThinking: false,
+    models: [],
+    currentModel: '',
     
     // UI State
     isSidebarOpenMobile: false, 
