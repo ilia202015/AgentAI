@@ -8,14 +8,11 @@ export async function fetchChats() {
 }
 
 export async function loadChat(id) {
-    // В новой архитектуре loadChat - это просто получение истории.
-    // Агент инициализируется лениво при первом send.
     const res = await fetch(`${API_BASE}/chats/${id}/load`, { method: 'POST' });
     return res.json();
 }
 
 export async function fetchCurrentChat() {
-    // Legacy support, or use local storage
     return null; 
 }
 

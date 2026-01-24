@@ -12,6 +12,7 @@ export const store = reactive({
     // UI State
     isSidebarOpenMobile: false, 
     isSidebarVisibleDesktop: true,
+    isBgEnabled: localStorage.getItem('agent_bg_enabled') === 'true',
     
     toasts: [], 
     
@@ -22,31 +23,22 @@ export const store = reactive({
         }
         
         this.messages = msgs.map(m => {
-            if (m.items && Array.isArray(m.items)) {
-                return m;
-            }
+            if (m.items && Array.isArray(m.items)) return m;
 
             const items = [];
             
-            if (m.thoughts) {
-                items.push({ type: 'thought', content: m.thoughts });
-            }
+            if (m.thoughts) items.push({ type: 'thought', content: m.thoughts });
             
             if (m.tools && Array.isArray(m.tools)) {
                 m.tools.forEach(t => items.push({ type: 'tool', ...t }));
             }
             
-            // NEW PARSING LOGIC
             if (m.parts && Array.isArray(m.parts)) {
                 m.parts.forEach(p => {
                     if (p.text) {
-                        // Try to merge with previous text item
                         const last = items.length > 0 ? items[items.length - 1] : null;
-                        if (last && last.type === 'text') {
-                            last.content += p.text;
-                        } else {
-                            items.push({ type: 'text', content: p.text });
-                        }
+                        if (last && last.type === 'text') last.content += p.text;
+                        else items.push({ type: 'text', content: p.text });
                     } else if (p.image_url) {
                         items.push({ type: 'images', content: [p.image_url] });
                     } else if (p.function_call) {
@@ -67,23 +59,14 @@ export const store = reactive({
                  items.push({ type: 'text', content: m.content });
             }
             
-            // Fallback for user messages or empty parts
-            if (items.length === 0 && m.content) {
-                 items.push({ type: 'text', content: m.content });
-            }
+            if (items.length === 0 && m.content) items.push({ type: 'text', content: m.content });
             
-            // Legacy images support
             if (m.images && Array.isArray(m.images) && m.images.length > 0) {
                  const hasImages = items.some(i => i.type === 'images');
-                 if (!hasImages) {
-                      items.push({ type: 'images', content: m.images });
-                 }
+                 if (!hasImages) items.push({ type: 'images', content: m.images });
             }
 
-            return {
-                ...m,
-                items: items
-            };
+            return { ...m, items: items };
         });
     },
     
@@ -91,9 +74,7 @@ export const store = reactive({
         const type = payload.type;
         const data = payload.data;
 
-        if (this.messages.length === 0) {
-             this.messages.push({ role: 'assistant', items: [] });
-        }
+        if (this.messages.length === 0) this.messages.push({ role: 'assistant', items: [] });
         
         let lastMsg = this.messages[this.messages.length - 1];
         
@@ -107,35 +88,21 @@ export const store = reactive({
         const lastItem = items.length > 0 ? items[items.length - 1] : null;
 
         if (type === 'text') {
-            if (lastItem && lastItem.type === 'text') {
-                lastItem.content += data;
-            } else {
-                items.push({ type: 'text', content: data });
-            }
+            if (lastItem && lastItem.type === 'text') lastItem.content += data;
+            else items.push({ type: 'text', content: data });
         } 
         else if (type === 'thought') {
-            if (lastItem && lastItem.type === 'thought') {
-                lastItem.content += data;
-            } else {
-                items.push({ type: 'thought', content: data });
-            }
+            if (lastItem && lastItem.type === 'thought') lastItem.content += data;
+            else items.push({ type: 'thought', content: data });
         }
         else if (type === 'tool') {
             items.push({ type: 'tool', ...data });
         }
     },
 
-    toggleSidebarMobile() {
-        this.isSidebarOpenMobile = !this.isSidebarOpenMobile;
-    },
-    
-    toggleSidebarDesktop() {
-        this.isSidebarVisibleDesktop = !this.isSidebarVisibleDesktop;
-    },
-
-    closeSidebarMobile() {
-        this.isSidebarOpenMobile = false;
-    },
+    toggleSidebarMobile() { this.isSidebarOpenMobile = !this.isSidebarOpenMobile; },
+    toggleSidebarDesktop() { this.isSidebarVisibleDesktop = !this.isSidebarVisibleDesktop; },
+    closeSidebarMobile() { this.isSidebarOpenMobile = false; },
 
     addToast(message, type = 'info') {
         const id = Date.now();
@@ -143,5 +110,10 @@ export const store = reactive({
         setTimeout(() => {
             this.toasts = this.toasts.filter(t => t.id !== id);
         }, 3000);
+    },
+    
+    toggleBg() {
+        this.isBgEnabled = !this.isBgEnabled;
+        localStorage.setItem('agent_bg_enabled', this.isBgEnabled);
     }
 });

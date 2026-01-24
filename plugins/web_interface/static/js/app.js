@@ -1,5 +1,6 @@
-import { createApp, defineComponent } from 'vue';
+import { createApp, defineComponent, watch } from 'vue';
 import { store } from './store.js';
+import { bgManager } from './bg_effect.js';
 import Sidebar from './components/Sidebar.js';
 import ChatArea from './components/ChatArea.js';
 
@@ -27,7 +28,7 @@ const ToastContainer = defineComponent({
 const App = {
     components: { Sidebar, ChatArea, ToastContainer },
     template: `
-        <div class="flex w-full h-full font-sans antialiased bg-gray-950 text-gray-200">
+        <div class="flex w-full h-full font-sans antialiased bg-gray-950 text-gray-200 relative overflow-hidden">
             <ToastContainer />
             <Sidebar />
             <ChatArea />
@@ -45,7 +46,6 @@ const App = {
                     const payload = JSON.parse(event.data);
                     
                     if (payload && payload.chatId) {
-                        // Обработка уведомлений (даже если чат не в фокусе)
                         if (payload.type === 'notification') {
                             if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
                                 const n = new Notification(payload.data.title || "Agent AI", {
@@ -55,12 +55,10 @@ const App = {
                                 n.onclick = () => {
                                     window.focus();
                                     store.currentChatId = payload.chatId;
-                                    // Можно добавить fetch чата если он не загружен
                                 };
                             }
                         }
 
-                        // Обновление интерфейса текущего чата
                         if (store.currentChatId === payload.chatId) {
                             if (payload.type === 'finish') {
                                 store.isThinking = false;
@@ -82,9 +80,22 @@ const App = {
 
         initSSE();
         
-        // Запрос разрешений на уведомления
         if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
             Notification.requestPermission();
+        }
+        
+        // Background Effect Watcher
+        watch(() => store.isBgEnabled, (val) => {
+            if (val) bgManager.init();
+            else bgManager.stop();
+        });
+        
+        // Init Bg if enabled
+        if (store.isBgEnabled) {
+            bgManager.init();
+        } else {
+            // Ensure clean state
+            bgManager.stop();
         }
         
         setTimeout(() => store.addToast('Агент готов к работе', 'success'), 1000);

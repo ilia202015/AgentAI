@@ -10,7 +10,7 @@ export default {
                  class="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 md:hidden transition-opacity"></div>
 
             <!-- Sidebar Container -->
-            <div class="fixed inset-y-0 left-0 w-[280px] bg-gray-950/95 backdrop-blur-xl border-r border-white/5 flex flex-col h-full flex-shrink-0 z-40 transition-transform duration-300 transform"
+            <div class="fixed inset-y-0 left-0 w-[280px] bg-gray-950/60 backdrop-blur-xl border-r border-white/5 flex flex-col h-full flex-shrink-0 z-40 transition-transform duration-300 transform"
                  :class="[
                     store.isSidebarOpenMobile ? 'translate-x-0' : '-translate-x-full',
                     'md:relative md:translate-x-0', 
@@ -27,6 +27,11 @@ export default {
                             </div>
                             <span class="font-bold text-gray-100 tracking-tight">Agent AI</span>
                         </div>
+                        <button @click="store.toggleBg()" class="p-1.5 rounded-lg hover:bg-white/10 transition-colors" 
+                            :class="store.isBgEnabled ? 'text-purple-400 bg-purple-500/10' : 'text-gray-500'" 
+                            title="Динамический фон">
+                            <i class="ph-bold ph-sparkle"></i>
+                        </button>
                     </div>
                     
                     <!-- New Chat Button -->
@@ -43,7 +48,7 @@ export default {
                         <div class="relative group">
                             <i class="ph ph-magnifying-glass absolute left-3 top-2.5 text-gray-500 group-focus-within:text-blue-400 transition-colors"></i>
                             <input type="text" placeholder="Поиск чатов..." v-model="searchQuery"
-                                class="w-full bg-gray-900/50 border border-white/5 rounded-lg py-2 pl-9 pr-3 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:bg-gray-900 transition-all">
+                                class="w-full bg-gray-900/40 border border-white/5 rounded-lg py-2 pl-9 pr-3 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:bg-gray-900/60 transition-all">
                         </div>
                     </div>
 
@@ -58,7 +63,7 @@ export default {
                             @click="selectChat(chat.id)"
                             class="group relative p-3 rounded-xl cursor-pointer transition-all duration-200 border border-transparent"
                             :class="chat.id === store.currentChatId 
-                                ? 'bg-white/10 border-white/5 shadow-sm' 
+                                ? 'bg-white/10 border-white/5 shadow-sm backdrop-blur-md' 
                                 : 'hover:bg-white/5 text-gray-400 hover:text-gray-200'"
                         >
                             <div v-if="editingId === chat.id" class="mb-1">
@@ -80,14 +85,14 @@ export default {
                     <!-- Footer -->
                     <div class="p-4 border-t border-white/5 bg-black/20 backdrop-blur-sm space-y-3 relative">
                         
-                        <!-- Model Selector (Custom Dropdown) -->
+                        <!-- Model Selector -->
                         <div v-if="store.currentChatId" class="relative" ref="modelMenuRef">
                              <div class="flex items-center justify-between mb-1.5 px-1">
                                 <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Модель</label>
                              </div>
                              
                              <button @click="isModelMenuOpen = !isModelMenuOpen" 
-                                class="w-full bg-gray-900/50 border border-white/10 rounded-xl py-2 px-3 flex items-center justify-between text-xs text-gray-200 hover:bg-gray-800/80 hover:border-white/20 transition-all duration-200 group">
+                                class="w-full bg-gray-900/40 border border-white/10 rounded-xl py-2 px-3 flex items-center justify-between text-xs text-gray-200 hover:bg-gray-800/60 hover:border-white/20 transition-all duration-200 group">
                                 <div class="flex items-center gap-2 truncate pr-2">
                                     <div class="w-5 h-5 rounded bg-blue-500/10 flex items-center justify-center flex-shrink-0">
                                         <i class="ph-fill ph-lightning text-blue-400 text-xs"></i>
@@ -97,9 +102,8 @@ export default {
                                 <i class="ph-bold ph-caret-down text-gray-500 group-hover:text-gray-300 transition-transform duration-200" :class="isModelMenuOpen ? 'rotate-180' : ''"></i>
                             </button>
                             
-                            <!-- Dropdown (Opens DOWNWARDS) -->
                             <div v-if="isModelMenuOpen" 
-                                class="absolute top-full left-0 right-0 mt-2 bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[60] animate-fade-in-up origin-top">
+                                class="absolute bottom-full left-0 right-0 mb-2 bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[60] animate-fade-in-up origin-bottom">
                                 <div class="p-1 max-h-48 overflow-y-auto custom-scrollbar">
                                     <button v-for="m in store.models" :key="m[0]" @click="selectModel(m[0])"
                                         class="w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between group transition-all duration-150"
@@ -122,7 +126,7 @@ export default {
                               <span v-if="connected" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                               <span class="relative inline-flex rounded-full h-2 w-2" :class="connected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500'"></span>
                             </div>
-                            <div class="flex flex-col"><span class="text-xs font-medium text-gray-300">Агент онлайн</span><span class="text-[10px] text-gray-600">v1.6.4 • {{ store.chats.length }} чатов</span></div>
+                            <div class="flex flex-col"><span class="text-xs font-medium text-gray-300">Агент онлайн</span><span class="text-[10px] text-gray-600">v1.6.5 • {{ store.chats.length }} чатов</span></div>
                         </div>
                     </div>
                 </div>
