@@ -15,6 +15,9 @@ except ImportError:
     sys.path.append(os.path.join(current_dir, "."))
     from agent import Chat
 
+# Список папок, которые мы всегда игнорируем (библиотеки, кэши, временные данные)
+EXCLUDE_DIRS = {".git", "__pycache__", ".venv", "venv", "env", "node_modules", "libs", "chats", "sandbox"}
+
 def load_plugins():
     config_path = os.path.join(current_dir, "plugin_config.json")
     if not os.path.exists(config_path):
@@ -53,8 +56,8 @@ def load_plugins():
     additional_info += "\nСтруктура файлов (относительно корня):\n"
     try:
         for root, dirs, files in os.walk(current_dir):
-            # Исключаем ненужные папки
-            dirs[:] = [d for d in dirs if d not in [".git", "__pycache__", "venv", "env"]]
+            # Фильтрация папок (удаляем исключенные папки из списка обхода)
+            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
             
             level = root.replace(current_dir, '').count(os.sep)
             indent = ' ' * 4 * level
@@ -99,11 +102,8 @@ def load_plugins():
             # --- Сбор всех файлов плагина ---
             plugin_files_dump = ""
             for root, dirs, files in os.walk(plugin_path):
-                # Фильтрация папок
-                if "prompts" in dirs: dirs.remove("prompts")
-                if "libs" in dirs: dirs.remove("libs")
-                if "__pycache__" in dirs: dirs.remove("__pycache__")
-                if "node_modules" in dirs: dirs.remove("node_modules") # На всякий случай
+                # Фильтрация папок: исключаем библиотеки и папку prompts (т.к. она грузится отдельно)
+                dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS and d != "prompts"]
                 
                 for file in files:
                     if file.endswith(".pyc") or file == ".DS_Store": continue
