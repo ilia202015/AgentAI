@@ -171,6 +171,31 @@
           ]
         }
       }
+    },
+    {
+      "function": {
+        "name": "sandbox",
+        "description": "Prompt 'sandbox' not found.",
+        "parameters": {
+          "type": "OBJECT",
+          "properties": {
+            "action": {
+              "type": "STRING",
+              "enum": [
+                "create",
+                "start",
+                "stop",
+                "info",
+                "delete"
+              ],
+              "description": "Действие с песочницей."
+            }
+          },
+          "required": [
+            "action"
+          ]
+        }
+      }
     }
   ]
 }
