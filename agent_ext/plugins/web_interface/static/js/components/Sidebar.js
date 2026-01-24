@@ -1,7 +1,6 @@
-
 import { store } from '../store.js';
 import * as api from '../api.js';
-import { onMounted, ref, computed, nextTick, watch } from 'vue';
+import { onMounted, onUnmounted, ref, computed, nextTick, watch } from 'vue';
 
 export default {
     template: `
@@ -79,23 +78,51 @@ export default {
                     </div>
                     
                     <!-- Footer -->
-                    <div class="p-4 border-t border-white/5 bg-black/20 backdrop-blur-sm space-y-3">
-                        <!-- Model Selector -->
-                        <div v-if="store.currentChatId" class="px-1 py-1">
-                            <label class="text-[10px] text-gray-500 ml-1 mb-1 block">Модель чата:</label>
-                            <select v-model="selectedModel" @change="updateModel" 
-                                class="w-full bg-gray-900 border border-white/10 rounded-lg py-1.5 px-2 text-xs text-gray-300 focus:outline-none focus:border-blue-500/50">
-                                <option v-for="m in store.models" :key="m[0]" :value="m[0]">{{ m[0] }}</option>
-                            </select>
+                    <div class="p-4 border-t border-white/5 bg-black/20 backdrop-blur-sm space-y-3 relative">
+                        
+                        <!-- Model Selector (Custom Dropdown) -->
+                        <div v-if="store.currentChatId" class="relative" ref="modelMenuRef">
+                             <div class="flex items-center justify-between mb-1.5 px-1">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Модель</label>
+                             </div>
+                             
+                             <button @click="isModelMenuOpen = !isModelMenuOpen" 
+                                class="w-full bg-gray-900/50 border border-white/10 rounded-xl py-2 px-3 flex items-center justify-between text-xs text-gray-200 hover:bg-gray-800/80 hover:border-white/20 transition-all duration-200 group">
+                                <div class="flex items-center gap-2 truncate pr-2">
+                                    <div class="w-5 h-5 rounded bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                                        <i class="ph-fill ph-lightning text-blue-400 text-xs"></i>
+                                    </div>
+                                    <span class="truncate font-medium">{{ selectedModel || 'Загрузка...' }}</span>
+                                </div>
+                                <i class="ph-bold ph-caret-down text-gray-500 group-hover:text-gray-300 transition-transform duration-200" :class="isModelMenuOpen ? 'rotate-180' : ''"></i>
+                            </button>
+                            
+                            <!-- Dropdown (Opens DOWNWARDS) -->
+                            <div v-if="isModelMenuOpen" 
+                                class="absolute top-full left-0 right-0 mt-2 bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[60] animate-fade-in-up origin-top">
+                                <div class="p-1 max-h-48 overflow-y-auto custom-scrollbar">
+                                    <button v-for="m in store.models" :key="m[0]" @click="selectModel(m[0])"
+                                        class="w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between group transition-all duration-150"
+                                        :class="selectedModel === m[0] ? 'bg-blue-600/10 text-blue-400' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'">
+                                        <span class="font-medium truncate">{{ m[0] }}</span>
+                                        <i v-if="selectedModel === m[0]" class="ph-bold ph-check text-blue-500"></i>
+                                        <span v-else class="text-[9px] opacity-0 group-hover:opacity-50 bg-white/10 px-1.5 py-0.5 rounded transition-opacity">{{ m[1] }} RPM</span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
 
-                        <button @click="startTemp" class="w-full flex items-center gap-3 p-2 rounded-lg transition-all duration-200" :class="store.currentChatId === 'temp' ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' : 'hover:bg-white/5 text-gray-400 border border-transparent'">
-                            <div class="w-6 h-6 rounded flex items-center justify-center bg-purple-500/20"><i class="ph-bold ph-ghost text-purple-400"></i></div>
+                        <button @click="startTemp" class="w-full flex items-center gap-3 p-2 rounded-lg transition-all duration-200 group relative z-10" :class="store.currentChatId === 'temp' ? 'bg-purple-500/20 text-purple-200 border border-purple-500/30' : 'hover:bg-white/5 text-gray-400 border border-transparent'">
+                            <div class="w-6 h-6 rounded flex items-center justify-center bg-purple-500/20 group-hover:scale-110 transition-transform"><i class="ph-bold ph-ghost text-purple-400"></i></div>
                             <div class="flex flex-col items-start"><span class="text-xs font-medium">Временный чат</span><span class="text-[9px] opacity-60">Без сохранения истории</span></div>
                         </button>
-                        <div class="flex items-center gap-3 pt-1">
-                            <div class="w-2 h-2 rounded-full animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)] bg-emerald-500"></div>
-                            <div class="flex flex-col"><span class="text-xs font-medium text-gray-300">Агент онлайн</span><span class="text-[10px] text-gray-600">v1.6.2 • {{ store.chats.length }} чатов</span></div>
+                        
+                        <div class="flex items-center gap-3 pt-1 px-1 relative z-10">
+                            <div class="relative flex h-2 w-2">
+                              <span v-if="connected" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                              <span class="relative inline-flex rounded-full h-2 w-2" :class="connected ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500'"></span>
+                            </div>
+                            <div class="flex flex-col"><span class="text-xs font-medium text-gray-300">Агент онлайн</span><span class="text-[10px] text-gray-600">v1.6.4 • {{ store.chats.length }} чатов</span></div>
                         </div>
                     </div>
                 </div>
@@ -105,28 +132,35 @@ export default {
     setup() {
         const searchQuery = ref('');
         const selectedModel = ref('');
-        const editingId = ref(null);
-        const editName = ref('');
-        const editInput = ref(null);
-
-        const filteredChats = computed(() => {
-            if (!searchQuery.value) return store.chats;
-            const q = searchQuery.value.toLowerCase();
-            return store.chats.filter(c => (c.name || '').toLowerCase().includes(q) || (c.preview || '').toLowerCase().includes(q));
-        });
-
+        const isModelMenuOpen = ref(false);
+        const modelMenuRef = ref(null);
+        
         const refreshModels = async () => {
             const res = await api.fetchModels();
-            if (Array.isArray(res)) store.models = res;
+            if (Array.isArray(res)) {
+                store.models = res;
+                if (!selectedModel.value && res.length > 0) {
+                     // Auto select logic
+                }
+            }
         };
+
+        const selectModel = async (modelName) => {
+            selectedModel.value = modelName;
+            isModelMenuOpen.value = false;
+            await updateModel();
+        }
 
         const updateModel = async () => {
             if (store.currentChatId && selectedModel.value) {
                 const res = await api.changeModel(store.currentChatId, selectedModel.value);
-                if (res.status === 'model_changed') {
-                    store.addToast('Модель изменена', 'success');
-                    store.currentModel = selectedModel.value;
-                }
+                if (res.status === 'model_changed') store.addToast('Модель изменена', 'success');
+            }
+        };
+
+        const handleClickOutside = (event) => {
+            if (modelMenuRef.value && !modelMenuRef.value.contains(event.target)) {
+                isModelMenuOpen.value = false;
             }
         };
 
@@ -142,6 +176,16 @@ export default {
                 }
             }
         };
+
+        const editingId = ref(null);
+        const editName = ref('');
+        const editInput = ref(null);
+
+        const filteredChats = computed(() => {
+            if (!searchQuery.value) return store.chats;
+            const q = searchQuery.value.toLowerCase();
+            return store.chats.filter(c => (c.name || '').toLowerCase().includes(q) || (c.preview || '').toLowerCase().includes(q));
+        });
 
         const createNew = async () => {
             const chat = await api.createChat();
@@ -162,8 +206,6 @@ export default {
             }
             store.currentChatId = 'temp';
             store.setMessages([]);
-            selectedModel.value = 'gemini-3-flash-preview';
-            store.currentModel = 'gemini-3-flash-preview';
             if (window.innerWidth < 768) store.closeSidebarMobile();
         };
         
@@ -191,10 +233,13 @@ export default {
                 }
                 store.currentChatId = id;
                 store.setMessages(data.chat.messages);
-                if (data.chat && data.chat.model) {
+                
+                if (data.chat.model) {
                     selectedModel.value = data.chat.model;
-                    store.currentModel = data.chat.model;
+                } else {
+                    if (store.models.length > 0 && !selectedModel.value) selectedModel.value = store.models[1][0]; 
                 }
+
             } catch (e) { 
                 console.error(e); 
                 store.addToast("Ошибка соединения", 'error'); 
@@ -204,8 +249,7 @@ export default {
 
         const startRename = async (chat) => {
             editingId.value = chat.id; editName.value = chat.name;
-            await nextTick();
-            if (editInput.value) editInput.value.focus();
+            await nextTick(); const el = document.querySelector('input[class*="bg-gray-950"]'); if (el) el.focus();
         };
 
         const saveRename = async (chat) => {
@@ -221,9 +265,7 @@ export default {
             }
             editingId.value = null;
         };
-
         const cancelRename = () => { editingId.value = null; }
-
         const refreshList = async () => { 
             const res = await api.fetchChats(); 
             if (Array.isArray(res)) store.chats = res;
@@ -232,26 +274,46 @@ export default {
         const checkCurrent = async () => {
              const current = await api.fetchCurrentChat();
              if (current && current.id) { 
-                 store.currentChatId = current.id; 
-                 store.setMessages(current.messages);
-                 if (current.model) {
-                     selectedModel.value = current.model;
-                     store.currentModel = current.model;
-                 }
+                store.currentChatId = current.id; 
+                store.setMessages(current.messages);
+                if (current.model) selectedModel.value = current.model;
              }
         }
         
-        onMounted(async () => { 
-            await refreshList(); 
-            await refreshModels();
-            await checkCurrent(); 
+        onMounted(async () => {
+             document.addEventListener('click', handleClickOutside);
+             await refreshModels();
+             await refreshList();
+             if (!selectedModel.value && store.models.length > 0) {
+                 selectedModel.value = store.models[1][0]; 
+             }
+        });
+        
+        onUnmounted(() => {
+            document.removeEventListener('click', handleClickOutside);
         });
         
         return { 
-            store, createNew, deleteChat, selectChat, startTemp, 
-            searchQuery, filteredChats, editingId, editName, 
-            startRename, saveRename, cancelRename, editInput,
-            selectedModel, updateModel, clearContext
+            store, 
+            selectedModel, 
+            updateModel, 
+            isModelMenuOpen,
+            selectModel,
+            modelMenuRef,
+            clearContext, 
+            createNew, 
+            deleteChat, 
+            selectChat, 
+            startTemp, 
+            connected: true, 
+            searchQuery, 
+            filteredChats, 
+            editingId, 
+            editName, 
+            startRename, 
+            saveRename, 
+            cancelRename, 
+            editInput 
         };
     }
 }
