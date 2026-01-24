@@ -275,6 +275,96 @@ class Chat:
     def python_str_tool(self, text):
         return repr(text)
 
+
+    def sandbox_tool(self, action):
+        import subprocess, sys, os, shutil, socket, re, json
+        
+        if 'sandbox_state' not in self.local_env:
+            self.local_env['sandbox_state'] = {'process': None, 'port': None, 'pid': None}
+        
+        state = self.local_env['sandbox_state']
+        sandbox_dir = "sandbox"
+        log_file = "sandbox_agent.log"
+        
+        if action == "create":
+            if os.path.exists(sandbox_dir):
+                if state['process'] and state['process'].poll() is None:
+                    state['process'].terminate()
+                    state['process'].wait()
+            
+            cmd = f"powershell -Command \"if (Test-Path '{sandbox_dir}') {{ Remove-Item -Path '{sandbox_dir}' -Recurse -Force }}; New-Item -ItemType Directory -Path '{sandbox_dir}'; Get-ChildItem -Exclude '{sandbox_dir}' | Copy-Item -Destination '{sandbox_dir}' -Recurse -Force\""
+            subprocess.run(cmd, shell=True)
+            
+            if os.path.exists(".gitignore"):
+                with open(".gitignore", "r+") as f:
+                    content = f.read()
+                    if "sandbox/" not in content:
+                        f.write("\nsandbox/")
+            return "Песочница создана успешно."
+
+        elif action == "start":
+            if state['process'] and state['process'].poll() is None:
+                return f"Уже запущена (PID: {state['pid']})"
+            
+            port_to_try = 8081
+            found_port = None
+            while port_to_try < 8095:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    if s.connect_ex(('127.0.0.1', port_to_try)) != 0:
+                        found_port = port_to_try
+                        break
+                port_to_try += 1
+            
+            if not found_port: return "Нет свободных портов."
+            
+            env = os.environ.copy()
+            env["PYTHONIOENCODING"] = "utf-8"
+            proc = subprocess.Popen(
+                [sys.executable, 'start.py'],
+                cwd=sandbox_dir,
+                stdout=open(os.path.join(sandbox_dir, log_file), 'w', encoding='utf-8'),
+                stderr=subprocess.STDOUT,
+                env=env
+            )
+            state['process'] = proc
+            state['pid'] = proc.pid
+            return f"Запущена (PID: {proc.pid})."
+
+        elif action == "info":
+            status = "Остановлен"
+            pid = state.get('pid')
+            if state['process']:
+                poll = state['process'].poll()
+                if poll is None: status = "Работает"
+                else: status = f"Завершен ({poll})"
+            
+            actual_port = "Неизвестен"
+            full_log_path = os.path.join(sandbox_dir, log_file)
+            logs = ""
+            if os.path.exists(full_log_path):
+                with open(full_log_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                    logs = "\n".join(content.splitlines()[-5:])
+                    match = re.search(r"http://127.0.0.1:(\d+)", content)
+                    if match: actual_port = match.group(1)
+
+            return json.dumps({"status": status, "pid": pid, "port": actual_port, "logs": logs}, ensure_ascii=False)
+
+        elif action == "stop":
+            if state['process'] and state['process'].poll() is None:
+                state['process'].terminate()
+                return "Остановлена."
+            return "Не запущена."
+
+        elif action == "delete":
+            if state['process'] and state['process'].poll() is None:
+                state['process'].terminate()
+                state['process'].wait()
+            if os.path.exists(sandbox_dir):
+                subprocess.run(f"powershell -Command \"Remove-Item -Path '{sandbox_dir}' -Recurse -Force\"", shell=True)
+                return "Удалена."
+            return "Не найдена."
+
     def validate_python_code(self, code):
         try:
             ast.parse(code)
