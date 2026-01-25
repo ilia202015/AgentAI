@@ -30,7 +30,7 @@ def main(chat, settings):
     tool_def = {
         "function": {
             "name": "start_computer_session",
-            "description": "Запускает сессию управления компьютером (Computer Use). Используй этот инструмент, когда нужно выполнить действия в браузере или операционной системе (найти информацию, кликнуть, ввести текст). Агент будет делать скриншоты и управлять мышью/клавиатурой.",
+            "description": chat.prompts["start_computer_session"],
             "parameters": {
                 "type": "OBJECT",
                 "properties": {
