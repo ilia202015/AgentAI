@@ -16,7 +16,7 @@ except ImportError:
     from agent import Chat
 
 # Список папок, которые мы всегда игнорируем (библиотеки, кэши, временные данные)
-EXCLUDE_DIRS = {".git", "__pycache__", ".venv", "venv", "env", "node_modules", "libs", "chats", "sandbox"}
+EXCLUDE_DIRS = {".git", "__pycache__", ".venv", "venv", "env", "node_modules", "libs", "chats", "sandbox", "temp"}
 
 def load_plugins():
     config_path = os.path.join(current_dir, "plugin_config.json")
