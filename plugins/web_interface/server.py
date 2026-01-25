@@ -475,11 +475,15 @@ def run_server(chat):
     chat.client = None
     chat.web_queue = None
     WebRequestHandler.root_chat = chat
+    print(f"WebRequestHandler настроен")
 
     if not os.path.exists(STATIC_DIR): 
+        print(f"Папки {STATIC_DIR} не существует, создаю...")
         os.makedirs(STATIC_DIR)
+    print(f"Поиск порта...")
     port = get_free_port(START_PORT)
     log_debug(f"Server starting on {port}")
+    print(f"Порт получен: {port}")
     try:
         server = socketserver.ThreadingTCPServer((HOST, port), WebRequestHandler)
         server.allow_reuse_address = True

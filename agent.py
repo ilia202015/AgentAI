@@ -279,8 +279,8 @@ class Chat:
     def sandbox_tool(self, action):
         sandbox_dir = "sandbox"
         log_file = "sandbox_agent.log"
+        import subprocess, sys, os, socket, re, json
         full_log_path = os.path.join(sandbox_dir, log_file)
-        import subprocess, sys, os, shutil, socket, re, json
         
         if 'sandbox_state' not in self.local_env:
             self.local_env['sandbox_state'] = {'process': None, 'port': None, 'pid': None}
@@ -301,13 +301,13 @@ class Chat:
                     content = f.read()
                     if "sandbox/" not in content:
                         f.write("\nsandbox/")
-            return "Песочница создана успешно."
+                return "Песочница создана успешно."
 
         elif action == "start":
             if state['process'] and state['process'].poll() is None:
                 return f"Уже запущена (PID: {state['pid']})"
             
-            port_to_try = 8081
+            port_to_try = 8080
             found_port = None
             while port_to_try < 8095:
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -374,6 +374,7 @@ class Chat:
                 subprocess.run(f"powershell -Command \"Remove-Item -Path '{sandbox_dir}' -Recurse -Force\"", shell=True)
                 return "Удалена."
             return "Не найдена."
+        return "Неверная команда"
 
 
     def validate_python_code(self, code):
