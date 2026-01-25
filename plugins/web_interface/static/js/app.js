@@ -1,3 +1,4 @@
+import * as api from './api.js';
 import { createApp, defineComponent, watch } from 'vue';
 import { store } from './store.js';
 import { bgManager } from './bg_effect.js';
@@ -35,6 +36,20 @@ const App = {
         </div>
     `,
     setup() {
+        window.agentSend = (text) => {
+            if (store.currentChatId && text) {
+                store.isThinking = true;
+                const msg = { role: 'user', content: text, items: [{type: 'text', content: text}] };
+                store.messages.push(msg);
+                api.sendMessage(store.currentChatId, text);
+                // Прокрутка вниз
+                setTimeout(() => {
+                    const container = document.querySelector('.overflow-y-auto');
+                    if (container) container.scrollTop = container.scrollHeight;
+                }, 100);
+            }
+        };
+
         const initSSE = () => {
             console.log("Connecting to SSE...");
             const eventSource = new EventSource('/stream');
