@@ -301,9 +301,11 @@ class Chat:
                     content = f.read()
                     if "sandbox/" not in content:
                         f.write("\nsandbox/")
-                return "Песочница создана успешно."
+            return "Песочница создана успешно."
 
         elif action == "start":
+            if not os.path.exists(sandbox_dir):
+                self.sandbox_tool("create")
             if state['process'] and state['process'].poll() is None:
                 return f"Уже запущена (PID: {state['pid']})"
             
@@ -339,7 +341,7 @@ class Chat:
                         actual_port = match.group(1)
                         break
 
-            return f"Запущена (PID: {proc.pid})."
+            return self.sandbox_tool("info")
 
         elif action == "info":
             status = "Остановлен"
