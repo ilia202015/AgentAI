@@ -51,6 +51,7 @@ except ImportError:
     log_debug(f"Plugin Init import failed")
 
 HOST = "127.0.0.1"
+#HOST = "192.168.123.10"
 START_PORT = 8080
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 

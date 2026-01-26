@@ -22,6 +22,8 @@ try:
 except ImportError:
     import tools
 
+EXCLUDED_PREDEFINED_FUNCTIONS = ["open_web_browser"]
+
 class ComputerUseChat(Chat):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -51,10 +53,6 @@ class ComputerUseChat(Chat):
             except Exception as e:
                 return f"Ошибка захвата экрана: {e}"
             
-            if hasattr(self, 'web_emit'):
-                b64_img = base64.b64encode(screenshot_bytes).decode('utf-8')
-                self.web_emit("computer_view", {"image": f"data:image/png;base64,{b64_img}"} )
-
             user_content = types.Content(
                 role="user",
                 parts=[
@@ -67,7 +65,8 @@ class ComputerUseChat(Chat):
             config = types.GenerateContentConfig(
                 tools=[types.Tool(
                     computer_use=types.ComputerUse(
-                        environment=types.Environment.ENVIRONMENT_UNSPECIFIED
+                        environment=types.Environment.ENVIRONMENT_UNSPECIFIED,
+                        excluded_predefined_functions=EXCLUDED_PREDEFINED_FUNCTIONS
                     )
                 )],
                 thinking_config=types.ThinkingConfig(include_thoughts=True),
@@ -191,18 +190,11 @@ class ComputerUseChat(Chat):
                                  p.function_response.parts = None
             
             if i >= turn_limit - 1:
-                final_report += "\nПревышен лимит ходов."
+                final_report += "\nДостигнут лимит ходов."
                 
         finally:
             if hasattr(tools, 'overlay'):
                 tools.overlay.stop()
-            
-            # Отправка браузерного уведомления
-            if hasattr(self, 'web_emit'):
-                self.web_emit("notification", {
-                    "title": "Computer Use завершен",
-                    "body": final_report
-                })
             
             # Оставляем системное как запасной вариант (опционально)
             # if hasattr(tools, 'show_completion_notification'):

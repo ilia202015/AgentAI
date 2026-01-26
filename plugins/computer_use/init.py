@@ -61,10 +61,6 @@ def main(chat, settings):
         # Создаем дочерний чат для Computer Use
         computer_agent = ComputerUseChat(print_to_console=True, count_tab=self.count_tab + 1)
         
-        # Передаем web_emit для стриминга
-        if hasattr(self, 'web_emit'):
-            computer_agent.web_emit = self.web_emit
-            
         result = computer_agent.run_task(task)
         return result
 
