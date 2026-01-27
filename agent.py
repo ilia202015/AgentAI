@@ -408,11 +408,14 @@ class Chat:
         return True
 
     def tool_exec(self, name, tool_args):
+        import json
+        import copy
+        
         tools_dict_required, tools_dict_additional = self._get_tools_dicts()
         required = tools_dict_required.get(name, [])
         additional = tools_dict_additional.get(name, [])
 
-        # Логирование
+        # Логирование запроса
         if name == 'python' and 'code' in tool_args:
             self.print_code(f"Запрос {name}", tool_args['code'])
         else:
@@ -438,7 +441,16 @@ class Chat:
                     self.python_tool(call_string, no_print=True)
                     tool_result = self.local_env.get("result")
 
-                self.print_code(f"Результат {name}", str(tool_result))
+                # Логирование результата (с очисткой от тяжелых данных)
+                print_result = tool_result
+                if isinstance(tool_result, dict):
+                    clean_result = copy.deepcopy(tool_result)
+                    if "images" in clean_result:
+                        count = len(clean_result["images"]) if isinstance(clean_result["images"], list) else 1
+                        clean_result["images"] = f"< {count} images omitted from logs >"
+                    print_result = json.dumps(clean_result, ensure_ascii=False, indent=2)
+                
+                self.print_code(f"Результат {name}", print_result)
                 return tool_result 
 
         except Exception as e:
@@ -607,7 +619,9 @@ class Chat:
             return f"Ошибка обработки стрима: {e}"
 
     def _execute_tool_calls(self, tool_calls):
-        # Gemini Protocol: Model -> User (FunctionResponse) -> Model
+        import json
+        import base64
+        from google.genai import types
         
         response_parts = []
         
@@ -615,28 +629,66 @@ class Chat:
             name = fc.name
             args = fc.args
             
-            # Приводим аргументы к dict
             if not isinstance(args, dict):
-                 try:
-                     args = json.loads(args)
-                 except:
-                     args = {}
+                try:
+                    args = json.loads(args)
+                except:
+                    args = {}
 
-            # Выполнение
-            result_str = self.tool_exec(name, args)
-
-            # Формируем ответ
+            # Выполнение инструмента
+            result = self.tool_exec(name, args)
+            
+            # Подготовка данных для FunctionResponse
+            res_payload = {"result": result}
+            fr_parts = []
+            
+            # Если инструмент вернул словарь, проверяем наличие изображений
+            if isinstance(result, dict):
+                res_payload = result.copy()
+                # Извлекаем изображения, если они есть
+                images = res_payload.pop("images", [])
+                if not isinstance(images, list):
+                    images = [images]
+                
+                for img in images:
+                    try:
+                        if isinstance(img, str):
+                            if "base64," in img:
+                                header, b64_str = img.split("base64,", 1)
+                                mime = header.split(":")[1].split(";")[0]
+                                data = base64.b64decode(b64_str)
+                            else:
+                                data = base64.b64decode(img)
+                                mime = "image/jpeg"
+                        elif isinstance(img, bytes):
+                            data = img
+                            mime = "image/jpeg"
+                        else:
+                            continue
+                            
+                        # Используем структуру для мультимодальных ответов инструментов
+                        fr_parts.append(types.FunctionResponsePart(
+                            inline_data=types.FunctionResponseBlob(
+                                mime_type=mime,
+                                data=data
+                            )
+                        ))
+                    except Exception as e:
+                        self.print(f"Ошибка обработки изображения в ответе инструмента: {e}")
+            
+            # Создаем Part с ответом функции
             response_parts.append(types.Part(
                 function_response=types.FunctionResponse(
                     name=name,
-                    response={"result": result_str} 
+                    response=res_payload,
+                    parts=fr_parts if fr_parts else None
                 )
             ))
         
-        # Добавляем ответы инструментов в историю (от имени user)
+        # Добавляем ответы инструментов в историю (от имени user по протоколу Gemini)
         self.messages.append(types.Content(role="user", parts=response_parts))
 
-        # Продолжаем диалог
+        # Продолжаем диалог с новыми данными
         return self._process_request()
 
     def _switch_api_key(self):
