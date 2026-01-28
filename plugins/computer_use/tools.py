@@ -181,6 +181,9 @@ def denormalize(x, y):
     return int(float(x) / 1000 * w), int(float(y) / 1000 * h)
 
 def execute_action(action_name, args):
+    if monitor.check():
+         return {"error": "Interrupted by user"}
+
     if action_name == "open_web_browser": #EXCLUDED
         url = args.get("url", "https://google.com")
         webbrowser.open(url)
