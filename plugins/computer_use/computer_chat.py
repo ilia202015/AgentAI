@@ -1,3 +1,4 @@
+import threading
 import sys
 import os
 import time
@@ -37,6 +38,7 @@ class ComputerUseChat(Chat):
             self.system_prompt = f.read()
     
     def run_task(self, task_description):
+        self.stop_requested = False
         self.print(f"🖥️ Computer Use Agent начал работу: {task_description}")
         
         # Запуск индикации и мониторинга
@@ -85,14 +87,36 @@ class ComputerUseChat(Chat):
                     final_report += "\nРабота прервана пользователем (движение мыши или ввод)."
                     break
 
-                try:
-                    response = self.client.models.generate_content(
-                        model=self.model,
-                        contents=self.messages,
-                        config=config
-                    )
-                except Exception as e:
-                    final_report += f"\nОшибка API: {e}"
+                # Генерация в отдельном потоке для возможности прерывания
+                res_container = [None]
+                def get_api_response():
+                    try:
+                        res_container[0] = self.client.models.generate_content(
+                            model=self.model,
+                            contents=self.messages,
+                            config=config
+                        )
+                    except Exception as e:
+                        res_container[0] = e
+
+                api_thread = threading.Thread(target=get_api_response, daemon=True)
+                api_thread.start()
+
+                # Ожидание с проверкой монитора
+                while api_thread.is_alive():
+                    if hasattr(tools, 'monitor') and tools.monitor.check():
+                        self.stop_requested = True
+                        break
+                    time.sleep(0.1)
+
+                if self.stop_requested:
+                    self.print("⚠️ Обнаружено вмешательство пользователя! Прерывание работы.")
+                    final_report += "\nРабота прервана пользователем во время генерации."
+                    break
+
+                response = res_container[0]
+                if isinstance(response, Exception):
+                    final_report += f"\nОшибка API: {response}"
                     break
 
                 if not response.candidates:

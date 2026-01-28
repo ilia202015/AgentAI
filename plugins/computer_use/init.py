@@ -1,3 +1,4 @@
+import traceback
 import types
 import json
 import os
@@ -58,11 +59,17 @@ def main(chat, settings):
         print("🔌 Computer Use tool registered.")
     
     def start_computer_session_tool(self, task):
-        # Создаем дочерний чат для Computer Use
-        computer_agent = ComputerUseChat(print_to_console=True, count_tab=self.count_tab + 1)
-        
-        result = computer_agent.run_task(task)
-        return result
+        try:
+            # Создаем дочерний чат для Computer Use
+            computer_agent = ComputerUseChat(print_to_console=True, count_tab=self.count_tab + 1)
+            # Передаем текущий клиент (с учетом патчей и настроек)
+            computer_agent.client = self.client
+            
+            result = computer_agent.run_task(task)
+            return result
+        except Exception as e:
+            error_trace = traceback.format_exc()
+            return f"Критическая ошибка при запуске сессии Computer Use: {e}\n{error_trace}"""
 
     chat.start_computer_session_tool = types.MethodType(start_computer_session_tool, chat)
     
