@@ -45,11 +45,6 @@ except ImportError:
     log_debug(f"Serialization import failed")
     serialization = None
 
-try:
-    import init as plugin_init
-except ImportError:
-    log_debug(f"Plugin Init import failed")
-
 HOST = "127.0.0.1"
 #HOST = "192.168.123.10"
 START_PORT = 8080
