@@ -87,3 +87,31 @@ export async function clearContext(chatId) {
     const res = await fetch(`${API_BASE}/chats/${chatId}/clear-context`, { method: 'POST' });
     return await res.json();
 }
+
+export async function fetchFinalPrompts() {
+    const res = await fetch(`${API_BASE}/final-prompts`);
+    return await res.json();
+}
+
+export async function saveFinalPrompt(id, name, text, makeActive = false) {
+    const res = await fetch(`${API_BASE}/final-prompts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, name, text, make_active: makeActive })
+    });
+    return await res.json();
+}
+
+export async function selectFinalPrompt(id) {
+    const res = await fetch(`${API_BASE}/final-prompts/select`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+    });
+    return await res.json();
+}
+
+export async function deleteFinalPrompt(id) {
+    const res = await fetch(`${API_BASE}/final-prompts/${id}`, { method: 'DELETE' });
+    return await res.json();
+}

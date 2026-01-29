@@ -102,7 +102,13 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 new_agent = self.clone_root_chat()
                 
                 # 2. Setup ID
-                new_agent.id = id # 'temp'
+                new_agent.id = id
+                # Inject active final prompt
+                final_text = storage.get_active_final_prompt_text()
+                if final_text and hasattr(new_agent, 'system_prompt'):
+                    if storage.WEB_PROMPT_MARKER_START not in new_agent.system_prompt:
+                        new_agent.system_prompt += f"\n\n{storage.WEB_PROMPT_MARKER_START}\n{final_text}\n{storage.WEB_PROMPT_MARKER_END}"
+
                 self.active_chats[id] = new_agent
                 return new_agent
             else:
@@ -117,6 +123,12 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                     
                 if warning:
                     print(warning)
+                
+                # Inject active final prompt
+                final_text = storage.get_active_final_prompt_text()
+                if final_text and hasattr(chat, 'system_prompt'):
+                    if storage.WEB_PROMPT_MARKER_START not in chat.system_prompt:
+                         chat.system_prompt += f"\n\n{storage.WEB_PROMPT_MARKER_START}\n{final_text}\n{storage.WEB_PROMPT_MARKER_END}"
                 self.active_chats[id] = chat
                 return chat
 
@@ -180,14 +192,24 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
     def do_DELETE(self):
          try:
              path = self.path.split('?')[0]
-             cid = path.split("/")[-1]
-             if storage.delete_chat(cid):
-                if cid in self.active_chats: del self.active_chats[cid]
-                self.send_json({"status": "deleted"})
-             else: self.send_json_error(404, "Not found")
+             if path.startswith("/api/final-prompts/"):
+                p_id = path.split("/")[-1]
+                config = storage.get_final_prompts_config()
+                if p_id in config["prompts"]:
+                    del config["prompts"][p_id]
+                    if config["active_id"] == p_id: config["active_id"] = next(iter(config["prompts"]), None)
+                    storage.save_final_prompts_config(config)
+                    self.send_json({"status": "deleted"})
+                else: self.send_json_error(404, "Not found")
+             else:
+                cid = path.split("/")[-1]
+                if storage.delete_chat(cid):
+                   if cid in self.active_chats: del self.active_chats[cid]
+                   self.send_json({"status": "deleted"})
+                else: self.send_json_error(404, "Not found")
          except Exception as e: self.send_json_error(500, str(e))
 
-    # Handlers
+        # Handlers
     def api_send(self, data):
         if is_print_debug:
             print(f"api_send(chatId={data.get('chatId')}, msg_len={len(data.get('message', ''))}, images={len(data.get('images', []))})")
@@ -331,12 +353,12 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
 
         if path == "/api/chats": 
             self.send_json(storage.list_chats())
+        elif path == "/api/final-prompts":
+            self.send_json(storage.get_final_prompts_config())
         elif path == "/api/models":
             self.send_json(self.root_chat.models)
         else: 
             self.send_json({})
-
-    
 
     def serve_chat_image(self, query):
         try:

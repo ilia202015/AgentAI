@@ -9,6 +9,11 @@ import sys
 import types
 import queue
 import traceback
+import re
+PROMPTS_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "final_prompts.json")
+WEB_PROMPT_MARKER_START = "### WEB_PROMPT_START ###"
+WEB_PROMPT_MARKER_END = "### WEB_PROMPT_END ###"
+
 
 # Import serialization utils
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -204,6 +209,11 @@ def save_chat_state(chat):
     if serialization:
         messages_json = serialization.serialize_history(chat.messages, chat_id=chat.id)
     
+    
+    # Clean system prompt from web injection before saving
+    if hasattr(chat, 'system_prompt') and chat.system_prompt:
+        pattern = re.escape(WEB_PROMPT_MARKER_START) + r".*?" + re.escape(WEB_PROMPT_MARKER_END)
+        chat.system_prompt = re.sub(pattern, "", chat.system_prompt, flags=re.DOTALL).strip()
     base_data = {
         "id": chat.id,
         "updated_at": datetime.datetime.now().isoformat(),
@@ -308,3 +318,36 @@ def clear_chat_context(id):
         os.remove(pkl_path)
         return True
     return False
+
+def get_final_prompts_config():
+    if not os.path.exists(PROMPTS_CONFIG_PATH):
+        # Default prompt with existing rules
+        default_prompt = """=== ЭКСПЕРТНЫЕ ВОЗМОЖНОСТИ ИНТЕРФЕЙСА ===
+1. Изоляция UI: Используй <div class="not-prose font-sans">...</div>
+2. JS: Используй <img src="x" style="display:none" onerror="...">
+3. Markdown: Никаких отступов в 4 пробела внутри HTML!
+4. Tailwind: Используй flex, grid и тени для дашбордов."""
+        config = {
+            "active_id": "default",
+            "prompts": {
+                "default": {"name": "UI Expert", "text": default_prompt}
+            }
+        }
+        save_final_prompts_config(config)
+        return config
+    try:
+        with open(PROMPTS_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return {"active_id": None, "prompts": {}}
+
+def save_final_prompts_config(config):
+    with open(PROMPTS_CONFIG_PATH, 'w', encoding='utf-8') as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
+def get_active_final_prompt_text():
+    config = get_final_prompts_config()
+    active_id = config.get("active_id")
+    if active_id and active_id in config.get("prompts", {}):
+        return config["prompts"][active_id].get("text", "")
+    return ""

@@ -4,6 +4,7 @@ import { store } from './store.js';
 import { bgManager } from './bg_effect.js';
 import Sidebar from './components/Sidebar.js';
 import ChatArea from './components/ChatArea.js';
+import PromptPanel from './components/PromptPanel.js';
 
 // --- Toast Component (Global) ---
 const ToastContainer = defineComponent({
@@ -27,12 +28,13 @@ const ToastContainer = defineComponent({
 });
 
 const App = {
-    components: { Sidebar, ChatArea, ToastContainer },
+    components: { Sidebar, ChatArea, PromptPanel, ToastContainer },
     template: `
         <div class="flex w-full h-full font-sans antialiased bg-gray-950 text-gray-200 relative overflow-hidden">
             <ToastContainer />
             <Sidebar />
             <ChatArea />
+            <PromptPanel />
         </div>
     `,
     setup() {

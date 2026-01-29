@@ -20,12 +20,12 @@ export default {
                 <div class="flex flex-col h-full w-[280px]"> 
                     
                     <!-- Header -->
-                    <div class="p-5 flex justify-between items-center">
+                    <div class="p-5 flex justify-between items-center text-gray-100">
                         <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                                <i class="ph-bold ph-robot text-white text-lg"></i>
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/20 text-white">
+                                <i class="ph-bold ph-robot text-lg"></i>
                             </div>
-                            <span class="font-bold text-gray-100 tracking-tight">Agent AI</span>
+                            <span class="font-bold tracking-tight">Agent AI</span>
                         </div>
                         <button @click="store.toggleBg()" class="p-1.5 rounded-lg hover:bg-white/10 transition-colors" 
                             :class="store.isBgEnabled ? 'text-purple-400 bg-purple-500/10' : 'text-gray-500'" 
@@ -84,7 +84,6 @@ export default {
                     
                     <!-- Footer -->
                     <div class="p-4 border-t border-white/5 bg-black/20 backdrop-blur-sm space-y-3 relative">
-                        
                         <!-- Model Selector -->
                         <div v-if="store.currentChatId" class="relative" ref="modelMenuRef">
                              <div class="flex items-center justify-between mb-1.5 px-1">
@@ -143,9 +142,6 @@ export default {
             const res = await api.fetchModels();
             if (Array.isArray(res)) {
                 store.models = res;
-                if (!selectedModel.value && res.length > 0) {
-                     // Auto select logic
-                }
             }
         };
 
@@ -275,15 +271,6 @@ export default {
             if (Array.isArray(res)) store.chats = res;
         };
         
-        const checkCurrent = async () => {
-             const current = await api.fetchCurrentChat();
-             if (current && current.id) { 
-                store.currentChatId = current.id; 
-                store.setMessages(current.messages);
-                if (current.model) selectedModel.value = current.model;
-             }
-        }
-        
         onMounted(async () => {
              document.addEventListener('click', handleClickOutside);
              await refreshModels();
@@ -317,7 +304,7 @@ export default {
             startRename, 
             saveRename, 
             cancelRename, 
-            editInput 
+            editInput
         };
     }
 }

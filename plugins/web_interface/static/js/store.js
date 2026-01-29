@@ -12,9 +12,12 @@ export const store = reactive({
     // UI State
     isSidebarOpenMobile: false, 
     isSidebarVisibleDesktop: true,
+    isPromptPanelOpen: false,
     isBgEnabled: localStorage.getItem('agent_bg_enabled') === 'true',
     
-    toasts: [], 
+    toasts: [],
+    finalPrompts: {},
+    activePromptId: null, 
     
     setMessages(msgs) {
         if (!msgs) {

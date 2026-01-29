@@ -218,12 +218,22 @@ const MessageBubble = defineComponent({
 export default {
     components: { MessageBubble },
     template: `
-        <div class="flex-1 flex flex-col h-full relative z-10 min-w-0" @dragover.prevent="onDragOver" @dragenter.prevent="onDragOver">
+        <div class="flex-1 flex flex-col h-full relative z-10 min-w-0 transition-all duration-300 ease-in-out" @dragover.prevent="onDragOver" @dragenter.prevent="onDragOver">
             <div class="hidden md:block absolute top-4 left-2 z-50">
                 <button @click="store.toggleSidebarDesktop()" class="p-2 rounded-lg bg-gray-900/50 backdrop-blur border border-white/10 text-gray-400 hover:text-white transition-colors shadow-sm">
                     <i class="ph-bold" :class="store.isSidebarVisibleDesktop ? 'ph-caret-left' : 'ph-caret-right'"></i>
                 </button>
             </div>
+            
+            <div class="absolute top-4 right-4 z-50 flex gap-2">
+                <button @click="store.isPromptPanelOpen = !store.isPromptPanelOpen" 
+                        class="p-2 rounded-lg bg-gray-900/50 backdrop-blur border border-white/10 text-gray-400 hover:text-blue-400 transition-all shadow-sm"
+                        :class="store.isPromptPanelOpen ? 'text-blue-400 border-blue-500/30 bg-blue-500/10' : ''"
+                        title="Настроить инструкции">
+                    <i class="ph-bold ph-terminal-window"></i>
+                </button>
+            </div>
+
             <div class="md:hidden absolute top-4 left-4 z-50">
                 <button @click="store.toggleSidebarMobile()" class="p-2 rounded-lg bg-gray-900/80 backdrop-blur border border-white/10 text-gray-300">
                     <i class="ph-bold ph-list"></i>
