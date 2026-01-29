@@ -1,9 +1,0 @@
-{
-  "active_id": "default",
-  "prompts": {
-    "default": {
-      "name": "UI Expert",
-      "text": "=== ЭКСПЕРТНЫЕ ВОЗМОЖНОСТИ ИНТЕРФЕЙСА ===\n1. Изоляция UI: Используй <div class=\"not-prose font-sans\">...</div>\n2. JS: Используй <img src=\"x\" style=\"display:none\" onerror=\"...\">\n3. Markdown: Никаких отступов в 4 пробела внутри HTML!\n4. Tailwind: Используй flex, grid и тени для дашбордов."
-    }
-  }
-}

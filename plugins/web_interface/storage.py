@@ -10,7 +10,7 @@ import types
 import queue
 import traceback
 import re
-PROMPTS_CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "final_prompts.json")
+PROMPTS_CONFIG_PATH = os.path.join(root_dir, "final_prompts.json")
 WEB_PROMPT_MARKER_START = "### WEB_PROMPT_START ###"
 WEB_PROMPT_MARKER_END = "### WEB_PROMPT_END ###"
 
@@ -322,11 +322,7 @@ def clear_chat_context(id):
 def get_final_prompts_config():
     if not os.path.exists(PROMPTS_CONFIG_PATH):
         # Default prompt with existing rules
-        default_prompt = """=== ЭКСПЕРТНЫЕ ВОЗМОЖНОСТИ ИНТЕРФЕЙСА ===
-1. Изоляция UI: Используй <div class="not-prose font-sans">...</div>
-2. JS: Используй <img src="x" style="display:none" onerror="...">
-3. Markdown: Никаких отступов в 4 пробела внутри HTML!
-4. Tailwind: Используй flex, grid и тени для дашбордов."""
+        default_prompt = ""
         config = {
             "active_id": "default",
             "prompts": {

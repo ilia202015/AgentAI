@@ -169,6 +169,8 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 config["prompts"][p_id] = {"name": data.get("name", "New Prompt"), "text": data.get("text", "")}
                 if data.get("make_active"): config["active_id"] = p_id
                 storage.save_final_prompts_config(config)
+                if data.get("make_active") or config.get("active_id") == p_id:
+                    self._refresh_active_agents_prompts()
                 self.send_json({"status": "ok", "id": p_id})
             elif path == "/api/final-prompts/select":
                 config = storage.get_final_prompts_config()
@@ -176,6 +178,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 if p_id in config["prompts"]:
                     config["active_id"] = p_id
                     storage.save_final_prompts_config(config)
+                    self._refresh_active_agents_prompts()
                     self.send_json({"status": "ok"})
                 else: self.send_json_error(404, "Not found")
             elif path == "/api/stop": self.api_stop(data)
@@ -445,6 +448,22 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self._send_cors_headers()
         self.end_headers()
+
+    def _refresh_active_agents_prompts(self):
+        final_text = storage.get_active_final_prompt_text()
+        marker_start = storage.WEB_PROMPT_MARKER_START
+        marker_end = storage.WEB_PROMPT_MARKER_END
+        
+        for agent in self.active_chats.values():
+            if hasattr(agent, 'system_prompt'):
+                # First, remove old injection if exists
+                pattern = re.escape(marker_start) + r".*?" + re.escape(marker_end)
+                agent.system_prompt = re.sub(pattern, "", agent.system_prompt, flags=re.DOTALL).strip()
+                
+                # Then, inject new one
+                if final_text:
+                    agent.system_prompt += f"\n\n{marker_start}\n{final_text}\n{marker_end}"
+
     def handle_stream(self):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
