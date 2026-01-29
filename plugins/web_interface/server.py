@@ -169,7 +169,10 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             path = self.path.split('?')[0]
             if path.endswith("/rename"):
                  cid = path.split("/")[-2]
-                 if storage.rename_chat(cid, data.get("name"), self.clone_root_chat): self.send_json({"status": "ok"})
+                 if storage.rename_chat(cid, data.get("name"), self.clone_root_chat):
+                     if cid in self.active_chats:
+                         self.active_chats[cid].name = data.get("name")
+                     self.send_json({"status": "ok"})
                  else: self.send_json_error(400, "Fail")
             else: self.send_json_error(404, "Not found")
          except Exception as e: self.send_json_error(500, str(e))

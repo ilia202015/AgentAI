@@ -211,25 +211,25 @@ def save_chat_state(chat):
         "plugin_config": get_current_config()
     }
 
-    if getattr(chat, "name", None):
-        base_data["name"] = chat.name
-    else:
-        # Generate Name Logic
-        old_name = "New Chat"
-        json_path = os.path.join(CHATS_DIR, f"{chat.id}.json")
+        # Определяем имя: приоритет у текущего, если оно не "New Chat"
+    current_name = getattr(chat, "name", "New Chat")
+    json_path = os.path.join(CHATS_DIR, f"{chat.id}.json")
+    
+    if current_name == "New Chat":
+        # Пробуем достать имя с диска, если оно там уже есть
         if os.path.exists(json_path):
-             try:
-                 with open(json_path, 'r', encoding='utf-8') as f:
-                     old_name = json.load(f).get("name", "New Chat")
-             except: pass
-        
-        if old_name == "New Chat":
-             # Try to generate from messages
-             preview = _get_preview(chat.messages)
-             if preview != "Empty chat":
-                 old_name = preview[:30]
-        
-        base_data["name"] = old_name
+            try:
+                with open(json_path, 'r', encoding='utf-8') as f:
+                    current_name = json.load(f).get("name", "New Chat")
+            except: pass
+            
+    if current_name == "New Chat":
+        # Если все еще нет имени - генерируем превью
+        preview = _get_preview(chat.messages)
+        if preview != "Empty chat":
+            current_name = preview[:30]
+            
+    base_data["name"] = current_name
 
     chat.name = base_data["name"]
 
