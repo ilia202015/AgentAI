@@ -163,6 +163,21 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             path = self.path.split('?')[0]
             
             if path == "/api/send": self.api_send(data)
+            elif path == "/api/final-prompts":
+                config = storage.get_final_prompts_config()
+                p_id = data.get("id") or str(time.time())
+                config["prompts"][p_id] = {"name": data.get("name", "New Prompt"), "text": data.get("text", "")}
+                if data.get("make_active"): config["active_id"] = p_id
+                storage.save_final_prompts_config(config)
+                self.send_json({"status": "ok", "id": p_id})
+            elif path == "/api/final-prompts/select":
+                config = storage.get_final_prompts_config()
+                p_id = data.get("id")
+                if p_id in config["prompts"]:
+                    config["active_id"] = p_id
+                    storage.save_final_prompts_config(config)
+                    self.send_json({"status": "ok"})
+                else: self.send_json_error(404, "Not found")
             elif path == "/api/stop": self.api_stop(data)
             elif path == "/api/chats": self.api_create_chat()
             elif path == "/api/temp": self.api_start_temp()
