@@ -10,7 +10,7 @@ import types
 import queue
 import traceback
 import re
-PROMPTS_CONFIG_PATH = os.path.join(root_dir, "final_prompts.json")
+PROMPTS_CONFIG_PATH = "final_prompts.json"
 WEB_PROMPT_MARKER_START = "### WEB_PROMPT_START ###"
 WEB_PROMPT_MARKER_END = "### WEB_PROMPT_END ###"
 
