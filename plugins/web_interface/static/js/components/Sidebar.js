@@ -5,16 +5,18 @@ import { onMounted, onUnmounted, ref, computed, nextTick, watch } from 'vue';
 export default {
     template: `
         <div>
-            <!-- Mobile Overlay -->
-            <div v-if="store.isSidebarOpenMobile" @click="store.closeSidebarMobile()" 
-                 class="fixed inset-0 bg-black/50 backdrop-blur-sm z-30 md:hidden transition-opacity"></div>
+            <!-- Mobile Overlay (Backdrop) -->
+            <Teleport to="body">
+                <div v-if="store.isSidebarOpenMobile" 
+                     class="fixed inset-0 bg-black/40 backdrop-blur-md z-[60] md:hidden transition-all duration-300"
+                     @click="store.closeSidebarMobile()"></div>
+            </Teleport>
 
             <!-- Sidebar Container -->
-            <div class="fixed inset-y-0 left-0 w-[280px] bg-gray-950/60 backdrop-blur-xl border-r border-white/5 flex flex-col h-full flex-shrink-0 z-40 transition-transform duration-300 transform"
+            <div class="fixed md:relative inset-y-0 left-0 bg-gray-950/60 backdrop-blur-xl border-r border-white/5 flex flex-col h-full flex-shrink-0 z-[70] transition-all duration-300 ease-in-out overflow-hidden"
                  :class="[
-                    store.isSidebarOpenMobile ? 'translate-x-0' : '-translate-x-full',
-                    'md:relative md:translate-x-0', 
-                    store.isSidebarVisibleDesktop ? 'md:w-[280px]' : 'md:w-0 md:border-none md:overflow-hidden'
+                    store.isSidebarOpenMobile ? 'translate-x-0 w-[280px]' : '-translate-x-full md:translate-x-0',
+                    store.isSidebarVisibleDesktop ? 'md:w-[280px] opacity-100' : 'md:w-0 opacity-0 md:border-none'
                  ]">
                 
                 <div class="flex flex-col h-full w-[280px]"> 
@@ -84,7 +86,6 @@ export default {
                     
                     <!-- Footer -->
                     <div class="p-4 border-t border-white/5 bg-black/20 backdrop-blur-sm space-y-3 relative">
-                        <!-- Model Selector -->
                         <div v-if="store.currentChatId" class="relative" ref="modelMenuRef">
                              <div class="flex items-center justify-between mb-1.5 px-1">
                                 <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Модель</label>
