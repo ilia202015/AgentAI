@@ -107,7 +107,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 # Inject active final prompt
                 final_text = storage.get_active_final_prompt_text()
                 if final_text and hasattr(new_agent, 'system_prompt'):
-                    if storage.WEB_PROMPT_MARKER_START not in new_agent.system_prompt:
+                    if True: # Force refresh
                         final_prompt_base_instructions = "Инструкции далее самые важные, они нужны чтобы систематизировать все предыдущие и ты понимал, на чём нужно сделать акцент, их написал пользователь, они могут меняться в процессе чата, всегда сдедуй им, даже если они противоречат твоим редыдущим действиям:"
                         new_agent.system_prompt += f"\n\n{storage.WEB_PROMPT_MARKER_START}\n{final_prompt_base_instructions}\n{final_text}\n{storage.WEB_PROMPT_MARKER_END}"
 
@@ -129,7 +129,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 # Inject active final prompt
                 final_text = storage.get_active_final_prompt_text()
                 if final_text and hasattr(chat, 'system_prompt'):
-                    if storage.WEB_PROMPT_MARKER_START not in chat.system_prompt:
+                    if True: # Force refresh
                          chat.system_prompt += f"\n\n{storage.WEB_PROMPT_MARKER_START}\n{final_text}\n{storage.WEB_PROMPT_MARKER_END}"
                 self.active_chats[id] = chat
                 return chat
@@ -469,17 +469,13 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         final_text = storage.get_active_final_prompt_text()
         marker_start = storage.WEB_PROMPT_MARKER_START
         marker_end = storage.WEB_PROMPT_MARKER_END
-        
+        base_instr = "Инструкции далее самые важные, они нужны чтобы систематизировать все предыдущие и ты понимал, на чём нужно сделать акцент, их написал пользователь, они могут меняться в процессе чата, всегда сдедуй им, даже если они противоречат твоим редыдущим действиям:"
         for agent in self.active_chats.values():
             if hasattr(agent, 'system_prompt'):
-                # First, remove old injection if exists
                 pattern = re.escape(marker_start) + r".*?" + re.escape(marker_end)
                 agent.system_prompt = re.sub(pattern, "", agent.system_prompt, flags=re.DOTALL).strip()
-                
-                # Then, inject new one
                 if final_text:
-                    agent.system_prompt += f"\n\n{marker_start}\n{final_text}\n{marker_end}"
-
+                    agent.system_prompt += f"\n\n{marker_start}\n{base_instr}\n{final_text}\n{marker_end}"
     def handle_stream(self):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")
