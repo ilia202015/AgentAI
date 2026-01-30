@@ -13,7 +13,7 @@ export default {
             </Teleport>
 
             <!-- Panel Container -->
-            <div class="fixed md:relative inset-y-0 right-0 h-full bg-gray-950/95 backdrop-blur-2xl border-l border-white/5 flex flex-col flex-shrink-0 z-[70] transition-all duration-300 ease-in-out shadow-2xl"
+            <div class="fixed md:relative inset-y-0 right-0 h-full bg-gray-900/40 backdrop-blur-xl border-l border-white/5 flex flex-col flex-shrink-0 z-[70] transition-all duration-300 ease-in-out shadow-2xl"
                  :class="[
                     !store.isPromptPanelOpen ? 'w-0 translate-x-full opacity-0 border-none pointer-events-none' : 
                     (isExpanded ? 'w-full md:w-[700px] translate-x-0 opacity-100' : 'w-[360px] translate-x-0 opacity-100')
@@ -21,7 +21,7 @@ export default {
                 
                 <div class="flex flex-col h-full w-full overflow-hidden">
                     <!-- Header -->
-                    <div class="p-5 flex items-center justify-between border-b border-white/5 bg-white/5">
+                    <div class="p-5 flex items-center justify-between border-b border-white/5 bg-transparent">
                         <div class="flex items-center gap-3">
                             <div class="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center">
                                 <i class="ph-bold ph-terminal-window text-blue-400"></i>
@@ -83,7 +83,7 @@ export default {
                     </div>
 
                     <!-- Editor Mode -->
-                    <div v-else class="flex-1 flex flex-col p-6 gap-4 overflow-hidden animate-fade-in relative h-full">
+                    <div v-else class="flex-1 flex flex-col p-6 gap-4 animate-fade-in relative h-full">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-3">
                                 <span class="px-2 py-1 rounded bg-blue-500/20 text-blue-400 text-[9px] font-bold uppercase tracking-widest">{{ getTypeName(editPromptData.type) }}</span>
@@ -118,7 +118,7 @@ export default {
                                         <button @click="isIconPickerOpen = !isIconPickerOpen" class="w-full h-[46px] bg-white/5 border border-white/10 rounded-xl flex items-center justify-center text-2xl hover:bg-white/10 text-blue-400 transition-colors">
                                             <i :class="['ph-bold', editPromptData.icon || 'ph-app-window']"></i>
                                         </button>
-                                        <div v-if="isIconPickerOpen" class="absolute bottom-full right-0 mb-3 bg-gray-900 border border-white/10 p-3 rounded-2xl grid grid-cols-4 gap-2 z-[100] w-48 shadow-2xl animate-fade-in-up">
+                                        <div v-if="isIconPickerOpen" class="absolute top-full right-0 mt-2 bg-gray-900 border border-white/10 p-3 rounded-2xl grid grid-cols-4 gap-2 z-[110] w-56 shadow-2xl animate-fade-in-up origin-top-right">
                                             <button v-for="ic in commonIcons" :key="ic" @click="selectIcon(ic)" class="w-10 h-10 flex items-center justify-center hover:bg-blue-600 rounded-xl text-xl transition-all hover:scale-110">
                                                 <i :class="['ph-bold', ic]"></i>
                                             </button>
@@ -134,7 +134,7 @@ export default {
                             </div>
                         </div>
 
-                        <div class="flex justify-between items-center py-4 border-t border-white/10 mt-auto bg-gray-950">
+                        <div class="flex justify-between items-center py-4 border-t border-white/10 mt-auto bg-transparent">
                             <button v-if="editPromptId" @click="deletePrompt(editPromptId)" class="p-3 text-red-500/60 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all">
                                 <i class="ph-bold ph-trash text-lg"></i>
                             </button>
@@ -156,7 +156,7 @@ export default {
         const isExpanded = ref(false);
         const isIconPickerOpen = ref(false);
 
-        const commonIcons = ['ph-robot', 'ph-strategy', 'ph-test-tube', 'ph-code', 'ph-bug', 'ph-terminal', 'ph-lightning', 'ph-sparkle', 'ph-brain', 'ph-wrench', 'ph-shield', 'ph-globe', 'ph-database', 'ph-gear', 'ph-file-code', 'ph-magic-wand', 'ph-cpu'];
+        const commonIcons = ['ph-robot', 'ph-strategy', 'ph-test-tube', 'ph-code', 'ph-bug', 'ph-terminal', 'ph-lightning', 'ph-sparkle', 'ph-brain', 'ph-wrench', 'ph-shield', 'ph-globe', 'ph-gear', 'ph-file-code', 'ph-magic-wand', 'ph-cpu'];
 
         const refresh = async () => {
             const config = await api.fetchFinalPrompts();
