@@ -321,21 +321,18 @@ def clear_chat_context(id):
 
 def get_final_prompts_config():
     if not os.path.exists(PROMPTS_CONFIG_PATH):
-        # Default prompt with existing rules
-        default_prompt = "Нет дополнительных инструкций, учитывай предыдущие"
-        config = {
-            "active_id": "default",
-            "prompts": {
-                "default": {"name": "Стандартный", "text": default_prompt}
-            }
-        }
-        save_final_prompts_config(config)
-        return config
+        default_path = os.path.join(os.path.dirname(__file__), 'default_prompts.json')
+        if os.path.exists(default_path):
+            shutil.copy(default_path, PROMPTS_CONFIG_PATH)
+        else:
+            # Fallback if even default is missing
+            config = {'active_id': 'default', 'active_parameters': [], 'prompts': {'default': {'name': 'Стандартный', 'text': '...', 'type': 'system'}}}
+            save_final_prompts_config(config)
+            return config
     try:
         with open(PROMPTS_CONFIG_PATH, 'r', encoding='utf-8') as f:
             return json.load(f)
-    except:
-        return {"active_id": None, "prompts": {}}
+    except: return {'active_id': None, 'active_parameters': [], 'prompts': {}}
 
 def save_final_prompts_config(config):
     with open(PROMPTS_CONFIG_PATH, 'w', encoding='utf-8') as f:
@@ -343,7 +340,14 @@ def save_final_prompts_config(config):
 
 def get_active_final_prompt_text():
     config = get_final_prompts_config()
-    active_id = config.get("active_id")
-    if active_id and active_id in config.get("prompts", {}):
-        return config["prompts"][active_id].get("text", "")
-    return ""
+    text = ''
+    # 1. System Prompt
+    active_id = config.get('active_id')
+    if active_id and active_id in config.get('prompts', {}):
+        text += config['prompts'][active_id].get('text', '') + '\n\n'
+    # 2. Active Parameters
+    active_params = config.get('active_parameters', [])
+    for p_id in active_params:
+        if p_id in config.get('prompts', {}):
+            text += config['prompts'][p_id].get('text', '') + '\n\n'
+    return text.strip()

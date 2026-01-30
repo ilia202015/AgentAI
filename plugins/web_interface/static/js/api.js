@@ -93,11 +93,11 @@ export async function fetchFinalPrompts() {
     return await res.json();
 }
 
-export async function saveFinalPrompt(id, name, text, makeActive = false) {
+export async function saveFinalPrompt(id, name, text, type = 'system', icon = 'ph-app-window', makeActive = false) {
     const res = await fetch(`${API_BASE}/final-prompts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, name, text, make_active: makeActive })
+        body: JSON.stringify({ id, name, text, type, icon, make_active: makeActive })
     });
     return await res.json();
 }
@@ -113,5 +113,14 @@ export async function selectFinalPrompt(id) {
 
 export async function deleteFinalPrompt(id) {
     const res = await fetch(`${API_BASE}/final-prompts/${id}`, { method: 'DELETE' });
+    return await res.json();
+}
+
+export async function toggleParameter(id) {
+    const res = await fetch(`${API_BASE}/final-prompts/toggle-parameter`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+    });
     return await res.json();
 }

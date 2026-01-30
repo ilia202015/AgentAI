@@ -168,12 +168,26 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             elif path == "/api/final-prompts":
                 config = storage.get_final_prompts_config()
                 p_id = data.get("id") or str(time.time())
-                config["prompts"][p_id] = {"name": data.get("name", "New Prompt"), "text": data.get("text", "")}
+                config["prompts"][p_id] = {
+                    "name": data.get("name", "New Prompt"), 
+                    "text": data.get("text", ""),
+                    "type": data.get("type", "system"),
+                    "icon": data.get("icon", "ph-app-window")
+                }
                 if data.get("make_active"): config["active_id"] = p_id
                 storage.save_final_prompts_config(config)
-                if data.get("make_active") or config.get("active_id") == p_id:
-                    self._refresh_active_agents_prompts()
+                self._refresh_active_agents_prompts()
                 self.send_json({"status": "ok", "id": p_id})
+            elif path == "/api/final-prompts/toggle-parameter":
+                config = storage.get_final_prompts_config()
+                p_id = data.get("id")
+                active_params = config.get("active_parameters", [])
+                if p_id in active_params: active_params.remove(p_id)
+                else: active_params.append(p_id)
+                config["active_parameters"] = active_params
+                storage.save_final_prompts_config(config)
+                self._refresh_active_agents_prompts()
+                self.send_json({"status": "ok", "active_parameters": active_params})
             elif path == "/api/final-prompts/select":
                 config = storage.get_final_prompts_config()
                 p_id = data.get("id")

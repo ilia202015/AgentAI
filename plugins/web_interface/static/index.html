@@ -6,6 +6,17 @@
     <title>Рабочая среда Агента</title>
     
     <!-- Tailwind -->
+    
+    <!-- Suppress Tailwind CDN warning -->
+    <script>
+        (function() {
+            const oldWarn = console.warn;
+            console.warn = function(msg) {
+                if (typeof msg === 'string' && msg.includes('cdn.tailwindcss.com')) return;
+                oldWarn.apply(console, arguments);
+            };
+        })();
+    </script>
     <script src="./libs/tailwindcss.js"></script>
     <script>
         tailwind.config = {
@@ -45,7 +56,7 @@
     <script type="importmap">
     {
       "imports": {
-        "vue": "./libs/vue.esm-browser.js"
+        "vue": "./libs/vue.esm-browser.prod.js"
       }
     }
     </script>

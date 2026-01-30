@@ -1,0 +1,26 @@
+{
+  "active_id": "system_default",
+  "active_parameters": [
+    "planner_mode"
+  ],
+  "prompts": {
+    "system_default": {
+      "name": "Стандартный",
+      "text": "Ты - опытный AI-ассистент. Отвечай кратко и по делу.",
+      "type": "system",
+      "icon": "ph-robot"
+    },
+    "planner_mode": {
+      "name": "Режим планировщик",
+      "text": "=== РЕЖИМ ПЛАНИРОВЩИК ===\nТы должен разбивать сложные задачи на этапы, согласовывать план с пользователем и только потом приступать к выполнению.",
+      "type": "parameter",
+      "icon": "ph-strategy"
+    },
+    "test_command": {
+      "name": "Тест",
+      "text": "Проведи диагностику системы и инструментов.",
+      "type": "command",
+      "icon": "ph-test-tube"
+    }
+  }
+}

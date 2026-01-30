@@ -60,6 +60,21 @@ style.textContent = `
     .no-ligatures { font-variant-ligatures: none; }
     .katex-display { margin: 0.5em 0; overflow-x: auto; overflow-y: hidden; }
     .code-block-wrapper { margin: 0.6em 0 !important; }
+
+    @keyframes fadeInUp { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+    .animate-fade-in-up { animation: fadeInUp 0.2s ease-out forwards; }
+    
+    .tooltip-arrow {
+        width: 0; height: 0;
+        border-left: 5px solid transparent;
+        border-right: 5px solid transparent;
+        border-top: 5px solid #111827; /* gray-900 */
+        position: absolute;
+        bottom: -5px;
+        left: 50%;
+        transform: translateX(-50%);
+    }
+
 `;
 document.head.appendChild(style);
 
@@ -272,49 +287,79 @@ export default {
             </div>
 
             <div class="absolute bottom-0 left-0 w-full pb-6 pt-12 z-20 pointer-events-none" style="background: linear-gradient(to top, rgba(3,7,18,0.8) 0%, transparent 100%);">
-                <div class="w-[95%] mx-auto relative group pointer-events-auto">
-                    <div class="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl blur-lg opacity-0 group-focus-within:opacity-100 transition-opacity duration-500"></div>
-                    <div class="relative bg-gray-900/60 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden flex flex-col transition-all group-focus-within:border-blue-500/30 group-focus-within:bg-gray-900/80">
-                        <div v-if="editingIndex !== null" class="bg-blue-500/10 border-b border-white/5 px-4 py-1 text-xs text-blue-300 flex justify-between items-center">
-                            <span>Редактирование сообщения...</span>
+                <div class="w-[95%] mx-auto relative group/msgbox pointer-events-auto">
+                    <div class="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl blur-lg opacity-0 group-focus-within/msgbox:opacity-100 transition-opacity duration-500"></div>
+                    <div class="relative bg-gray-900/80 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col transition-all group-focus-within/msgbox:border-blue-500/40 group-focus-within/msgbox:bg-gray-900/90 group-focus-within/msgbox:shadow-blue-500/10">
+                        <div v-if="editingIndex !== null" class="bg-blue-500/10 border-b border-white/5 px-4 py-1.5 text-[10px] text-blue-300 flex justify-between items-center uppercase font-bold tracking-wider">
+                            <span>Режим редактирования</span>
                             <button @click="cancelEdit" class="hover:text-white"><i class="ph-bold ph-x"></i></button>
                         </div>
                         
-                        <div v-if="attachments.length > 0" class="flex gap-2 p-2 px-4 overflow-x-auto custom-scrollbar border-b border-white/5">
+                        <div v-if="attachments.length > 0" class="flex gap-3 p-3 px-4 overflow-x-auto custom-scrollbar border-b border-white/5 bg-black/20">
                             <div v-for="(img, idx) in attachments" :key="idx" class="relative group/img flex-shrink-0">
-                                <img :src="img" @click="zoomImage(img)" class="h-16 w-16 object-cover rounded-lg border border-white/10 cursor-zoom-in hover:opacity-80 transition-opacity">
-                                <button @click="removeAttachment(idx)" class="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-md opacity-0 group-hover/img:opacity-100 transition-opacity transform scale-75 hover:scale-100">
-                                    <i class="ph-bold ph-x text-xs"></i>
+                                <img :src="img" @click="zoomImage(img)" class="h-20 w-20 object-cover rounded-xl border border-white/10 cursor-zoom-in hover:opacity-80 transition-all shadow-lg">
+                                <button @click="removeAttachment(idx)" class="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-1 shadow-xl opacity-0 group-hover/img:opacity-100 transition-all transform hover:scale-110">
+                                    <i class="ph-bold ph-x text-[10px]"></i>
                                 </button>
                             </div>
                         </div>
 
                         <textarea v-model="inputText" @keydown.enter.exact.prevent="send" @paste="handlePaste"
-                            :placeholder="editingIndex !== null ? 'Измените сообщение...' : 'Отправить сообщение...'"
+                            :placeholder="editingIndex !== null ? 'Измените сообщение...' : 'Напишите что-нибудь...'"
                             rows="1" ref="textarea" @input="resizeTextarea" 
-                            class="w-full bg-transparent text-gray-100 px-4 py-4 focus:outline-none resize-none max-h-48 overflow-y-auto placeholder-gray-500 text-sm leading-relaxed"></textarea>
+                            class="w-full bg-transparent text-gray-100 px-5 py-5 focus:outline-none resize-none max-h-64 overflow-y-auto placeholder-gray-600 text-sm leading-relaxed"></textarea>
                         
-                        <div class="flex justify-between items-center px-2 pb-2">
-                            <div class="flex gap-1 px-2">
-                                <button @click="triggerFileSelect" class="p-2 text-gray-400 hover:text-blue-400 transition-colors rounded-lg hover:bg-white/5" title="Прикрепить изображение">
-                                    <i class="ph-bold ph-paperclip"></i>
+                        <div class="flex items-center justify-between px-3 pb-3 gap-2">
+                            <div v-if="parameters.length > 0 || attachments.length >= 0" class="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/5">
+                                <button @click="triggerFileSelect" class="p-2 text-gray-400 hover:text-blue-400 transition-all rounded-lg hover:bg-white/5" title="Прикрепить файл">
+                                    <i class="ph-bold ph-paperclip-horizontal text-lg"></i>
                                 </button>
-                                <button @click="captureScreen" class="p-2 text-gray-400 hover:text-blue-400 transition-colors rounded-lg hover:bg-white/5" title="Сделать скриншот экрана">
-                                    <i class="ph-bold ph-monitor"></i>
+                                <button @click="captureScreen" class="p-2 text-gray-400 hover:text-blue-400 transition-all rounded-lg hover:bg-white/5" title="Скриншот экрана">
+                                    <i class="ph-bold ph-monitor text-lg"></i>
                                 </button>
-                                <input type="file" ref="fileInput" multiple accept="image/*" class="hidden" @change="handleFileSelect">
+                                
+                                <div v-if="parameters.length > 0 && (true)" class="h-4 w-px bg-white/10 mx-1"></div>
+                                
+                                <!-- Parameters -->
+                                <button v-for="p in parameters" :key="p.id" 
+                                    @click="store.toggleParameter(p.id)"
+                                    class="p-2 transition-all rounded-lg group relative flex items-center justify-center"
+                                    :class="store.active_parameters.includes(p.id) ? 'text-blue-400 bg-blue-500/20 shadow-inner' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'">
+                                    <i class="ph-bold" :class="p.icon || 'ph-gear'"></i>
+                                    <div class="absolute bottom-full mb-3 hidden group-hover:block pointer-events-none z-[100]">
+                                        <div class="bg-gray-900 text-white text-[10px] px-3 py-1.5 rounded-lg border border-white/20 shadow-2xl whitespace-nowrap animate-fade-in-up uppercase font-bold tracking-widest">{{ p.name }}<div class="tooltip-arrow"></div></div>
+                                        
+                                    </div>
+                                </button>
                             </div>
-                            <button v-if="store.isThinking" @click="stop" class="p-2 rounded-lg bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all duration-200 flex items-center justify-center gap-2 border border-red-500/20" title="Остановить генерацию"><i class="ph-fill ph-stop text-lg"></i></button>
-                            <button v-else @click="send" :disabled="!inputText.trim() && attachments.length === 0" 
-                                class="p-2 rounded-lg transition-all duration-200 flex items-center justify-center gap-2" 
-                                :class="(inputText.trim() || attachments.length > 0) ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/25 hover:bg-blue-500' : 'bg-white/5 text-gray-600 cursor-not-allowed'">
-                                <i :class="editingIndex !== null ? 'ph-fill ph-check' : 'ph-fill ph-paper-plane-right'" class="text-lg"></i>
-                            </button>
+
+                            <div class="flex items-center gap-2">
+                                <!-- Commands -->
+                                <div class="flex items-center gap-1.5 px-2">
+                                    <button v-for="c in commands" :key="c.id" 
+                                        @click="runCommand(c)"
+                                        class="px-3 py-2 rounded-xl bg-white/5 text-gray-400 hover:text-blue-300 hover:bg-blue-500/10 transition-all group relative border border-white/5 flex items-center gap-2 shadow-sm"
+                                        :title="c.name">
+                                        <i class="ph-bold" :class="c.icon || 'ph-lightning'"></i>
+                                        <span class="text-[10px] font-bold uppercase tracking-wider hidden lg:block">{{ c.name }}</span>
+                                        
+                                    </button>
+                                </div>
+
+                                <button v-if="store.isThinking" @click="stop" class="w-11 h-11 rounded-xl bg-red-500/10 text-red-500 hover:bg-red-500/20 transition-all flex items-center justify-center border border-red-500/20 shadow-lg shadow-red-500/10" title="Остановить">
+                                    <i class="ph-fill ph-stop text-xl"></i>
+                                </button>
+                                <button v-else @click="send" :disabled="!inputText.trim() && attachments.length === 0" 
+                                    class="w-11 h-11 rounded-xl transition-all flex items-center justify-center group/send shadow-xl" 
+                                    :class="(inputText.trim() || attachments.length > 0) ? 'bg-blue-600 text-white shadow-blue-500/25 hover:bg-blue-500 hover:scale-105 active:scale-95' : 'bg-white/5 text-gray-700 cursor-not-allowed'">
+                                    <i :class="editingIndex !== null ? 'ph-fill ph-check' : 'ph-fill ph-paper-plane-right'" class="text-xl transition-transform group-hover/send:rotate-12"></i>
+                                </button>
+                            </div>
                         </div>
+                        <input type="file" ref="fileInput" multiple accept="image/*" class="hidden" @change="handleFileSelect">
                     </div>
-                </div>
             </div>
-            
+            </div>
             <div v-if="isDragging" 
                  @dragleave.prevent.stop="isDragging = false" 
                  @drop.prevent.stop="handleDrop" 
@@ -568,6 +613,28 @@ export default {
             window.removeEventListener('keydown', handleKeydown);
         });
 
-        return { store, inputText, send, stop, filteredMessages, messagesContainer, textarea, resizeTextarea, showScrollButton, scrollToBottom, handleScroll, handleEdit, startEditing, editingIndex, cancelEdit, fileInput, attachments, triggerFileSelect, handleFileSelect, removeAttachment, handlePaste, onDragOver, handleDrop, isDragging, captureScreen, zoomedImage, zoomImage, closeZoom };
+        
+        const parameters = computed(() => {
+            const res = [];
+            for (const [id, p] of Object.entries(store.finalPrompts)) {
+                if (p.type === 'parameter') res.push({ id, ...p });
+            }
+            return res;
+        });
+
+        const commands = computed(() => {
+            const res = [];
+            for (const [id, p] of Object.entries(store.finalPrompts)) {
+                if (p.type === 'command') res.push({ id, ...p });
+            }
+            return res;
+        });
+
+        const runCommand = (cmd) => {
+            inputText.value = `[КОМАНДА: ${cmd.name}]\n${cmd.text}`;
+            send();
+        };
+
+        return { store, inputText, parameters, commands, runCommand, send, stop, filteredMessages, messagesContainer, textarea, resizeTextarea, showScrollButton, scrollToBottom, handleScroll, handleEdit, startEditing, editingIndex, cancelEdit, fileInput, attachments, triggerFileSelect, handleFileSelect, removeAttachment, handlePaste, onDragOver, handleDrop, isDragging, captureScreen, zoomedImage, zoomImage, closeZoom };
     }
 }

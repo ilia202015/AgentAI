@@ -17,7 +17,8 @@ export const store = reactive({
     
     toasts: [],
     finalPrompts: {},
-    activePromptId: null, 
+    activePromptId: null,
+    active_parameters: [], 
     
     setMessages(msgs) {
         if (!msgs) {
@@ -107,6 +108,14 @@ export const store = reactive({
     toggleSidebarDesktop() { this.isSidebarVisibleDesktop = !this.isSidebarVisibleDesktop; },
     closeSidebarMobile() { this.isSidebarOpenMobile = false; },
 
+    
+    async toggleParameter(id) {
+        const api = await import('./api.js');
+        const res = await api.toggleParameter(id);
+        if (res.status === 'ok') {
+            this.active_parameters = res.active_parameters;
+        }
+    },
     addToast(message, type = 'info') {
         const id = Date.now();
         this.toasts.push({ id, message, type });
