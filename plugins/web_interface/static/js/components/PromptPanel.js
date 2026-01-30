@@ -83,7 +83,7 @@ export default {
                     </div>
 
                     <!-- Editor Mode -->
-                    <div v-else class="flex-1 flex flex-col p-6 gap-6 animate-fade-in relative">
+                    <div v-else class="flex-1 flex flex-col p-6 gap-4 overflow-hidden animate-fade-in relative h-full">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-3">
                                 <span class="px-2 py-1 rounded bg-blue-500/20 text-blue-400 text-[9px] font-bold uppercase tracking-widest">{{ getTypeName(editPromptData.type) }}</span>
@@ -94,7 +94,7 @@ export default {
                             </button>
                         </div>
 
-                        <div class="flex flex-col flex-1 gap-5 overflow-y-auto custom-scrollbar pr-2">
+                        <div class="flex flex-col flex-1 gap-5 overflow-y-auto custom-scrollbar pr-2 pb-10">
                             <div class="space-y-2">
                                 <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Тип промпта</label>
                                 <div class="grid grid-cols-3 gap-2">
@@ -130,11 +130,11 @@ export default {
                             <div class="flex-1 flex flex-col space-y-2">
                                 <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Инструкция (Промпт)</label>
                                 <textarea v-model="editPromptData.text" 
-                                    class="flex-1 w-full min-h-[250px] bg-white/5 border border-white/10 rounded-2xl px-4 py-4 focus:outline-none focus:border-blue-500/50 text-xs font-mono resize-none text-gray-300 custom-scrollbar leading-relaxed"></textarea>
+                                    class="flex-1 w-full min-h-[150px] flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-4 focus:outline-none focus:border-blue-500/50 text-xs font-mono resize-none text-gray-300 custom-scrollbar leading-relaxed"></textarea>
                             </div>
                         </div>
 
-                        <div class="flex justify-between items-center pt-5 border-t border-white/5 bg-gray-950/50">
+                        <div class="flex justify-between items-center py-4 border-t border-white/10 mt-auto bg-gray-950">
                             <button v-if="editPromptId" @click="deletePrompt(editPromptId)" class="p-3 text-red-500/60 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all">
                                 <i class="ph-bold ph-trash text-lg"></i>
                             </button>
