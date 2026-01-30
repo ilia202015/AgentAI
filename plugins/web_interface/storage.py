@@ -11,8 +11,8 @@ import queue
 import traceback
 import re
 PROMPTS_CONFIG_PATH = "final_prompts.json"
-WEB_PROMPT_MARKER_START = "### WEB_PROMPT_START ###"
-WEB_PROMPT_MARKER_END = "### WEB_PROMPT_END ###"
+WEB_PROMPT_MARKER_START = "### FINAL_PROMPT_START ###"
+WEB_PROMPT_MARKER_END = "### FINAL_PROMPT_END ###"
 
 
 # Import serialization utils
@@ -322,11 +322,11 @@ def clear_chat_context(id):
 def get_final_prompts_config():
     if not os.path.exists(PROMPTS_CONFIG_PATH):
         # Default prompt with existing rules
-        default_prompt = ""
+        default_prompt = "Нет дополнительных инструкций, учитывай предыдущие"
         config = {
             "active_id": "default",
             "prompts": {
-                "default": {"name": "UI Expert", "text": default_prompt}
+                "default": {"name": "Стандартный", "text": default_prompt}
             }
         }
         save_final_prompts_config(config)
