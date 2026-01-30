@@ -13,7 +13,7 @@ export default {
             </Teleport>
 
             <!-- Panel Container -->
-            <div class="fixed md:relative inset-y-0 right-0 h-full bg-gray-950/60 backdrop-blur-xl border-l border-white/5 flex flex-col flex-shrink-0 z-[70] transition-all duration-300 ease-in-out overflow-hidden"
+            <div class="fixed md:relative inset-y-0 right-0 h-full bg-gray-900/40 backdrop-blur-xl border-l border-white/5 flex flex-col flex-shrink-0 z-[70] transition-all duration-300 ease-in-out overflow-hidden"
                  :class="store.isPromptPanelOpen ? 'w-[320px] translate-x-0 opacity-100' : 'w-0 translate-x-full md:translate-x-0 opacity-0 border-none'">
                 
                 <div class="flex flex-col h-full w-[320px]">
@@ -47,12 +47,12 @@ export default {
                         <div v-if="editPromptId || isCreating" class="flex flex-col h-full gap-4">
                             <div class="space-y-1">
                                 <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Название</label>
-                                <input v-model="editPromptData.name" class="w-full bg-gray-900 border border-white/5 rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500/50 text-xs text-gray-200">
+                                <input v-model="editPromptData.name" class="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500/50 text-xs text-gray-200">
                             </div>
                             <div class="flex-1 flex flex-col space-y-1 overflow-hidden">
                                 <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Текст промпта</label>
                                 <textarea v-model="editPromptData.text" 
-                                    class="flex-1 w-full bg-gray-900 border border-white/5 rounded-xl px-3 py-3 focus:outline-none focus:border-blue-500/50 text-xs font-mono resize-none text-gray-400 custom-scrollbar"></textarea>
+                                    class="flex-1 w-full bg-white/5 border border-white/10 rounded-xl px-3 py-3 focus:outline-none focus:border-blue-500/50 text-xs font-mono resize-none text-gray-400 custom-scrollbar"></textarea>
                             </div>
                             <div class="flex justify-between items-center gap-2">
                                 <button v-if="editPromptId" @click="deletePrompt(editPromptId)" class="p-2 text-red-500/60 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors">

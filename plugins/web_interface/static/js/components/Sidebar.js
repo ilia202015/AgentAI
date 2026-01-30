@@ -13,7 +13,7 @@ export default {
             </Teleport>
 
             <!-- Sidebar Container -->
-            <div class="fixed md:relative inset-y-0 left-0 bg-gray-950/60 backdrop-blur-xl border-r border-white/5 flex flex-col h-full flex-shrink-0 z-[70] transition-all duration-300 ease-in-out overflow-hidden"
+            <div class="fixed md:relative inset-y-0 left-0 bg-gray-900/40 backdrop-blur-xl border-r border-white/5 flex flex-col h-full flex-shrink-0 z-[70] transition-all duration-300 ease-in-out overflow-hidden"
                  :class="[
                     store.isSidebarOpenMobile ? 'translate-x-0 w-[280px]' : '-translate-x-full md:translate-x-0',
                     store.isSidebarVisibleDesktop ? 'md:w-[280px] opacity-100' : 'md:w-0 opacity-0 md:border-none'
@@ -50,7 +50,7 @@ export default {
                         <div class="relative group">
                             <i class="ph ph-magnifying-glass absolute left-3 top-2.5 text-gray-500 group-focus-within:text-blue-400 transition-colors"></i>
                             <input type="text" placeholder="Поиск чатов..." v-model="searchQuery"
-                                class="w-full bg-gray-900/40 border border-white/5 rounded-lg py-2 pl-9 pr-3 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:bg-gray-900/60 transition-all">
+                                class="w-full bg-white/5 border border-white/10 rounded-lg py-2 pl-9 pr-3 text-xs text-gray-300 placeholder-gray-600 focus:outline-none focus:border-blue-500/50 focus:bg-gray-900/60 transition-all">
                         </div>
                     </div>
 
@@ -92,7 +92,7 @@ export default {
                              </div>
                              
                              <button @click="isModelMenuOpen = !isModelMenuOpen" 
-                                class="w-full bg-gray-900/40 border border-white/10 rounded-xl py-2 px-3 flex items-center justify-between text-xs text-gray-200 hover:bg-gray-800/60 hover:border-white/20 transition-all duration-200 group">
+                                class="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 flex items-center justify-between text-xs text-gray-200 hover:bg-gray-800/60 hover:border-white/20 transition-all duration-200 group">
                                 <div class="flex items-center gap-2 truncate pr-2">
                                     <div class="w-5 h-5 rounded bg-blue-500/10 flex items-center justify-center flex-shrink-0">
                                         <i class="ph-fill ph-lightning text-blue-400 text-xs"></i>
