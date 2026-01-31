@@ -1,0 +1,54 @@
+{
+  "id": "v1",
+  "updated_at": "2026-01-31T22:28:00.644172",
+  "messages": [
+    {
+      "role": "user",
+      "parts": [
+        {
+          "text": "Hello with image"
+        },
+        {
+          "local_image_path": "chats/v1/images/62439487ddb74fb7fcbbd34370bfba3c.png",
+          "mime_type": "image/png"
+        }
+      ],
+      "thoughts": "",
+      "tools": []
+    },
+    {
+      "role": "model",
+      "parts": [
+        {
+          "text": "I will call a tool"
+        },
+        {
+          "function_call": {
+            "args": {
+              "code": "print(123)"
+            },
+            "name": "python"
+          }
+        }
+      ],
+      "thoughts": "Baseline thoughts",
+      "tools": [
+        {
+          "title": "python",
+          "content": "print(123)"
+        }
+      ]
+    }
+  ],
+  "plugin_config": {
+    "settings": {
+      "console_output": {},
+      "computer_use": {}
+    },
+    "list": [
+      "computer_use",
+      "web_interface"
+    ]
+  },
+  "name": "Baseline Chat v1"
+}
