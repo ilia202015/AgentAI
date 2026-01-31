@@ -189,6 +189,42 @@
    <button onclick="this.closest('.not-prose').remove()" class="text-red-500/50 hover:text-red-500"><i class="ph ph-x"></i></button>
    </div>
 
+   Согласие с планом или редактирование (всегда пиши в конце плана):
+   <div id="plan-manager-card" class="not-prose my-6 max-w-2xl animate-fade-in-up">
+   <div class="bg-gray-900/90 backdrop-blur-2xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
+   <div id="plan-view-actions" class="p-6">
+   <div class="flex flex-col md:flex-row items-center gap-4">
+   <button onclick="agentSend('Выполняй план')" class="flex-1 w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-2xl font-bold text-sm shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2">
+   <i class="ph-fill ph-rocket-launch text-lg"></i>
+   УТВЕРДИТЬ И ЗАПУСТИТЬ
+   </button>
+   <button onclick="document.getElementById('plan-view-actions').classList.add('hidden'); document.getElementById('plan-view-edit').classList.remove('hidden')" class="flex-1 w-full py-4 bg-white/5 hover:bg-white/10 text-gray-300 border border-white/10 rounded-2xl font-bold text-sm transition-all active:scale-[0.98] flex items-center justify-center gap-2">
+   <i class="ph-bold ph-pencil-simple text-lg"></i>
+   ВНЕСТИ ИЗМЕНЕНИЯ
+   </button>
+   </div>
+   </div>
+   <div id="plan-view-edit" class="hidden p-6 space-y-4 animate-fade-in">
+   <div class="flex items-center gap-3 mb-2">
+   <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-500">
+   <i class="ph-bold ph-note-pencil text-lg"></i>
+   </div>
+   <h3 class="text-sm font-bold text-white uppercase tracking-wider">Что нужно изменить?</h3>
+   </div>
+   <textarea id="plan-edit-input" placeholder="Опишите ваши замечания или дополнения к плану..." class="w-full bg-black/40 border border-white/10 rounded-2xl p-4 text-sm text-gray-200 focus:outline-none focus:border-blue-500/50 min-h-[120px] resize-none shadow-inner custom-scrollbar"></textarea>
+   <div class="flex gap-3">
+   <button onclick="const val = document.getElementById('plan-edit-input').value; if(val.trim()){ agentSend('план нужно изменить:\n' + val + '\nпредложи новый план'); } else { alert('Введите текст изменений'); }" class="flex-[2] py-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2">
+   <i class="ph-bold ph-paper-plane-right"></i>
+   ОТПРАВИТЬ ПРАВКИ
+   </button>
+   <button onclick="document.getElementById('plan-view-edit').classList.add('hidden'); document.getElementById('plan-view-actions').classList.remove('hidden')" class="flex-1 py-3 bg-white/5 hover:bg-white/10 text-gray-400 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2">
+   ОТМЕНА
+   </button>
+   </div>
+   </div>
+   </div>
+   </div>
+
 7. СОВЕТЫ:
    - Не нужно слепо использовать шаблоны из пункта 6, иначе интерфейс будет однообразным, попробуй придумывать что нибудь уникальное
    - Когда создаёшь кнопки, лучше вписать действие в кнопку, чем написать send в качестве действия
