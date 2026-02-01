@@ -88,7 +88,7 @@ class Chat:
         self.messages = [] 
 
         self._initialize_tools()
-        self._apply_saved_changes()
+
 
     def _load_config(self):
         self.gemini_keys = []
@@ -113,7 +113,7 @@ class Chat:
         self.ai_key = self.gemini_keys[self.current_key_index]
 
         self.prompts = {}
-        prompt_names = ["system", "python", "chat", "chat_exec", "user_profile", "save_code_changes", "http", "shell", "google_search", "python_str"]
+        prompt_names = ["system", "python", "chat", "chat_exec", "user_profile", "http", "shell", "google_search", "python_str"]
         for name in prompt_names:
             try:
                 with open(f"{self.agent_dir}/prompts/{name}", 'r', encoding="utf8") as f:
@@ -123,17 +123,9 @@ class Chat:
 
         with open(f"{self.agent_dir}/user_profile.json", 'r', encoding="utf8") as f:
             self.user_profile = f.read()
-        
         self_code_path = "agent.py" if os.path.exists("agent.py") else __file__
         with open(self_code_path, 'r', encoding="utf8") as f:
             self.self_code = f.read()
-        
-        saved_changes_path = f"{self.agent_dir}/saved_code_changes.py"
-        if not os.path.exists(saved_changes_path):
-            with open(saved_changes_path, 'w', encoding="utf8") as f:
-                f.write('# Этот файл хранит сохраненные изменения кода агента.\n\n')
-        with open(saved_changes_path, 'r', encoding="utf8") as f:
-            self.saved_code = f.read()
 
         with open("keys/google.key", "r") as f:
             self.google_search_key = f.read().strip()
@@ -157,18 +149,6 @@ class Chat:
             self.tools = json.load(f)["tools"]
         for tool in self.tools:
             tool["function"]["description"] = self.prompts.get(tool["function"]["name"], tool["function"]["description"])
-
-    def _apply_saved_changes(self):
-        try:
-            if self.saved_code.strip():
-                print("⚙️ Обнаружены сохраненные изменения. Применяю...")
-                result = self.python_tool(self.saved_code, no_print=True)
-                if result and "Ошибка" in str(result):
-                    print(f"❌ Ошибка: {result}")
-                else:
-                    print("✅ Изменения успешно применены.")
-        except Exception as e:
-            print(f"❌ Критическая ошибка при загрузке изменений: {e}")
 
 
 
