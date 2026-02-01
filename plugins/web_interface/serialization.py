@@ -52,6 +52,7 @@ def serialize_message(msg, chat_id=None):
                 if img_bytes:
                     image_path = _save_image(chat_id, img_bytes, mime_type)
                     if image_path:
+                        part._local_filename = os.path.basename(image_path)
                         parts_data.append({"local_image_path": image_path, "mime_type": mime_type})
             elif text:
                 if is_thought: thoughts_list.append(text)

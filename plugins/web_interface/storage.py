@@ -195,83 +195,63 @@ def load_chat_state(id, get_chat):
 def save_chat_state(chat):
     ensure_chats_dir()
     
-    if not getattr(chat, "id", None):
+    if not getattr(chat, 'id', None):
         chat.id = str(uuid.uuid4())
-
-    if is_print_debug:
-        print(f"save_chat_state({chat.id})")
 
     chat.updated_at = datetime.datetime.now().isoformat()
     chat.plugin_config = get_current_config()
     
-    # Serialize messages for JSON
+    # Очищаем системный промпт от внедрений веб-интерфейса перед сохранением
+    # чтобы избежать дублирования при следующей загрузке
+    if hasattr(chat, 'system_prompt') and chat.system_prompt:
+        pattern = re.escape(WEB_PROMPT_MARKER_START) + r".*?" + re.escape(WEB_PROMPT_MARKER_END)
+        chat.system_prompt = re.sub(pattern, "", chat.system_prompt, flags=re.DOTALL).strip()
+
+    # Подготовка данных для JSON
     messages_json = chat.messages
     if serialization:
         messages_json = serialization.serialize_history(chat.messages, chat_id=chat.id)
     
-    
-    # Clean system prompt from web injection before saving
-    if hasattr(chat, 'system_prompt') and chat.system_prompt:
-        pattern = re.escape(WEB_PROMPT_MARKER_START) + r".*?" + re.escape(WEB_PROMPT_MARKER_END)
-        chat.system_prompt = re.sub(pattern, "", chat.system_prompt, flags=re.DOTALL).strip()
     base_data = {
-        "id": chat.id,
-        "updated_at": datetime.datetime.now().isoformat(),
-        "messages": messages_json,
-        "plugin_config": get_current_config()
+        'id': chat.id,
+        'updated_at': chat.updated_at,
+        'messages': messages_json,
+        'plugin_config': chat.plugin_config
     }
 
-        # Определяем имя: приоритет у текущего, если оно не "New Chat"
-    current_name = getattr(chat, "name", "New Chat")
-    json_path = os.path.join(CHATS_DIR, f"{chat.id}.json")
+    # Определение имени чата
+    current_name = getattr(chat, 'name', 'New Chat')
+    json_path = os.path.join(CHATS_DIR, f'{chat.id}.json')
     
-    if current_name == "New Chat":
-        # Пробуем достать имя с диска, если оно там уже есть
-        if os.path.exists(json_path):
-            try:
-                with open(json_path, 'r', encoding='utf-8') as f:
-                    current_name = json.load(f).get("name", "New Chat")
-            except: pass
+    if current_name == 'New Chat' and os.path.exists(json_path):
+        try:
+            with open(json_path, 'r', encoding='utf-8') as f:
+                current_name = json.load(f).get('name', 'New Chat')
+        except: pass
             
-    if current_name == "New Chat":
-        # Если все еще нет имени - генерируем превью
+    if current_name == 'New Chat':
         preview = _get_preview(chat.messages)
-        if preview != "Empty chat":
+        if preview != 'Empty chat':
             current_name = preview[:30]
             
-    base_data["name"] = current_name
+    base_data['name'] = current_name
+    chat.name = base_data['name']
 
-    chat.name = base_data["name"]
-
-    # 1. Save JSON
-    json_path = os.path.join(CHATS_DIR, f"{chat.id}.json")
+    # 1. Сохранение JSON (Бэкап и метаданные)
     try:
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(base_data, f, ensure_ascii=False, indent=2, default=str)
     except Exception as e:
         print(f"❌ Error saving JSON backup: {e}")
 
-    # 2. Save dill
-    pkl_path = os.path.join(CHATS_DIR, f"{chat.id}.pkl")
+    # 2. Сохранение Dill (Полное состояние объекта)
+    # Логика очистки непиклируемых полей теперь в Chat.__getstate__ (web_getstate)
+    pkl_path = os.path.join(CHATS_DIR, f'{chat.id}.pkl')
     try:
         with open(pkl_path, 'wb') as f:            
-            # Safe attribute access
-            client = getattr(chat, 'client', None)
-            chat.client = None
-            
-            busy_depth = getattr(chat, 'busy_depth', 0)
-            chat.busy_depth = 0
-
             dill.dump(chat, f)
-
-            chat.busy_depth = busy_depth
-            if client:
-                chat.client = client
     except Exception as e:
         print(f"❌ Error saving dill: {e}")
-        # Restore attributes in case of error
-        chat.busy_depth = getattr(chat, 'busy_depth', 0) # Should be original value roughly
-        if client: chat.client = client
     
     return chat
 

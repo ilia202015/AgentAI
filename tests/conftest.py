@@ -18,6 +18,13 @@ def mock_client():
     return client
 
 @pytest.fixture(scope='module')
+def monkeypatch_module():
+    from _pytest.monkeypatch import MonkeyPatch
+    mp = MonkeyPatch()
+    yield mp
+    mp.undo()
+
+@pytest.fixture(scope='function')
 def mock_agent(mock_client, tmp_path_factory, monkeypatch_module):
     # 1. Isolate Storage
     tmp_path = tmp_path_factory.mktemp("data"); test_chats_dir = tmp_path / "chats"

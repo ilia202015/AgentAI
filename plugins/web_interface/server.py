@@ -308,23 +308,22 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_json({"status": "ok", "id": "temp"})
 
     def api_load_chat(self, path):
-        if is_print_debug:
-            print(f"api_load_chat({path})")
-        
         cid = path.split("/")[-2]
-        chat, _ = storage.load_chat_state(cid, self.clone_root_chat)
-        if chat: 
-            resp = chat.__dict__.copy()
-            if 'client' in resp: del resp['client']
-            if 'web_queue' in resp: del resp['web_queue']
-            
-            if serialization:
-                resp['messages'] = serialization.serialize_history_for_web(chat.messages, chat_id=cid)
-            
-            self.send_json({"status": "loaded", "chat": resp})
-        else: 
-            self.send_json_error(404, "Not found")
-        
+        try:
+            chat, warning = storage.load_chat_state(cid, self.clone_root_chat)
+            if chat: 
+                resp = chat.__dict__.copy()
+                if "client" in resp: del resp["client"]
+                if "web_queue" in resp: del resp["web_queue"]
+                
+                if serialization:
+                    resp["messages"] = serialization.serialize_history_for_web(chat.messages, chat_id=cid)
+                
+                self.send_json({"status": "loaded", "chat": resp, "warning": warning})
+            else: 
+                self.send_json_error(404, f"Chat {cid} not found or corrupted")
+        except Exception as e:
+            self.send_json_error(500, f"Error loading chat: {str(e)}")
     def api_save_chat(self, path):
         if is_print_debug:
             print(f"api_save_chat({path})")
@@ -402,11 +401,11 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             if not chat_id or not filename:
                 return self.send_json_error(400, "Missing params")
                 
-            # Security check
-            if ".." in filename or "/" in filename or "\\" in filename:
-                return self.send_json_error(403, "Invalid filename")
+            # Security check for both chat_id and filename to prevent traversal
+            if any(p and (".." in p or "/" in p or "\\" in p) for p in [chat_id, filename]):
+                return self.send_json_error(403, "Invalid path component")
                 
-            file_path = os.path.join(root_dir, "chats", chat_id, "images", filename)
+            file_path = os.path.join("chats", chat_id, "images", filename)
             
             if os.path.exists(file_path):
                 self.send_response(200)

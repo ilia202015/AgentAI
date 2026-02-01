@@ -213,20 +213,19 @@ def web_handle_stream(self, stream):
 # === PICKLE SUPPORT ===
 
 def web_getstate(self):
-    # Вызываем оригинальный getstate класса (если он был) или стандартный dict
-    # Но так как мы патчим класс, оригинальный __getstate__ может быть затерт нами же.
-    # Поэтому мы сохраняем оригинальный при патчинге.
-    
     orig = getattr(self.__class__, '_original_getstate', None)
     if orig:
         state = orig(self)
     else:
         state = self.__dict__.copy()
-        if 'client' in state: del state['client']
 
-    # Удаляем очередь (не пиклится)
-    if 'web_queue' in state:
-        del state['web_queue']
+    # Удаляем непиклируемые или временные объекты
+    for attr in ['client', 'web_queue', '_web_thought_stack']:
+        if attr in state:
+            del state[attr]
+            
+    # Сбрасываем состояние занятости для сохраненной копии
+    state['busy_depth'] = 0
         
     return state
 
