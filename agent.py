@@ -89,7 +89,6 @@ class Chat:
 
         self._initialize_tools()
 
-
     def _load_config(self):
         self.gemini_keys = []
         i = 0
@@ -121,7 +120,12 @@ class Chat:
             except FileNotFoundError:
                 self.prompts[name] = f"Prompt '{name}' not found."
 
-        with open(f"{self.agent_dir}/user_profile.json", 'r', encoding="utf8") as f:
+                
+        profile_path = f"{self.agent_dir}/user_profile.json"
+        if not os.path.exists(profile_path):
+            with open(profile_path, 'w', encoding="utf-8") as f:
+                json.dump({}, f)
+        with open(profile_path, 'r', encoding="utf8") as f:
             self.user_profile = f.read()
         self_code_path = "agent.py" if os.path.exists("agent.py") else __file__
         with open(self_code_path, 'r', encoding="utf8") as f:
@@ -149,8 +153,6 @@ class Chat:
             self.tools = json.load(f)["tools"]
         for tool in self.tools:
             tool["function"]["description"] = self.prompts.get(tool["function"]["name"], tool["function"]["description"])
-
-
 
     def __getstate__(self):
         state = self.__dict__.copy()
@@ -268,11 +270,11 @@ class Chat:
     def python_str_tool(self, text):
         return repr(text)
 
-
     def sandbox_tool(self, action):
+        import os, subprocess, sys, shutil, socket, re, json, fnmatch, time
+        
         sandbox_dir = "sandbox"
         log_file = "sandbox_agent.log"
-        import subprocess, sys, os, socket, re, json
         full_log_path = os.path.join(sandbox_dir, log_file)
         
         if 'sandbox_state' not in self.local_env:
@@ -281,27 +283,80 @@ class Chat:
         state = self.local_env['sandbox_state']
         
         if action == "create":
-            if os.path.exists(sandbox_dir):
-                if state['process'] and state['process'].poll() is None:
-                    state['process'].terminate()
-                    state['process'].wait()
+            if state['process'] and state['process'].poll() is None:
+                state['process'].terminate()
+                state['process'].wait()
             
-            cmd = f"powershell -Command \"if (Test-Path '{sandbox_dir}') {{ Remove-Item -Path '{sandbox_dir}' -Recurse -Force }}; New-Item -ItemType Directory -Path '{sandbox_dir}'; Get-ChildItem -Exclude '{sandbox_dir}' | Copy-Item -Destination '{sandbox_dir}' -Recurse -Force\""
-            subprocess.run(cmd, shell=True)
+            if os.path.exists(sandbox_dir):
+                try: shutil.rmtree(sandbox_dir)
+                except: subprocess.run(f"powershell -Command \"Remove-Item -Path '{sandbox_dir}' -Recurse -Force\"", shell=True)
+            
+            os.makedirs(sandbox_dir, exist_ok=True)
+            
+            exclude_patterns = {
+                'temp', 'chats', 'venv', '.venv', 'env', 
+                '__pycache__', '.pytest_cache', '.git', 
+                '*.log', 'final_prompts.json', 'user_profile.json',
+                'sandbox'
+            }
             
             if os.path.exists(".gitignore"):
-                with open(".gitignore", "r+") as f:
-                    content = f.read()
-                    if "sandbox/" not in content:
-                        f.write("\nsandbox/")
-            return "Песочница создана успешно."
+                try:
+                    with open(".gitignore", "r", encoding="utf-8") as f:
+                        for line in f:
+                            line = line.strip()
+                            if line and not line.startswith('#'):
+                                pattern = line.rstrip('/').replace("\\", "/")
+                                exclude_patterns.add(pattern)
+                except: pass
+                
+            must_include_patterns = {
+                'plugin_config.json', 
+                'gemini*.key', 'google.key', 'search_engine.id',
+                'keys/gemini*.key', 'keys/google.key', 'keys/search_engine.id',
+                'keys/gemini.key_num'
+            }
+
+            def should_exclude(name, rel_path):
+                for p in must_include_patterns:
+                    if fnmatch.fnmatch(name, p) or fnmatch.fnmatch(rel_path, p):
+                        return False
+                for p in exclude_patterns:
+                    if fnmatch.fnmatch(name, p) or fnmatch.fnmatch(rel_path, p):
+                        return True
+                    if p.endswith('/') and (fnmatch.fnmatch(name + '/', p) or fnmatch.fnmatch(rel_path + '/', p)):
+                        return True
+                return False
+
+            def copy_recursive(src_root, dst_root, current_rel=""):
+                for item in os.listdir(src_root):
+                    item_rel = os.path.join(current_rel, item).replace("\\", "/")
+                    if should_exclude(item, item_rel):
+                        continue
+                    
+                    src_item = os.path.join(src_root, item)
+                    dst_item = os.path.join(dst_root, item)
+                    
+                    if os.path.isdir(src_item):
+                        os.makedirs(dst_item, exist_ok=True)
+                        copy_recursive(src_item, dst_item, item_rel)
+                    else:
+                        shutil.copy2(src_item, dst_item)
+
+            try:
+                copy_recursive(".", sandbox_dir)
+                prompts_path = os.path.join(sandbox_dir, "final_prompts.json")
+                if not os.path.exists(prompts_path):
+                    default_p = "plugins/web_interface/default_prompts.json"
+                    if os.path.exists(default_p):
+                        shutil.copy2(default_p, prompts_path)
+                return "Песочница создана успешно."
+            except Exception as e:
+                return f"Ошибка при создании: {str(e)}"
 
         elif action == "start":
-            if not os.path.exists(sandbox_dir):
-                self.sandbox_tool("create")
-            if state['process'] and state['process'].poll() is None:
-                return f"Уже запущена (PID: {state['pid']})"
-            
+            if not os.path.exists(sandbox_dir): self.sandbox_tool("create")
+            if state['process'] and state['process'].poll() is None: return f"Уже запущена (PID: {state['pid']})"
             port_to_try = 8080
             found_port = None
             while port_to_try < 8095:
@@ -310,30 +365,23 @@ class Chat:
                         found_port = port_to_try
                         break
                 port_to_try += 1
-            
             if not found_port: return "Нет свободных портов."
-            
             env = os.environ.copy()
             env["PYTHONIOENCODING"] = "utf-8"
-            proc = subprocess.Popen(
-                [sys.executable, 'start.py'],
-                cwd=sandbox_dir,
-                stdout=open(os.path.join(sandbox_dir, log_file), 'w', encoding='utf-8'),
-                stderr=subprocess.STDOUT,
-                env=env
-            )
+            proc = subprocess.Popen([sys.executable, 'start.py'], cwd=sandbox_dir, stdout=open(os.path.join(sandbox_dir, log_file), 'w', encoding='utf-8'), stderr=subprocess.STDOUT, env=env)
             state['process'] = proc
             state['pid'] = proc.pid
-
             actual_port = "Неизвестен"
-            while True:
-                with open(full_log_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read()
-                    match = re.search(r"http://127.0.0.1:(\d+)", content)
-                    if match:
-                        actual_port = match.group(1)
-                        break
-
+            start_time = time.time()
+            while time.time() - start_time < 20:
+                if os.path.exists(full_log_path):
+                    with open(full_log_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+                        match = re.search(r"http://127.0.0.1:(\d+)", content)
+                        if match:
+                            actual_port = match.group(1)
+                            break
+                time.sleep(1)
             return self.sandbox_tool("info")
 
         elif action == "info":
@@ -343,16 +391,15 @@ class Chat:
                 poll = state['process'].poll()
                 if poll is None: status = "Работает"
                 else: status = f"Завершен ({poll})"
-            
             actual_port = "Неизвестен"
             logs = ""
             if os.path.exists(full_log_path):
                 with open(full_log_path, 'r', encoding='utf-8', errors='ignore') as f:
                     content = f.read()
-                    logs = "\n".join(content.splitlines()[-5:])
+                    logs_list = content.splitlines()
+                    logs = "\n".join(logs_list[-7:])
                     match = re.search(r"http://127.0.0.1:(\d+)", content)
                     if match: actual_port = match.group(1)
-
             return json.dumps({"status": status, "pid": pid, "port": actual_port, "logs": logs}, ensure_ascii=False)
 
         elif action == "stop":
@@ -366,11 +413,11 @@ class Chat:
                 state['process'].terminate()
                 state['process'].wait()
             if os.path.exists(sandbox_dir):
-                subprocess.run(f"powershell -Command \"Remove-Item -Path '{sandbox_dir}' -Recurse -Force\"", shell=True)
+                try: shutil.rmtree(sandbox_dir)
+                except: subprocess.run(f"powershell -Command \"Remove-Item -Path '{sandbox_dir}' -Recurse -Force\"", shell=True)
                 return "Удалена."
             return "Не найдена."
         return "Неверная команда"
-
 
     def validate_python_code(self, code):
         try:
@@ -691,7 +738,6 @@ class Chat:
         self.ai_key = self.gemini_keys[self.current_key_index]
         self.client = genai.Client(api_key=self.ai_key)
         self.print(f"🔑 Превышен лимит запросов. Переключаюсь на следующий ключ ({self.current_key_index + 1}/{len(self.gemini_keys)}).")
-
 
 def main():
     print("🚀 AI-агент запущен (Gemini Native Mode). Введите ваш запрос.")
