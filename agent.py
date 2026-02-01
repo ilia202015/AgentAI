@@ -245,13 +245,26 @@ class Chat:
 
     def shell_tool(self, command, timeout=120):
         try:
-            process = subprocess.run(command, encoding='utf-8', shell=True, capture_output=True, text=True, timeout=timeout)
-            return json.dumps({"returncode": process.returncode, "stdout": process.stdout, "stderr": process.stderr}, ensure_ascii=False, indent=2)
+            import subprocess, json
+            process = subprocess.run(command, shell=True, capture_output=True, timeout=timeout)
+            
+            def decode_bytes(data):
+                if not data: return ""
+                for enc in ['utf-8', 'cp866', 'cp1251']:
+                    try:
+                        return data.decode(enc)
+                    except UnicodeDecodeError:
+                        continue
+                return data.decode('utf-8', errors='replace')
+
+            stdout = decode_bytes(process.stdout)
+            stderr = decode_bytes(process.stderr)
+            
+            return json.dumps({"returncode": process.returncode, "stdout": stdout, "stderr": stderr}, ensure_ascii=False, indent=2)
         except subprocess.TimeoutExpired:
             return json.dumps({"returncode": -1, "stdout": "", "stderr": f"Ошибка: Команда выполнялась дольше {timeout} секунд и была прервана."}, ensure_ascii=False, indent=2)
         except Exception as e:
             return json.dumps({"returncode": -1, "stdout": "", "stderr": f"Критическая ошибка при выполнении команды: {str(e)}"}, ensure_ascii=False, indent=2)
-
     def http_tool(self, url):
         try:
             import requests
