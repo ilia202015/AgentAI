@@ -10,19 +10,19 @@ import agent
 import plugins.web_interface.storage as storage
 from google.genai import types
 
-@pytest.fixture
+@pytest.fixture(scope='module')
 def mock_client():
     client = MagicMock()
     # Mock models.generate_content_stream if needed, but for storage tests 
     # we mostly need the client object to exist in the Chat instance.
     return client
 
-@pytest.fixture
-def mock_agent(mock_client, tmp_path, monkeypatch):
+@pytest.fixture(scope='module')
+def mock_agent(mock_client, tmp_path_factory, monkeypatch_module):
     # 1. Isolate Storage
-    test_chats_dir = tmp_path / "chats"
+    tmp_path = tmp_path_factory.mktemp("data"); test_chats_dir = tmp_path / "chats"
     test_chats_dir.mkdir()
-    monkeypatch.setattr(storage, "CHATS_DIR", str(test_chats_dir))
+    monkeypatch_module.setattr(storage, "CHATS_DIR", str(test_chats_dir))
     
     # 2. Mock Config loading (don't read real keys/files)
     def dummy_load(self):
@@ -40,7 +40,7 @@ def mock_agent(mock_client, tmp_path, monkeypatch):
         self.google_search_key = "dummy"
         self.search_engine_id = "dummy"
 
-    monkeypatch.setattr(agent.Chat, "_load_config", dummy_load)
+    monkeypatch_module.setattr(agent.Chat, "_load_config", dummy_load)
     
     # 3. Create Chat instance
     # We patch the Client class to return our mock_client
