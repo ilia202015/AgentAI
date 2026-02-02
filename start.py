@@ -106,7 +106,7 @@ def load_plugins():
                 dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS and d != "prompts"]
                 
                 for file in files:
-                    if file.endswith(".pyc") or file == ".DS_Store": continue
+                    if file.endswith(".pyc") or file == ".DS_Store" or file == "default_prompts.json": continue
                     
                     abs_path = os.path.join(root, file)
                     rel_path = os.path.relpath(abs_path, plugin_path).replace("\\", "/")
