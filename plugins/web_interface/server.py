@@ -96,6 +96,10 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         if id in self.active_chats: 
             return self.active_chats[id]
         
+        final_text = storage.get_active_final_prompt_text()
+        final_prompt_base_instructions = "Инструкции далее самые важные, они нужны чтобы систематизировать все предыдущие и ты понимал, на чём нужно сделать акцент, их написал пользователь, они могут меняться в процессе чата, всегда сдедуй им, даже если они противоречат твоим редыдущим действиям:"
+        final_prompt = f"\n\n{storage.WEB_PROMPT_MARKER_START}\n{final_prompt_base_instructions}\n{final_text}\n{storage.WEB_PROMPT_MARKER_END}"
+
         log_debug(f"Creating agent for {id}")
         try:
             if id == 'temp':
@@ -104,11 +108,8 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 
                 # 2. Setup ID
                 new_agent.id = id
-                # Inject active final prompt
-                final_text = storage.get_active_final_prompt_text()
-                if final_text and hasattr(new_agent, 'system_prompt'):
-                    final_prompt_base_instructions = "Инструкции далее самые важные, они нужны чтобы систематизировать все предыдущие и ты понимал, на чём нужно сделать акцент, их написал пользователь, они могут меняться в процессе чата, всегда сдедуй им, даже если они противоречат твоим редыдущим действиям:"
-                    new_agent.system_prompt += f"\n\n{storage.WEB_PROMPT_MARKER_START}\n{final_prompt_base_instructions}\n{final_text}\n{storage.WEB_PROMPT_MARKER_END}"
+                
+                new_agent.system_prompt = final_prompt + new_agent.system_prompt + final_prompt
 
                 self.active_chats[id] = new_agent
                 return new_agent
@@ -125,11 +126,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 if warning:
                     print(warning)
                 
-                # Inject active final prompt
-                final_text = storage.get_active_final_prompt_text()
-                if final_text and hasattr(chat, 'system_prompt'):
-                    final_prompt_base_instructions = "Инструкции далее самые важные, они нужны чтобы систематизировать все предыдущие и ты понимал, на чём нужно сделать акцент, их написал пользователь, они могут меняться в процессе чата, всегда сдедуй им, даже если они противоречат твоим редыдущим действиям:"
-                    chat.system_prompt += f"\n\n{storage.WEB_PROMPT_MARKER_START}\n{final_prompt_base_instructions}\n{final_text}\n{storage.WEB_PROMPT_MARKER_END}"
+                chat.system_prompt = final_prompt + chat.system_prompt + final_prompt
 
                 self.active_chats[id] = chat
                 return chat
