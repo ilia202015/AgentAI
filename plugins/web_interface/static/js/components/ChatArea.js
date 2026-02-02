@@ -1,4 +1,3 @@
-
 import { store } from '../store.js';
 import * as api from '../api.js';
 import { nextTick, ref, watch, onMounted, onUnmounted, computed, defineComponent } from 'vue';
@@ -136,7 +135,37 @@ const latexExtension = {
     }, 
     renderer(token) { return token.text; }
 };
-marked.use({ extensions: [latexExtension] });
+
+// NEW: Streaming HTML Extension to prevent escaping during typing
+const streamingHtmlExtension = {
+    name: 'streamingHtml',
+    level: 'inline',
+    start(src) { return src.indexOf('<'); },
+    tokenizer(src, tokens) {
+        // Look for an opening tag. It must start with < followed by a tag name.
+        // Captures everything until a corresponding closing tag or end of string.
+        const match = /^<([a-z1-6]+)\b[^>]*>([\s\S]*?)(?:<\/\1>|$)/i.exec(src);
+        if (match) {
+            return {
+                type: 'streamingHtml',
+                raw: match[0],
+                text: match[0]
+            };
+        }
+        // Handle partial opening tag at the very end (e.g., "<div class=")
+        const partialMatch = /^<[a-z1-6]*\b[^>]*$/i.exec(src);
+        if (partialMatch) {
+             return {
+                type: 'streamingHtml',
+                raw: partialMatch[0],
+                text: partialMatch[0]
+            };
+        }
+    },
+    renderer(token) { return token.text; }
+};
+
+marked.use({ extensions: [latexExtension, streamingHtmlExtension] });
 marked.setOptions({ renderer: renderer, pedantic: false, gfm: true, breaks: true });
 
 const MarkdownContent = defineComponent({
@@ -631,7 +660,7 @@ export default {
         });
 
         const runCommand = (cmd) => {
-            inputText.value = `[КОМАНДА: ${cmd.name}]\n${cmd.text}`;
+            inputText.value = `[КОМАНДА: ${cmd.name}]\\n${cmd.text}`;
             send();
         };
 
