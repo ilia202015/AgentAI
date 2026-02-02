@@ -107,9 +107,8 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 # Inject active final prompt
                 final_text = storage.get_active_final_prompt_text()
                 if final_text and hasattr(new_agent, 'system_prompt'):
-                    if True: # Force refresh
-                        final_prompt_base_instructions = "Инструкции далее самые важные, они нужны чтобы систематизировать все предыдущие и ты понимал, на чём нужно сделать акцент, их написал пользователь, они могут меняться в процессе чата, всегда сдедуй им, даже если они противоречат твоим редыдущим действиям:"
-                        new_agent.system_prompt += f"\n\n{storage.WEB_PROMPT_MARKER_START}\n{final_prompt_base_instructions}\n{final_text}\n{storage.WEB_PROMPT_MARKER_END}"
+                    final_prompt_base_instructions = "Инструкции далее самые важные, они нужны чтобы систематизировать все предыдущие и ты понимал, на чём нужно сделать акцент, их написал пользователь, они могут меняться в процессе чата, всегда сдедуй им, даже если они противоречат твоим редыдущим действиям:"
+                    new_agent.system_prompt += f"\n\n{storage.WEB_PROMPT_MARKER_START}\n{final_prompt_base_instructions}\n{final_text}\n{storage.WEB_PROMPT_MARKER_END}"
 
                 self.active_chats[id] = new_agent
                 return new_agent
@@ -129,8 +128,9 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 # Inject active final prompt
                 final_text = storage.get_active_final_prompt_text()
                 if final_text and hasattr(chat, 'system_prompt'):
-                    if True: # Force refresh
-                         chat.system_prompt += f"\n\n{storage.WEB_PROMPT_MARKER_START}\n{final_text}\n{storage.WEB_PROMPT_MARKER_END}"
+                    final_prompt_base_instructions = "Инструкции далее самые важные, они нужны чтобы систематизировать все предыдущие и ты понимал, на чём нужно сделать акцент, их написал пользователь, они могут меняться в процессе чата, всегда сдедуй им, даже если они противоречат твоим редыдущим действиям:"
+                    chat.system_prompt += f"\n\n{storage.WEB_PROMPT_MARKER_START}\n{final_prompt_base_instructions}\n{final_text}\n{storage.WEB_PROMPT_MARKER_END}"
+
                 self.active_chats[id] = chat
                 return chat
 

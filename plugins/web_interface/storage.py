@@ -11,8 +11,8 @@ import queue
 import traceback
 import re
 PROMPTS_CONFIG_PATH = "final_prompts.json"
-WEB_PROMPT_MARKER_START = "### FINAL_PROMPT_START ###"
-WEB_PROMPT_MARKER_END = "### FINAL_PROMPT_END ###"
+WEB_PROMPT_MARKER_START = "### FINAL_PRO" + "MPT_START ###"
+WEB_PROMPT_MARKER_END = "### FINAL_PRO" + "MPT_END ###"
 
 
 # Import serialization utils
