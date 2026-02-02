@@ -176,6 +176,7 @@ def load_chat_state(id, get_chat):
             chat.messages = serialization.deserialize_history(value)
         else:
             setattr(chat, key, value)
+    chat.busy_depth = 0
 
     if not getattr(chat, "name", False): chat.name = "New chat"
     if not getattr(chat, "id", False): chat.id = id
@@ -239,8 +240,10 @@ def save_chat_state(chat):
 
     # 1. Сохранение JSON (Бэкап и метаданные)
     try:
-        with open(json_path, 'w', encoding='utf-8') as f:
+        tmp_path = json_path + ".tmp"
+        with open(tmp_path, 'w', encoding='utf-8') as f:
             json.dump(base_data, f, ensure_ascii=False, indent=2, default=str)
+        os.replace(tmp_path, json_path)
     except Exception as e:
         print(f"❌ Error saving JSON backup: {e}")
 
@@ -248,8 +251,10 @@ def save_chat_state(chat):
     # Логика очистки непиклируемых полей теперь в Chat.__getstate__ (web_getstate)
     pkl_path = os.path.join(CHATS_DIR, f'{chat.id}.pkl')
     try:
-        with open(pkl_path, 'wb') as f:            
+        tmp_pkl = pkl_path + ".tmp"
+        with open(tmp_pkl, 'wb') as f:
             dill.dump(chat, f)
+        os.replace(tmp_pkl, pkl_path)
     except Exception as e:
         print(f"❌ Error saving dill: {e}")
     

@@ -215,6 +215,9 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             path = self.path.split('?')[0]
             if path.endswith("/rename"):
                  cid = path.split("/")[-2]
+                 agent = self.active_chats.get(cid)
+                 if agent and getattr(agent, "busy_depth", 0) > 0:
+                     return self.send_json_error(409, "Agent is busy")
                  if storage.rename_chat(cid, data.get("name"), self.clone_root_chat):
                      if cid in self.active_chats:
                          self.active_chats[cid].name = data.get("name")
@@ -293,6 +296,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         if serialization:
             resp['messages'] = serialization.serialize_history_for_web(new_chat.messages, chat_id=getattr(new_chat, 'id', None))
             
+        log_debug(f"DEBUG RESP: {resp.keys()}")
         self.send_json(resp)
 
     def api_start_temp(self):
@@ -319,6 +323,9 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 if serialization:
                     resp["messages"] = serialization.serialize_history_for_web(chat.messages, chat_id=cid)
                 
+                chat.client = self.ai_client
+                self.active_chats[cid] = chat
+                
                 self.send_json({"status": "loaded", "chat": resp, "warning": warning})
             else: 
                 self.send_json_error(404, f"Chat {cid} not found or corrupted")
@@ -334,8 +341,10 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         self.send_json({"status": "saved"})
 
     def api_edit_message(self, path, data): 
-        if is_print_debug:
-            print(f"api_edit_message({path}, {data})")
+        cid = data.get("chatId")
+        agent = self.get_agent_for_chat(cid)
+        if agent and getattr(agent, "busy_depth", 0) > 0:
+            return self.send_json_error(409, "Agent is busy")
 
         self.send_json_error(501, "Not impl in debug")
     
@@ -364,6 +373,9 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
 
     def api_change_model(self, path, data):
         cid = path.split("/")[-2]
+        agent = self.active_chats.get(cid)
+        if agent and getattr(agent, "busy_depth", 0) > 0:
+            return self.send_json_error(409, "Agent is busy")
         model_name = data.get("model")
         if not model_name: return self.send_json_error(400, "No model")
         
@@ -513,8 +525,12 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                     got_event = True
                 except queue.Empty:
                     pass
-                except Exception: 
-                    # Connection closed
+                except Exception as e:
+                    log_debug(f"SSE Connection error: {e}")
+                    # Stop all agents if the user closed the connection
+                    for c in current_chats:
+                        if hasattr(c, "stop_requested"):
+                            c.stop_requested = True
                     return
 
             if not got_event:
@@ -523,6 +539,8 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                     self.wfile.write(b": keep-alive\n\n")
                     self.wfile.flush()
                  except Exception:
+                    for c in current_chats:
+                        if hasattr(c, "stop_requested"): c.stop_requested = True
                     break
 
 def get_free_port(start_port):
