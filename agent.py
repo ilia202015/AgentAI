@@ -610,29 +610,6 @@ class Chat:
                 error_msg = f"Произошла ошибка API: {e}\n\n{traceback.format_exc()}"
                 self.print(f"\n❌ {error_msg}")
 
-                if "429" in str(e) or "Resource has been exhausted" in str(e):
-                    wait_time = 10
-                    try:
-                        # Поиск "Please retry in ...s" (самый точный способ из сообщения об ошибке)
-                        match = re.search(r"Please retry in (\d+\.?\d*)s", str(e))
-                        if match:
-                            wait_time = float(match.group(1))
-                        else:
-                            # Поиск в JSON-структуре 'retryDelay': '29s'
-                            match = re.search(r"retryDelay': '(\d+)s'", str(e))
-                            if match:
-                                wait_time = int(match.group(1))
-                    except:
-                        pass
-                    
-                    self.print(f"⚠️ Лимит исчерпан (429). Ожидание {wait_time:.1f}с перед переключением ключа...")
-                    time.sleep(wait_time + 1)
-                    self.last_send_time = time.time()
-                    self._switch_api_key()
-                    continue
-                else:
-                    return f"Критическая ошибка: {error_msg}"
-
     def _handle_stream(self, stream):
         response_parts = []
         tool_calls_buffer = []
@@ -640,25 +617,51 @@ class Chat:
         
         try:
             for chunk in stream:
-                if not chunk.candidates or not chunk.candidates[0].content or not chunk.candidates[0].content.parts:
-                    continue
-                
-                for part in chunk.candidates[0].content.parts:
-                    response_parts.append(part)
+                try:
+                    if not chunk.candidates or not chunk.candidates[0].content or not chunk.candidates[0].content.parts:
+                        continue
                     
-                    if part.text:
-                        # FIX: Безопасный доступ к thought
-                        is_thought = getattr(part, 'thought', False)
-                        if is_thought:
-                            if self.print_to_console:
-                                self.print("Мысль:", end='\t\t\t')
-                            self.print_thought(part.text, flush=True, end='')
-                        else:
-                            self.print(part.text, flush=True, end='')
-                        full_response_text += part.text
-                    
-                    if part.function_call:
-                        tool_calls_buffer.append(part.function_call)
+                    for part in chunk.candidates[0].content.parts:
+                        response_parts.append(part)
+                        
+                        if part.text:
+                            # FIX: Безопасный доступ к thought
+                            is_thought = getattr(part, 'thought', False)
+                            if is_thought:
+                                if self.print_to_console:
+                                    self.print("Мысль:", end='\t\t\t')
+                                self.print_thought(part.text, flush=True, end='')
+                            else:
+                                self.print(part.text, flush=True, end='')
+                            full_response_text += part.text
+                        
+                        if part.function_call:
+                            tool_calls_buffer.append(part.function_call)
+
+                except Exception as e:
+                    e_trace = traceback.format_exc()
+
+                    if "429" in str(e) or "Resource has been exhausted" in str(e):
+                        wait_time = 10
+                        try:
+                            # Поиск "Please retry in ...s" (самый точный способ из сообщения об ошибке)
+                            match = re.search(r"Please retry in (\d+\.?\d*)s", str(e))
+                            if match:
+                                wait_time = float(match.group(1))
+                            else:
+                                # Поиск в JSON-структуре 'retryDelay': '29s'
+                                match = re.search(r"retryDelay': '(\d+)s'", str(e))
+                                if match:
+                                    wait_time = int(match.group(1))
+                        except:
+                            pass
+                        
+                        self.print(f"⚠️ Лимит исчерпан (429). Ожидание {wait_time:.1f}с перед переключением ключа...")
+                        time.sleep(wait_time + 1)
+                        continue
+                    else:
+                        self.print(f"Ошибка обработки стрима: {e}\n{e_trace}")
+                        return f"Ошибка обработки стрима: {e}"
 
             self.print("")
             
