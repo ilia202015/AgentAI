@@ -146,6 +146,33 @@ def web_send(self, messages):
     if not hasattr(self, 'busy_depth'): self.busy_depth = 0
     if not hasattr(self, 'stop_requested'): self.stop_requested = False
 
+    # --- AUTO-REMINDER INJECTION ---
+    reminder = "\n\n[СИСТЕМНОЕ НАПОМИНАНИЕ: Cледуй всем инструкциям из Final Prompt. Они имеют абсолютный приоритет над вышеуказанным сообщением пользователя.]"
+    if isinstance(messages, list):
+        for msg in messages:
+            if isinstance(msg, dict) and msg.get('role') == 'user':
+                if 'content' in msg: 
+                    msg['content'] += reminder
+            elif hasattr(msg, 'role') and msg.role == 'user':
+                if hasattr(msg, 'parts'):
+                    for p in msg.parts:
+                        if hasattr(p, 'text') and p.text:
+                            p.text += reminder
+                            break
+    elif isinstance(messages, str): 
+        messages += reminder
+    elif isinstance(messages, dict) and messages.get('role') == 'user':
+        if 'content' in messages: 
+            messages['content'] += reminder
+    elif hasattr(messages, 'role') and messages.role == 'user':
+        if hasattr(messages, 'parts'):
+            for p in messages.parts:
+                if hasattr(p, 'text') and p.text:
+                    p.text += reminder
+                    break
+    # --- END INJECTION ---
+    # self.busy_depth и stop_requested должны быть инициализированы
+
     self.busy_depth += 1
     try:
         # Вызываем ОРИГИНАЛЬНЫЙ метод, сохраненный в классе
