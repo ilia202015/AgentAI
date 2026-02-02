@@ -136,33 +136,68 @@ const latexExtension = {
     renderer(token) { return token.text; }
 };
 
-// NEW: Streaming HTML Extension to prevent escaping during typing
+// NEW: Streaming HTML Extension (Block Level with Nesting)
 const streamingHtmlExtension = {
     name: 'streamingHtml',
-    level: 'inline',
-    start(src) { return src.indexOf('<'); },
+    level: 'block', 
+    start(src) { return src.match(/^ *<[a-z1-6]/i)?.index; },
     tokenizer(src, tokens) {
-        // Look for an opening tag. It must start with < followed by a tag name.
-        // Captures everything until a corresponding closing tag or end of string.
-        const match = /^<([a-z1-6]+)\b[^>]*>([\s\S]*?)(?:<\/\1>|$)/i.exec(src);
-        if (match) {
+        // 1. Check for opening tag
+        const startMatch = /^ *<([a-z1-6]+)(?:\s|\/?>)/i.exec(src);
+        if (!startMatch) return;
+
+        const tagName = startMatch[1];
+        
+        // 2. Scan for matching closing tag with nesting counting
+        let depth = 0;
+        const tagRegex = new RegExp(`<\/?${tagName}(?:\\s|\\/?>|$)`, 'gi');
+        let match;
+        let endIndex = -1;
+        
+        // We must start searching from the beginning to count the first open tag
+        while ((match = tagRegex.exec(src)) !== null) {
+            if (match[0].startsWith('</')) {
+                depth--;
+            } else {
+                if (!match[0].endsWith('/>')) depth++;
+            }
+            
+            if (depth === 0) {
+                const closingTagEnd = src.indexOf('>', match.index);
+                if (closingTagEnd !== -1) {
+                    endIndex = closingTagEnd + 1;
+                    break;
+                }
+            }
+        }
+
+        if (endIndex !== -1) {
+            const raw = src.substring(0, endIndex);
             return {
-                type: 'streamingHtml',
-                raw: match[0],
-                text: match[0]
+                type: 'html',
+                raw: raw,
+                pre: false,
+                text: raw
             };
         }
-        // Handle partial opening tag at the very end (e.g., "<div class=")
-        const partialMatch = /^<[a-z1-6]*\b[^>]*$/i.exec(src);
-        if (partialMatch) {
+        
+        // 3. Streaming case: If depth > 0, we are inside an unfinished block.
+        // Capture everything to prevent indentation from triggering code blocks.
+        if (depth > 0) {
              return {
-                type: 'streamingHtml',
-                raw: partialMatch[0],
-                text: partialMatch[0]
+                type: 'html',
+                raw: src,
+                pre: false,
+                text: src
             };
         }
-    },
-    renderer(token) { return token.text; }
+        
+        // Fallback for simple partials
+        const partialMatch = /^ *<[a-z1-6]*(?:\s[^>]*)?$/i.exec(src);
+        if (partialMatch) {
+             return { type: 'html', raw: partialMatch[0], pre: false, text: partialMatch[0] };
+        }
+    }
 };
 
 marked.use({ extensions: [latexExtension, streamingHtmlExtension] });
@@ -660,7 +695,7 @@ export default {
         });
 
         const runCommand = (cmd) => {
-            inputText.value = `[КОМАНДА: ${cmd.name}]\\n${cmd.text}`;
+            inputText.value = `[КОМАНДА: ${cmd.name}]\n${cmd.text}`;
             send();
         };
 
