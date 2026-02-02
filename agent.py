@@ -1,4 +1,4 @@
-import os, json, base64, ast, sys, types, datetime, time, subprocess, traceback, platform
+import os, re, json, base64, ast, sys, types, datetime, time, subprocess, traceback, platform
 from google import genai
 from google.genai import types
 
@@ -611,7 +611,23 @@ class Chat:
                 self.print(f"\n❌ {error_msg}")
 
                 if "429" in str(e) or "Resource has been exhausted" in str(e):
-                    self.last_send_time -= 60
+                    wait_time = 10
+                    try:
+                        # Поиск "Please retry in ...s" (самый точный способ из сообщения об ошибке)
+                        match = re.search(r"Please retry in (\d+\.?\d*)s", str(e))
+                        if match:
+                            wait_time = float(match.group(1))
+                        else:
+                            # Поиск в JSON-структуре 'retryDelay': '29s'
+                            match = re.search(r"retryDelay': '(\d+)s'", str(e))
+                            if match:
+                                wait_time = int(match.group(1))
+                    except:
+                        pass
+                    
+                    self.print(f"⚠️ Лимит исчерпан (429). Ожидание {wait_time:.1f}с перед переключением ключа...")
+                    time.sleep(wait_time + 1)
+                    self.last_send_time = time.time()
                     self._switch_api_key()
                     continue
                 else:
