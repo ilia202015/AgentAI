@@ -2,6 +2,19 @@ import time
 import json
 import queue
 import threading
+import logging
+import os
+
+# Настройка логирования для отладки сервера
+debug_log_path = "server_debug.log"
+logging.basicConfig(
+    filename=debug_log_path,
+    level=logging.DEBUG,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    force=True # Переопределяем если уже настроен
+)
+logger = logging.getLogger("browser_bridge")
+
 
 # Глобальные переменные для реализации синглтона вне атрибутов класса
 # Это предотвращает рекурсию при попытке dill проинспектировать класс.
@@ -72,10 +85,12 @@ class BrowserBridge:
         self._cleanup_responses()
         try:
             # Ожидание команды до 25 секунд
-            cmd = self._command_queue.get(timeout=25)
+            logger.debug('Polling: waiting for command...')
+            cmd = self._command_queue.get(timeout=15)
             print(f"🌐 [BrowserBridge] Команда отправлена в расширение: {cmd.get('type')}")
             return cmd
         except queue.Empty:
+            logger.debug('Polling: no command, sending noop')
             return {"type": "noop"}
 
     def respond(self, data):
@@ -99,6 +114,7 @@ class BrowserBridge:
             return {"error": "Browser extension not registered or lost connection"}
         
         request_id = f"{command_type}_{time.time()}"
+        logger.info(f'Executing command {command_type} (ID: {request_id})')
         cmd = {
             "request_id": request_id,
             "type": command_type,

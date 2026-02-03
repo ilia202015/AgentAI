@@ -114,27 +114,50 @@ def main(chat, settings):
         _old_do_POST = WebRequestHandler.do_POST
         _old_do_GET = WebRequestHandler.do_GET
 
+        
         def new_do_POST(self):
-            if self.path == '/api/browser/register':
-                content_length = int(self.headers['Content-Length'])
-                self.rfile.read(content_length)
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                self._send_cors_headers()
-                self.end_headers()
-                self.wfile.write(json.dumps(bridge.register()).encode())
-            elif self.path == '/api/browser/respond':
-                content_length = int(self.headers['Content-Length'])
-                post_data = json.loads(self.rfile.read(content_length))
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                self._send_cors_headers()
-                self.end_headers()
-                self.wfile.write(json.dumps(bridge.respond(post_data)).encode())
-            else:
-                _old_do_POST(self)
+            import logging
+            logger = logging.getLogger('browser_bridge')
+            try:
+                if self.path == '/api/browser/register':
+                    logger.info("Registering browser extension")
+                    content_length = int(self.headers.get('Content-Length', 0))
+                    if content_length > 0:
+                        self.rfile.read(content_length)
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self._send_cors_headers()
+                    self.end_headers()
+                    self.wfile.write(json.dumps(bridge.register()).encode())
+                elif self.path == '/api/browser/respond':
+                    content_length = int(self.headers.get('Content-Length', 0))
+                    if content_length > 0:
+                        post_data = json.loads(self.rfile.read(content_length))
+                        logger.info(f"Received response for ID: {post_data.get('request_id')}")
+                        res = bridge.respond(post_data)
+                    else:
+                        res = {"status": "error", "message": "no data"}
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self._send_cors_headers()
+                    self.end_headers()
+                    self.wfile.write(json.dumps(res).encode())
+                else:
+                    _old_do_POST(self)
+            except Exception as e:
+                logger.error(f"Error in browser_use POST: {e}", exc_info=True)
+                if not self.wfile.closed:
+                    try:
+                        # Если мы еще не отправили заголовки, пробуем 500
+                        # Но проще просто передать управление старому обработчику или закрыть
+                        _old_do_POST(self)
+                    except: pass
+
 
         def new_do_GET(self):
+            import logging
+            logger = logging.getLogger('browser_bridge')
+            logger.debug(f'GET request: {self.path}')
             if self.path == '/api/browser/poll':
                 self.send_response(200)
                 self.send_header('Content-type', 'application/json')

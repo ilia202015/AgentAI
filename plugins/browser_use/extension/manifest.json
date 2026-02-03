@@ -10,9 +10,16 @@
     "scripting"
   ],
   "host_permissions": [
-    "http://localhost/*"
+    "http://localhost/*",
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js"
-  }
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"]
+    }
+  ]
 }
