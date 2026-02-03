@@ -1,7 +1,17 @@
 import json
 import importlib.util
 import types
-from .bridge import bridge
+import os
+import sys
+
+# Динамическая загрузка bridge.py для избежания ModuleNotFoundError
+current_dir = os.path.dirname(os.path.abspath(__file__))
+spec = importlib.util.spec_from_file_location("browser_bridge", os.path.join(current_dir, "bridge.py"))
+bridge_module = importlib.util.module_from_spec(spec)
+# Регистрируем модуль в sys.modules, чтобы dill мог его найти при сериализации чата
+sys.modules["browser_bridge"] = bridge_module
+spec.loader.exec_module(bridge_module)
+bridge = bridge_module.bridge
 
 # --- Реализация инструментов ---
 
@@ -22,7 +32,7 @@ def browser_get_raw_html_tool(self, selector=None):
 
 # --- Инициализация ---
 
-def init(chat):
+def main(chat, settings):
     """
     Инициализация плагина browser_use.
     Регистрирует инструменты в объекте chat и настраивает API эндпоинты.
@@ -85,7 +95,8 @@ def init(chat):
                     "type": "object",
                     "properties": {
                         "selector": {"type": "string", "description": "CSS селектор (например, '#main-content'). Если не указан, вернет всю страницу."}
-                    }
+                    },
+                    "required": []
                 }
             }
         }
@@ -96,11 +107,10 @@ def init(chat):
             chat.tools.append(tool)
 
     try:
-        spec = importlib.util.find_spec("plugins.web_interface.server")
-        if spec:
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            WebRequestHandler = module.WebRequestHandler
+        # Прямой доступ к WebRequestHandler через sys.modules (если загружен)
+        server_mod = sys.modules.get('server')
+        if server_mod:
+            WebRequestHandler = server_mod.WebRequestHandler
             
             _old_do_POST = WebRequestHandler.do_POST
             _old_do_GET = WebRequestHandler.do_GET
@@ -111,6 +121,7 @@ def init(chat):
                     self.rfile.read(content_length)
                     self.send_response(200)
                     self.send_header('Content-type', 'application/json')
+                    self._send_cors_headers()
                     self.end_headers()
                     self.wfile.write(json.dumps(bridge.register()).encode())
                 elif self.path == '/api/browser/respond':
@@ -118,6 +129,7 @@ def init(chat):
                     post_data = json.loads(self.rfile.read(content_length))
                     self.send_response(200)
                     self.send_header('Content-type', 'application/json')
+                    self._send_cors_headers()
                     self.end_headers()
                     self.wfile.write(json.dumps(bridge.respond(post_data)).encode())
                 else:
@@ -127,6 +139,7 @@ def init(chat):
                 if self.path == '/api/browser/poll':
                     self.send_response(200)
                     self.send_header('Content-type', 'application/json')
+                    self._send_cors_headers()
                     self.end_headers()
                     self.wfile.write(json.dumps(bridge.poll()).encode())
                 else:
@@ -135,5 +148,7 @@ def init(chat):
             WebRequestHandler.do_POST = new_do_POST
             WebRequestHandler.do_GET = new_do_GET
             print("✅ [browser_use] API эндпоинты интегрированы в WebRequestHandler")
+        return chat
     except Exception as e:
         print(f"⚠️ [browser_use] Ошибка интеграции в веб-интерфейс: {e}")
+        return chat
