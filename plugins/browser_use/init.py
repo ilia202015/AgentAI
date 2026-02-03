@@ -1,0 +1,139 @@
+import json
+import importlib.util
+import types
+from .bridge import bridge
+
+# --- Реализация инструментов ---
+
+def browser_open_tool(self, url):
+    """Открыть URL в браузере."""
+    return bridge.execute("open_url", {"url": url})
+
+def browser_actions_tool(self, commands):
+    """
+    Выполнить пакет команд (click, type, wait, scroll, get_state, get_html, js_exec) за один вызов.
+    Используй этот инструмент для большинства задач.
+    """
+    return bridge.execute("execute_batch", {"commands": commands})
+
+def browser_get_raw_html_tool(self, selector=None):
+    """Получить полный HTML код страницы или элемента для глубокого анализа."""
+    return bridge.execute("get_raw_html", {"selector": selector})
+
+# --- Инициализация ---
+
+def init(chat):
+    """
+    Инициализация плагина browser_use.
+    Регистрирует инструменты в объекте chat и настраивает API эндпоинты.
+    """
+    print("🔌 [browser_use] Инициализация инструментов и API...")
+    
+    chat.browser_open_tool = types.MethodType(browser_open_tool, chat)
+    chat.browser_actions_tool = types.MethodType(browser_actions_tool, chat)
+    chat.browser_get_raw_html_tool = types.MethodType(browser_get_raw_html_tool, chat)
+    
+    browser_tools = [
+        {
+            "function": {
+                "name": "browser_open",
+                "description": "Открыть указанный URL в новой или текущей вкладке браузера.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "description": "URL для перехода (обязательно с http/https)"}
+                    },
+                    "required": ["url"]
+                }
+            }
+        },
+        {
+            "function": {
+                "name": "browser_actions",
+                "description": "Выполнить пакет команд (click, type, wait, scroll, get_state, get_html, js_exec) за один вызов. Это основной инструмент для навигации и взаимодействия.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "commands": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string", 
+                                        "enum": ["click", "type", "scroll", "wait", "get_state", "get_html", "js_exec"]
+                                    },
+                                    "id": {"type": "integer", "description": "ID элемента (Label ID) из состояния страницы"},
+                                    "text": {"type": "string", "description": "Текст для ввода или JS код"},
+                                    "enter": {"type": "boolean", "description": "Нажать Enter после ввода текста"},
+                                    "ms": {"type": "integer", "description": "Миллисекунды ожидания"},
+                                    "direction": {"type": "string", "enum": ["up", "down"], "description": "Направление скролла"}
+                                },
+                                "required": ["type"]
+                            }
+                        }
+                    },
+                    "required": ["commands"]
+                }
+            }
+        },
+        {
+            "function": {
+                "name": "browser_get_raw_html",
+                "description": "Получить полный, нефильтрованный HTML код всей страницы или конкретного элемента по CSS-селектору.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "selector": {"type": "string", "description": "CSS селектор (например, '#main-content'). Если не указан, вернет всю страницу."}
+                    }
+                }
+            }
+        }
+    ]
+
+    for tool in browser_tools:
+        if not any(t.get("function", {}).get("name") == tool["function"]["name"] for t in chat.tools):
+            chat.tools.append(tool)
+
+    try:
+        spec = importlib.util.find_spec("plugins.web_interface.server")
+        if spec:
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            WebRequestHandler = module.WebRequestHandler
+            
+            _old_do_POST = WebRequestHandler.do_POST
+            _old_do_GET = WebRequestHandler.do_GET
+
+            def new_do_POST(self):
+                if self.path == '/api/browser/register':
+                    content_length = int(self.headers['Content-Length'])
+                    self.rfile.read(content_length)
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(bridge.register()).encode())
+                elif self.path == '/api/browser/respond':
+                    content_length = int(self.headers['Content-Length'])
+                    post_data = json.loads(self.rfile.read(content_length))
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(bridge.respond(post_data)).encode())
+                else:
+                    _old_do_POST(self)
+
+            def new_do_GET(self):
+                if self.path == '/api/browser/poll':
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(bridge.poll()).encode())
+                else:
+                    _old_do_GET(self)
+
+            WebRequestHandler.do_POST = new_do_POST
+            WebRequestHandler.do_GET = new_do_GET
+            print("✅ [browser_use] API эндпоинты интегрированы в WebRequestHandler")
+    except Exception as e:
+        print(f"⚠️ [browser_use] Ошибка интеграции в веб-интерфейс: {e}")
