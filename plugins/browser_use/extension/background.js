@@ -25,7 +25,7 @@ async function poll() {
             handleCommand(command);
         }
     } catch (error) {
-        console.error('❌ Polling error:', error);
+        // console.error('❌ Polling error:', error);
         await new Promise(r => setTimeout(r, 5000));
     }
     poll(); // Continue loop
@@ -44,6 +44,10 @@ async function handleCommand(command) {
                 status: 'success', 
                 data: tabs.map(t => ({ id: t.id, url: t.url, title: t.title })) 
             };
+        } else if (command.type === 'open_url') {
+            const url = command.params.url;
+            await chrome.tabs.create({ url: url });
+            result = { request_id: command.request_id, status: 'success', data: { message: `Opened ${url}` } };
         } else if (command.type === 'get_state') {
             if (!tab) throw new Error("No active tab found");
             const response = await chrome.tabs.sendMessage(tab.id, { action: "getPageData" });
@@ -55,6 +59,20 @@ async function handleCommand(command) {
                 commands: command.params.commands 
             });
             result = { request_id: command.request_id, status: 'success', data: response };
+        } else if (command.type === 'get_raw_html') {
+             if (!tab) throw new Error("No active tab found");
+             const response = await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                func: (selector) => {
+                    if (selector) {
+                        const el = document.querySelector(selector);
+                        return el ? el.outerHTML : "Element not found";
+                    }
+                    return document.documentElement.outerHTML;
+                },
+                args: [command.params.selector]
+             });
+             result = { request_id: command.request_id, status: 'success', data: { html: response[0].result } };
         }
     } catch (e) {
         result = { request_id: command.request_id, status: 'error', message: e.toString() };

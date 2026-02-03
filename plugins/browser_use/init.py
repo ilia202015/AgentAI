@@ -109,45 +109,44 @@ def main(chat, settings):
     try:
         # Прямой доступ к WebRequestHandler через sys.modules (если загружен)
         server_mod = sys.modules.get('server')
-        if server_mod:
-            WebRequestHandler = server_mod.WebRequestHandler
-            
-            _old_do_POST = WebRequestHandler.do_POST
-            _old_do_GET = WebRequestHandler.do_GET
+        WebRequestHandler = server_mod.WebRequestHandler
+        
+        _old_do_POST = WebRequestHandler.do_POST
+        _old_do_GET = WebRequestHandler.do_GET
 
-            def new_do_POST(self):
-                if self.path == '/api/browser/register':
-                    content_length = int(self.headers['Content-Length'])
-                    self.rfile.read(content_length)
-                    self.send_response(200)
-                    self.send_header('Content-type', 'application/json')
-                    self._send_cors_headers()
-                    self.end_headers()
-                    self.wfile.write(json.dumps(bridge.register()).encode())
-                elif self.path == '/api/browser/respond':
-                    content_length = int(self.headers['Content-Length'])
-                    post_data = json.loads(self.rfile.read(content_length))
-                    self.send_response(200)
-                    self.send_header('Content-type', 'application/json')
-                    self._send_cors_headers()
-                    self.end_headers()
-                    self.wfile.write(json.dumps(bridge.respond(post_data)).encode())
-                else:
-                    _old_do_POST(self)
+        def new_do_POST(self):
+            if self.path == '/api/browser/register':
+                content_length = int(self.headers['Content-Length'])
+                self.rfile.read(content_length)
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self._send_cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps(bridge.register()).encode())
+            elif self.path == '/api/browser/respond':
+                content_length = int(self.headers['Content-Length'])
+                post_data = json.loads(self.rfile.read(content_length))
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self._send_cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps(bridge.respond(post_data)).encode())
+            else:
+                _old_do_POST(self)
 
-            def new_do_GET(self):
-                if self.path == '/api/browser/poll':
-                    self.send_response(200)
-                    self.send_header('Content-type', 'application/json')
-                    self._send_cors_headers()
-                    self.end_headers()
-                    self.wfile.write(json.dumps(bridge.poll()).encode())
-                else:
-                    _old_do_GET(self)
+        def new_do_GET(self):
+            if self.path == '/api/browser/poll':
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self._send_cors_headers()
+                self.end_headers()
+                self.wfile.write(json.dumps(bridge.poll()).encode())
+            else:
+                _old_do_GET(self)
 
-            WebRequestHandler.do_POST = new_do_POST
-            WebRequestHandler.do_GET = new_do_GET
-            print("✅ [browser_use] API эндпоинты интегрированы в WebRequestHandler")
+        WebRequestHandler.do_POST = new_do_POST
+        WebRequestHandler.do_GET = new_do_GET
+        print("✅ [browser_use] API эндпоинты интегрированы в WebRequestHandler")
         return chat
     except Exception as e:
         print(f"⚠️ [browser_use] Ошибка интеграции в веб-интерфейс: {e}")
