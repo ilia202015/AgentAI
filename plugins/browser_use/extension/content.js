@@ -119,3 +119,100 @@ async function executeSingleAction(action) {
             return { error: 'Unknown action: ' + action.action };
     }
 }
+
+// Message Listener
+
+// Message Listener
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    const { action, data } = request;
+    
+    if (action === 'get_state') {
+        const elements = getInteractiveElements();
+        sendResponse({ elements });
+        // Optional: Draw labels for debugging
+        drawLabels(elements);
+    } 
+    else if (action === 'get_raw_html') {
+        sendResponse({ html: getCleanHTML() });
+    }
+    else if (action === 'batch') {
+        (async () => {
+            const results = [];
+            for (const cmd of data.commands) {
+                const currentElements = getInteractiveElements();
+                if (cmd.type === 'get_state') {
+                    results.push({ type: 'state', elements: currentElements });
+                } else if (cmd.type === 'wait') {
+                    await new Promise(r => setTimeout(r, cmd.ms || 1000));
+                } else if (cmd.type === 'scroll') {
+                    if (cmd.direction === 'down') window.scrollBy(0, window.innerHeight * 0.8);
+                    else if (cmd.direction === 'up') window.scrollBy(0, -window.innerHeight * 0.8);
+                    results.push({ status: 'scrolled' });
+                } else {
+                    const elData = currentElements[cmd.id];
+                    if (elData) {
+                        const actualEl = document.elementFromPoint(elData.rect.left + 5, elData.rect.top + 5);
+                        if (actualEl) {
+                            const res = await executeActionOnElement(actualEl, cmd);
+                            results.push({ id: cmd.id, ...res });
+                        } else {
+                            // Fallback to finding by tag and text if elementFromPoint fails (e.g. scrolled out)
+                            results.push({ error: 'Element at ID ' + cmd.id + ' not clickable at these coordinates' });
+                        }
+                    } else {
+                         results.push({ error: 'Element ID ' + cmd.id + ' not found' });
+                    }
+                }
+            }
+            sendResponse({ results });
+        })();
+        return true; 
+    }
+    return true;
+});
+
+function drawLabels(elements) {
+    document.querySelectorAll('.browser-use-label').forEach(l => l.remove());
+    elements.forEach((el, index) => {
+        const label = document.createElement('div');
+        label.innerText = index;
+        label.style.cssText = `position: absolute; left: ${el.rect.left + window.scrollX}px; top: ${el.rect.top + window.scrollY}px; background: #2563eb; color: white; padding: 1px 4px; z-index: 10000; font-size: 10px; border-radius: 3px; pointer-events: none; box-shadow: 0 2px 4px rgba(0,0,0,0.3); font-weight: bold;`;
+        label.className = 'browser-use-label';
+        document.body.appendChild(label);
+        setTimeout(() => label.remove(), 5000);
+    });
+}
+
+async function executeActionOnElement(el, action) {
+    try {
+        switch (action.type) {
+            case 'click':
+                el.scrollIntoView({ block: 'center', inline: 'center' });
+                el.click();
+                return { status: 'clicked' };
+            case 'type':
+                el.scrollIntoView({ block: 'center', inline: 'center' });
+                el.focus();
+                document.execCommand('insertText', false, action.text);
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+                if (action.enter) {
+                    el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+                }
+                return { status: 'typed' };
+            case 'hover':
+                el.scrollIntoView({ block: 'center', inline: 'center' });
+                el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+                return { status: 'hovered' };
+            default:
+                return { error: 'Unknown action type: ' + action.type };
+        }
+    } catch (e) {
+        return { error: e.message };
+    }
+}
+
+// Auto-detect server URL
+if (document.title.includes("Рабочая среда Агента") || document.body.innerText.includes("Agent AI")) {
+    chrome.runtime.sendMessage({ type: "SET_SERVER_URL", url: window.location.origin + "/api/browser" });
+}

@@ -53,6 +53,7 @@ class BrowserBridge:
 
     def poll(self):
         self._last_poll = time.time()
+        self._is_registered = True
         self._cleanup_responses()
         try:
             cmd = self._command_queue.get(timeout=15)
