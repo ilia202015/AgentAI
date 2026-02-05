@@ -10,7 +10,6 @@ async function register() {
         });
         return response.ok;
     } catch (e) {
-        console.error("Registration failed:", e);
         return false;
     }
 }
@@ -20,61 +19,35 @@ async function poll() {
     isPolling = true;
     try {
         const response = await fetch(`${serverUrl}/poll`);
-        if (!response.ok) {
-            console.warn("Poll failed, re-registering in 5s...");
-            setTimeout(poll, 5000);
-            return;
-        }
-        
-        const cmd = await response.json();
-        
-        // В bridge.py пустой ответ - это {type: "noop"}
-        if (cmd && cmd.type !== "noop" && cmd.request_id) {
-            console.log("Received command:", cmd);
-            try {
-                const result = await handleCommand(cmd);
-                // ВАЖНО: шлем на /respond и включаем request_id
-                await fetch(`${serverUrl}/respond`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        request_id: cmd.request_id, 
-                        status: "success",
-                        ...result 
-                    })
-                });
-            } catch (cmdError) {
-                console.error("Command error:", cmdError);
-                await fetch(`${serverUrl}/respond`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        request_id: cmd.request_id, 
-                        status: "error", 
-                        message: cmdError.message 
-                    })
+        if (response.status === 200) {
+            const cmd = await response.json();
+            if (cmd && cmd.type !== "noop" && cmd.request_id) {
+                console.log("Exec:", cmd.type);
+                handleCommand(cmd).then(result => {
+                    return fetch(`${serverUrl}/respond`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ request_id: cmd.request_id, status: "success", ...result })
+                    });
+                }).catch(err => {
+                    fetch(`${serverUrl}/respond`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ request_id: cmd.request_id, status: "error", message: err.message })
+                    });
                 });
             }
         }
     } catch (e) {
         console.error("Poll error:", e);
+        await new Promise(r => setTimeout(r, 2000)); // Пауза при ошибке сети
     } finally {
         isPolling = false;
-        // Рекурсивный вызов для Long Polling
-        setTimeout(poll, 100); 
+        setTimeout(poll, 100);
     }
 }
 
-// Keep-alive via alarms (as backup)
-if (chrome.alarms) {
-    chrome.alarms.create('keepAlive', { periodInMinutes: 1 });
-    chrome.alarms.onAlarm.addListener((alarm) => {
-        if (alarm.name === 'keepAlive' && !isPolling) poll();
-    });
-}
-
 async function handleCommand(command) {
-    // В bridge.py тип команды в поле 'type', параметры в 'params'
     const action = command.type;
     const params = command.params || {};
     const { tabId, url } = params;
@@ -83,16 +56,14 @@ async function handleCommand(command) {
         case 'open_url':
             return new Promise((resolve, reject) => {
                 chrome.tabs.create({ url: url }, (tab) => {
-                    const listener = (updatedTabId, changeInfo, updatedTab) => {
-                        if (updatedTabId === tab.id && changeInfo.status === 'complete') {
-                            chrome.tabs.onUpdated.removeListener(listener);
-                            resolve({ status: 'complete', tabId: tab.id, url: updatedTab.url });
-                        }
-                    };
-                    chrome.tabs.onUpdated.addListener(listener);
+                    if (chrome.runtime.lastError) {
+                        reject(new Error(chrome.runtime.lastError.message));
+                    } else {
+                        // Сразу возвращаем успех, не дожидаясь загрузки, 
+                        // чтобы избежать зависания на 'complete'
+                        resolve({ status: 'opened', tabId: tab.id, url: url });
+                    }
                 });
-                // Таймаут безопасности
-                setTimeout(() => reject(new Error("Tab load timeout")), 20000);
             });
 
         case 'get_state':
@@ -101,8 +72,11 @@ async function handleCommand(command) {
             if (!tabId) throw new Error(`Action ${action} requires tabId`);
             return new Promise((resolve, reject) => {
                 chrome.tabs.sendMessage(tabId, { action, data: params }, (response) => {
-                    if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
-                    else resolve(response);
+                    if (chrome.runtime.lastError) {
+                        reject(new Error("Content script not ready. Try refreshing the page."));
+                    } else {
+                        resolve(response);
+                    }
                 });
             });
 
@@ -111,5 +85,4 @@ async function handleCommand(command) {
     }
 }
 
-// Start
 register().then(() => poll());
