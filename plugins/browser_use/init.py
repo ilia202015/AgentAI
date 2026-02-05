@@ -16,18 +16,15 @@ bridge = bridge_module.bridge
 # --- Реализация инструментов ---
 
 def browser_open_tool(self, url):
-    """Открыть URL в браузере."""
+    """Открыть указанный URL. Ждет полной загрузки до 10 сек (состояние complete). Если страница не загружена полностью за это время, возвращает ответ о таймауте, но не прерывает работу."""
     return bridge.execute("open_url", {"url": url})
 
 def browser_actions_tool(self, commands):
-    """
-    Выполнить пакет команд (click, type, wait, scroll, get_state, get_html, js_exec) за один вызов.
-    Используй этот инструмент для большинства задач.
-    """
+    """Выполнить пакет команд. Типы: click, type, scroll, wait, get_state, hover, js_exec, get_text. Вкладки: list_tabs, switch_tab, close_tab. ВНИМАНИЕ: get_state НЕ возвращает список вкладок."""
     return bridge.execute("execute_batch", {"commands": commands})
 
 def browser_get_raw_html_tool(self, selector=None):
-    """Получить полный HTML код страницы или элемента для глубокого анализа."""
+    """Получить полный HTML код страницы или элемента. Параметр selector опционален."""
     return bridge.execute("get_raw_html", {"selector": selector})
 
 # --- Инициализация ---
@@ -47,7 +44,7 @@ def main(chat, settings):
         {
             "function": {
                 "name": "browser_open",
-                "description": "Открыть указанный URL в новой или текущей вкладке браузера.",
+                "description": chat.prompts.get('browser_open', 'Открыть указанный URL в новой или текущей вкладке браузера.'),
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -60,7 +57,7 @@ def main(chat, settings):
         {
             "function": {
                 "name": "browser_actions",
-                "description": "Выполнить пакет команд (click, type, wait, scroll, get_state, get_html, js_exec) за один вызов. Это основной инструмент для навигации и взаимодействия.",
+                "description": chat.prompts.get('browser_actions', 'Выполнить пакет команд взаимодействия.'),
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -71,7 +68,7 @@ def main(chat, settings):
                                 "properties": {
                                     "type": {
                                         "type": "string", 
-                                        "enum": ["click", "type", "scroll", "wait", "get_state", "get_html", "js_exec"]
+                                        "enum": ["click", "type", "scroll", "wait", "get_state", "hover", "js_exec", "get_text", "list_tabs", "switch_tab", "close_tab"]
                                     },
                                     "id": {"type": "integer", "description": "ID элемента (Label ID) из состояния страницы"},
                                     "text": {"type": "string", "description": "Текст для ввода или JS код"},
@@ -90,11 +87,11 @@ def main(chat, settings):
         {
             "function": {
                 "name": "browser_get_raw_html",
-                "description": "Получить полный, нефильтрованный HTML код всей страницы или конкретного элемента по CSS-селектору.",
+                "description": chat.prompts.get('browser_get_raw_html', 'Получить полный HTML код страницы.'),
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "selector": {"type": "string", "description": "CSS селектор (например, '#main-content'). Если не указан, вернет всю страницу."}
+                        "selector": {"type": "string", "description": "CSS селектор. Если не указан, вернет всю страницу."}
                     },
                     "required": []
                 }
@@ -103,12 +100,21 @@ def main(chat, settings):
     ]
 
     for tool in browser_tools:
-        if not any(t.get("function", {}).get("name") == tool["function"]["name"] for t in chat.tools):
+        # Обновляем или добавляем инструменты
+        existing = next((t for t in chat.tools if t.get("function", {}).get("name") == tool["function"]["name"]), None)
+        if existing:
+            existing["function"]["description"] = tool["function"]["description"]
+            existing["function"]["parameters"] = tool["function"]["parameters"]
+        else:
             chat.tools.append(tool)
 
     try:
         # Прямой доступ к WebRequestHandler через sys.modules (если загружен)
         server_mod = sys.modules.get('server')
+        if not server_mod:
+             print("⚠️ [browser_use] Модуль server не найден в sys.modules")
+             return chat
+             
         WebRequestHandler = server_mod.WebRequestHandler
         
         _old_do_POST = WebRequestHandler.do_POST
@@ -148,8 +154,6 @@ def main(chat, settings):
                 logger.error(f"Error in browser_use POST: {e}", exc_info=True)
                 if not self.wfile.closed:
                     try:
-                        # Если мы еще не отправили заголовки, пробуем 500
-                        # Но проще просто передать управление старому обработчику или закрыть
                         _old_do_POST(self)
                     except: pass
 

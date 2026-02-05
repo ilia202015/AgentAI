@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Complex Test Page</title>
+    <style>
+        [data-cursor-pointer] { cursor: pointer; }
+        #hidden-menu { display: none; background: #eee; border: 1px solid #ccc; padding: 5px; position: absolute; }
+        #btn-div { transition: background 0.3s; }
+        #btn-div:hover { background: darkblue !important; }
+        .hover-trigger { background: #f0f0f0; padding: 10px; margin-top: 20px; border: 1px dashed black; }
+    </style>
+</head>
+<body>
+    <h1>Browser Use Test Page</h1>
+
+    <!-- 1. Кнопка-DIV -->
+    <div id="btn-div" data-cursor-pointer style="padding:10px; background:blue; color: white; display: inline-flex; align-items: center;">
+        <svg width="20" height="20" viewBox="0 0 20 20" aria-label="Checkmark">
+            <circle cx="10" cy="10" r="8" fill="white" />
+        </svg>
+        <span style="margin-left: 5px;">Click Me</span>
+    </div>
+
+    <hr>
+
+    <!-- 2. Поле ввода (React-like) -->
+    <div class="input-container">
+        <label for="react-input">Input (React-like):</label>
+        <input id="react-input" type="text" placeholder="Type something..." />
+        <div style="margin-top: 10px;">
+            <strong>Display:</strong> <span id="display"></span>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- 3. Скрытое меню -->
+    <div class="hover-trigger" id="hover-zone">
+        Hover over me to see the menu
+    </div>
+    <div id="hidden-menu">
+        <ul>
+            <li>Action 1</li>
+            <li>Action 2</li>
+        </ul>
+    </div>
+
+    <hr>
+
+    <!-- 4. iFrame -->
+    <h3>IFrame Content</h3>
+    <iframe srcdoc="<html><head><style>body { font-family: sans-serif; }</style></head><body><p id='if-text'>Inside IFrame</p></body></html>" width="300" height="100"></iframe>
+
+    <script>
+        // React-like display logic
+        const input = document.getElementById('react-input');
+        const display = document.getElementById('display');
+        input.addEventListener('input', (e) => {
+            display.innerText = e.target.value;
+        });
+
+        // Hidden menu logic
+        const trigger = document.getElementById('hover-zone');
+        const menu = document.getElementById('hidden-menu');
+        trigger.addEventListener('mouseover', (e) => {
+            menu.style.display = 'block';
+            menu.style.left = e.pageX + 'px';
+            menu.style.top = e.pageY + 'px';
+        });
+        trigger.addEventListener('mouseleave', () => {
+            // Задержка для удобства тестов, если нужно
+            // menu.style.display = 'none';
+        });
+        // Закрытие при клике в другом месте
+        document.addEventListener('click', (e) => {
+            if (e.target !== trigger && !menu.contains(e.target)) {
+                menu.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

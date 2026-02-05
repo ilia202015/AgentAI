@@ -1,99 +1,73 @@
-const SERVER_URL = 'http://localhost:8080';
+let serverUrl = "http://localhost:3000"; // Default
+let isPolling = false;
 
 async function register() {
     try {
-        const response = await fetch(`${SERVER_URL}/api/browser/register`, {
+        const response = await fetch(`${serverUrl}/register`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'ready' })
+            body: JSON.stringify({ name: 'browser_use_ext' })
         });
-        const data = await response.json();
-        console.log('✅ Registered:', data);
-    } catch (error) {
-        console.error('❌ Registration failed:', error);
-        setTimeout(register, 5000);
+        return response.ok;
+    } catch (e) {
+        console.error("Registration failed:", e);
+        return false;
     }
 }
 
 async function poll() {
+    if (isPolling) return;
+    isPolling = true;
     try {
-        const response = await fetch(`${SERVER_URL}/api/browser/poll`);
-        const command = await response.json();
-        
-        if (command && command.type !== 'noop') {
-            console.log('📥 Received command:', command);
-            handleCommand(command);
+        const response = await fetch(`${serverUrl}/poll`);
+        if (!response.ok) {
+            console.warn("Poll failed, re-registering...");
+            await register();
+            return;
         }
-    } catch (error) {
-        // console.error('❌ Polling error:', error);
-        await new Promise(r => setTimeout(r, 5000));
-    }
-    poll(); // Continue loop
-}
-
-async function handleCommand(command) {
-    let result = { request_id: command.request_id, status: 'error', message: 'Unknown command' };
-    
-    try {
-        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        
-        if (command.type === 'get_tabs') {
-            const tabs = await chrome.tabs.query({});
-            result = { 
-                request_id: command.request_id, 
-                status: 'success', 
-                data: tabs.map(t => ({ id: t.id, url: t.url, title: t.title })) 
-            };
-        } else if (command.type === 'open_url') {
-            const url = command.params.url;
-            await chrome.tabs.create({ url: url });
-            result = { request_id: command.request_id, status: 'success', data: { message: `Opened ${url}` } };
-        } else if (command.type === 'get_state') {
-            if (!tab) throw new Error("No active tab found");
-            const response = await chrome.tabs.sendMessage(tab.id, { action: "getPageData" });
-            result = { request_id: command.request_id, status: 'success', data: response };
-        } else if (command.type === 'execute_batch') {
-            if (!tab) throw new Error("No active tab found");
-            const response = await chrome.tabs.sendMessage(tab.id, { 
-                action: "execute_batch", 
-                commands: command.params.commands 
-            });
-            result = { request_id: command.request_id, status: 'success', data: response };
-        } else if (command.type === 'get_raw_html') {
-             if (!tab) throw new Error("No active tab found");
-             const response = await chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                func: (selector) => {
-                    if (selector) {
-                        const el = document.querySelector(selector);
-                        return el ? el.outerHTML : "Element not found";
-                    }
-                    return document.documentElement.outerHTML;
-                },
-                args: [command.params.selector]
-             });
-             result = { request_id: command.request_id, status: 'success', data: { html: response[0].result } };
+        const commands = await response.json();
+        for (const cmd of commands) {
+            await handleCommand(cmd);
         }
     } catch (e) {
-        result = { request_id: command.request_id, status: 'error', message: e.toString() };
-    }
-
-    sendResponse(result);
-}
-
-async function sendResponse(data) {
-    try {
-        await fetch(`${SERVER_URL}/api/browser/respond`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        console.log('📤 Response sent');
-    } catch (error) {
-        console.error('❌ Failed to send response:', error);
+        console.error("Poll error:", e);
+        await register(); // Сразу вызываем register при падении fetch
+    } finally {
+        isPolling = false;
     }
 }
 
-// Start
+// Keep-alive via alarms
+chrome.alarms.create('keepAlive', { periodInMinutes: 0.5 });
+chrome.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === 'keepAlive') {
+        poll();
+    }
+});
+
+async function handleCommand(command) {
+    switch (command.action) {
+        case 'open_url':
+            return new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    chrome.tabs.onUpdated.removeListener(listener);
+                    reject(new Error("Timeout waiting for tab update"));
+                }, 15000); // 15 sec timeout
+
+                const listener = (tabId, changeInfo, tab) => {
+                    if (tabId === command.tabId && changeInfo.status === 'complete') {
+                        clearTimeout(timeout);
+                        chrome.tabs.onUpdated.removeListener(listener);
+                        resolve({ status: 'complete', url: tab.url });
+                    }
+                };
+
+                chrome.tabs.onUpdated.addListener(listener);
+                chrome.tabs.update(command.tabId, { url: command.url });
+            });
+        // ... другие команды
+    }
+}
+
+// Initial registration
 register();
-poll();
