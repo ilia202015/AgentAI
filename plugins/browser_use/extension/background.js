@@ -1,4 +1,4 @@
-let serverUrl = "http://localhost:3000"; // Default
+const serverUrl = "http://localhost:8080/api/browser";
 let isPolling = false;
 
 async function register() {
@@ -21,53 +21,95 @@ async function poll() {
     try {
         const response = await fetch(`${serverUrl}/poll`);
         if (!response.ok) {
-            console.warn("Poll failed, re-registering...");
-            await register();
+            console.warn("Poll failed, re-registering in 5s...");
+            setTimeout(poll, 5000);
             return;
         }
-        const commands = await response.json();
-        for (const cmd of commands) {
-            await handleCommand(cmd);
+        
+        const cmd = await response.json();
+        
+        // В bridge.py пустой ответ - это {type: "noop"}
+        if (cmd && cmd.type !== "noop" && cmd.request_id) {
+            console.log("Received command:", cmd);
+            try {
+                const result = await handleCommand(cmd);
+                // ВАЖНО: шлем на /respond и включаем request_id
+                await fetch(`${serverUrl}/respond`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        request_id: cmd.request_id, 
+                        status: "success",
+                        ...result 
+                    })
+                });
+            } catch (cmdError) {
+                console.error("Command error:", cmdError);
+                await fetch(`${serverUrl}/respond`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        request_id: cmd.request_id, 
+                        status: "error", 
+                        message: cmdError.message 
+                    })
+                });
+            }
         }
     } catch (e) {
         console.error("Poll error:", e);
-        await register(); // Сразу вызываем register при падении fetch
     } finally {
         isPolling = false;
+        // Рекурсивный вызов для Long Polling
+        setTimeout(poll, 100); 
     }
 }
 
-// Keep-alive via alarms
-chrome.alarms.create('keepAlive', { periodInMinutes: 0.5 });
-chrome.alarms.onAlarm.addListener((alarm) => {
-    if (alarm.name === 'keepAlive') {
-        poll();
-    }
-});
+// Keep-alive via alarms (as backup)
+if (chrome.alarms) {
+    chrome.alarms.create('keepAlive', { periodInMinutes: 1 });
+    chrome.alarms.onAlarm.addListener((alarm) => {
+        if (alarm.name === 'keepAlive' && !isPolling) poll();
+    });
+}
 
 async function handleCommand(command) {
-    switch (command.action) {
+    // В bridge.py тип команды в поле 'type', параметры в 'params'
+    const action = command.type;
+    const params = command.params || {};
+    const { tabId, url } = params;
+
+    switch (action) {
         case 'open_url':
             return new Promise((resolve, reject) => {
-                const timeout = setTimeout(() => {
-                    chrome.tabs.onUpdated.removeListener(listener);
-                    reject(new Error("Timeout waiting for tab update"));
-                }, 15000); // 15 sec timeout
-
-                const listener = (tabId, changeInfo, tab) => {
-                    if (tabId === command.tabId && changeInfo.status === 'complete') {
-                        clearTimeout(timeout);
-                        chrome.tabs.onUpdated.removeListener(listener);
-                        resolve({ status: 'complete', url: tab.url });
-                    }
-                };
-
-                chrome.tabs.onUpdated.addListener(listener);
-                chrome.tabs.update(command.tabId, { url: command.url });
+                chrome.tabs.create({ url: url }, (tab) => {
+                    const listener = (updatedTabId, changeInfo, updatedTab) => {
+                        if (updatedTabId === tab.id && changeInfo.status === 'complete') {
+                            chrome.tabs.onUpdated.removeListener(listener);
+                            resolve({ status: 'complete', tabId: tab.id, url: updatedTab.url });
+                        }
+                    };
+                    chrome.tabs.onUpdated.addListener(listener);
+                });
+                // Таймаут безопасности
+                setTimeout(() => reject(new Error("Tab load timeout")), 20000);
             });
-        // ... другие команды
+
+        case 'get_state':
+        case 'batch':
+        case 'get_raw_html':
+            if (!tabId) throw new Error(`Action ${action} requires tabId`);
+            return new Promise((resolve, reject) => {
+                chrome.tabs.sendMessage(tabId, { action, data: params }, (response) => {
+                    if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+                    else resolve(response);
+                });
+            });
+
+        default:
+            throw new Error(`Unknown action: ${action}`);
     }
 }
 
-// Initial registration
-register();
+// Start
+register().then(() => poll());
