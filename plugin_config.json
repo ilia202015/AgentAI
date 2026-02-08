@@ -1,11 +1,7 @@
 {
   "settings": {
-    "console_output": {},
-    "computer_use": {}
   },
   "list": [
-    "computer_use",
-    "web_interface",
-    "browser_use"
+    "web_interface"
   ]
 }
