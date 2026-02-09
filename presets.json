@@ -5,11 +5,15 @@
       "prompt_ids": [
         "default"
       ],
-      "modes": [],
+      "modes": [
+        "planner",
+        "sandbox",
+        "HW"
+      ],
       "blocked": [],
       "settings": {}
     },
-    "1": {
+    "protected": {
       "name": "Безопасный",
       "prompt_ids": [
         "default"
@@ -23,12 +27,7 @@
         "chat",
         "sandbox",
         "computer_use"
-      ],
-      "settings": {
-        "python": {
-          "timeout": 120
-        }
-      }
+      ]
     }
   }
 }
