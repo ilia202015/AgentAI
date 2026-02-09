@@ -112,7 +112,7 @@ class Chat:
         self.ai_key = self.gemini_keys[self.current_key_index]
 
         self.prompts = {}
-        prompt_names = ["system", "python", "chat", "chat_exec", "user_profile", "http", "shell", "google_search", "python_str"]
+        prompt_names = ["system", "python", "chat", "user_profile", "http", "shell", "google_search", "python_str"]
         for name in prompt_names:
             try:
                 with open(f"{self.agent_dir}/prompts/{name}", 'r', encoding="utf8") as f:
@@ -186,11 +186,6 @@ class Chat:
         self.print(f"\n⚙️ Агент (авто, запрос, чат: {name}): " + message)
         # Отправляем сообщение как user
         return self.chats[name].send(types.Content(role="user", parts=[types.Part(text=message)]))
-
-    def chat_exec_tool(self, name, code):
-        if name not in self.chats.keys():
-            self.chats[name] = Chat(output_mode="auto", count_tab=self.count_tab + 1)
-        return self.chats[name].python_tool(code)
 
     def google_search_tool(self, query, num_results=10):
         try:

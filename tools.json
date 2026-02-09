@@ -46,30 +46,6 @@
     {
       "type": "function",
       "function": {
-        "name": "chat_exec",
-        "description": "self_chat_exec_prompt",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "name": {
-              "type": "string",
-              "description": "Имя чата"
-            },
-            "code": {
-              "type": "string",
-              "description": "Код для выполненич в чате"
-            }
-          },
-          "required": [
-            "name",
-            "code"
-          ]
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
         "name": "google_search",
         "description": "self_google_search_exec_prompt",
         "parameters": {
