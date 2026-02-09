@@ -9,16 +9,20 @@
       "blocked": [],
       "settings": {}
     },
-    "coder": {
-      "name": "Разработчик",
+    "1": {
+      "name": "Безопасный",
       "prompt_ids": [
         "default"
       ],
       "modes": [
-        "file_structure"
       ],
       "blocked": [
-        "google_search"
+        "python",
+        "shell",
+        "user_profile",
+        "chat",
+        "sandbox",
+        "computer_use"
       ],
       "settings": {
         "python": {

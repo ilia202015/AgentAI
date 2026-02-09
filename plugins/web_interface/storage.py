@@ -26,7 +26,7 @@ except ImportError:
     print("Warning: serialization module not found in storage")
     serialization = None
 
-is_print_debug = False
+is_print_debug = True
 
 CHATS_DIR = "chats"
 CONFIG_PATH = "plugin_config.json"
@@ -138,7 +138,7 @@ def load_chat_state(id, get_chat):
                 # Basic fixups
                 if not getattr(chat, "name", False): chat.name = "New chat"
                 if not getattr(chat, "id", False): chat.id = id
-                chat.active_preset_id = data.get('active_preset_id', 'default')
+                if not getattr(chat, "active_preset_id", False): chat.active_preset_id = 'default'
                 if not getattr(chat, "web_queue", False): chat.web_queue = queue.Queue()
                 chat.busy_depth = 0
                 

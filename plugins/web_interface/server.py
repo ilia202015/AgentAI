@@ -87,6 +87,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         new_agent.web_queue = queue.Queue()
         
         return new_agent
+    
     def get_agent_for_chat(self, id):
         if is_print_debug:
             print(f"get_agent_for_chat({id})")
@@ -205,6 +206,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             else: self.send_json_error(404, "Endpoint not found")
         except Exception as e:
             self.send_json_error(500, str(e))
+    
     def do_PATCH(self):
          try:
             length = int(self.headers.get('Content-Length', 0))
@@ -347,6 +349,8 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
     def api_load_chat(self, path):
         cid = path.split("/")[-2]
         try:
+            if is_print_debug:
+                print(f"api_load_chat({cid})")
             chat, warning = storage.load_chat_state(cid, self.clone_root_chat)
             if chat: 
                 resp = chat.__dict__.copy()
@@ -364,6 +368,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json_error(404, f"Chat {cid} not found or corrupted")
         except Exception as e:
             self.send_json_error(500, f"Error loading chat: {str(e)}")
+    
     def api_save_chat(self, path):
         if is_print_debug:
             print(f"api_save_chat({path})")
