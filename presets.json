@@ -1,0 +1,30 @@
+{
+  "presets": {
+    "default": {
+      "name": "Стандартный",
+      "prompt_ids": [
+        "default"
+      ],
+      "modes": [],
+      "blocked": [],
+      "settings": {}
+    },
+    "coder": {
+      "name": "Разработчик",
+      "prompt_ids": [
+        "default"
+      ],
+      "modes": [
+        "file_structure"
+      ],
+      "blocked": [
+        "google_search"
+      ],
+      "settings": {
+        "python": {
+          "timeout": 120
+        }
+      }
+    }
+  }
+}

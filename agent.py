@@ -63,6 +63,10 @@ class Chat:
         self.print_to_console = print_to_console
         self.chats = {}
         self.last_send_time = 0
+        self.active_preset_id = "default"
+        self.final_prompt = ""
+        self.blocked_tools = []
+        self.settings_tools = {}
         
         self.models = [ #(name, rpm)
             ("gemini-3-pro-preview", 25),
@@ -583,6 +587,28 @@ class Chat:
         
         return self._process_request()
 
+
+    def get_generate_config(self):
+        # 1. Сборка промпта
+        full_instruction = self.system_prompt + getattr(self, "final_prompt", "")
+        
+        # 2. Фильтрация инструментов
+        blocked = getattr(self, "blocked_tools", [])
+        allowed_tools_defs = [
+            t for t in self.tools 
+            if t["function"]["name"] not in blocked
+        ]
+        
+        tools_gemini = []
+        for tool in allowed_tools_defs:
+            tools_gemini.append(types.Tool(function_declarations=[tool["function"]]))
+
+        return types.GenerateContentConfig(
+            tools=tools_gemini,
+            system_instruction=full_instruction,
+            thinking_config=types.ThinkingConfig(include_thoughts=True),
+        )
+
     def _process_request(self):
         while True:
             try:
@@ -597,15 +623,7 @@ class Chat:
                     prefix = "🤖 Агент: " if self.output_mode == "user" else "⚙️ Агент (авто, ответ): "
                     self.print(prefix, end="", flush=True)
 
-                tools_gemini = []
-                for tool in self.tools:
-                    tools_gemini.append(types.Tool(function_declarations=[tool["function"]]))
-
-                config = types.GenerateContentConfig(
-                    tools=tools_gemini,
-                    system_instruction=self.system_prompt,
-                    thinking_config=types.ThinkingConfig(include_thoughts=True),
-                )
+                config = self.get_generate_config()
 
                 stream = self.client.models.generate_content_stream(
                     model=self.model,
@@ -705,7 +723,27 @@ class Chat:
                     args = {}
 
             # Выполнение инструмента
-            result = self.tool_exec(name, args)
+            # Guard: Blocked tools
+            if name in getattr(self, "blocked_tools", []):
+                result = f"Ошибка: Инструмент {name} заблокирован пресетом."
+            else:
+                # Overrides: Settings tools
+                overrides = getattr(self, "settings_tools", {}).get(name, {})
+                if overrides:
+                    original_args = args.copy() if isinstance(args, dict) else {}
+                    conflicts = [k for k in overrides if k in original_args and original_args[k] != overrides[k]]
+                    
+                    if isinstance(args, dict):
+                        args.update(overrides)
+                    
+                    result = self.tool_exec(name, args)
+                    
+                    if conflicts:
+                        notes = ", ".join(conflicts)
+                        if isinstance(result, str):
+                            result += f"\n[Внимание: Аргументы ({notes}) были переопределены настройками пресета]"
+                else:
+                    result = self.tool_exec(name, args)
             
             # Подготовка данных для FunctionResponse
             res_payload = {"result": result}

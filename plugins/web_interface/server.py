@@ -261,6 +261,42 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         
         agent.stop_requested = False
 
+        # --- PRESET ORCHESTRATION ---
+        preset_id = getattr(agent, "active_preset_id", "default")
+        preset = storage.get_preset(preset_id)
+        
+        compiled_text = ""
+        # 1. Resolve prompt texts
+        if "prompt_ids" in preset:
+            compiled_text += storage.resolve_prompts_text(preset["prompt_ids"]) + "\n\n"
+        
+        # 2. Dynamic Gathering (Modes)
+        final_prompts_config = storage.get_final_prompts_config()
+        all_prompts = final_prompts_config.get("prompts", {})
+        
+        active_modes = preset.get("modes", [])
+        for mode_id in active_modes:
+            if mode_id in all_prompts:
+                mode_data = all_prompts[mode_id]
+                compiled_text += f"### MODE: {mode_data.get('name', mode_id)} ###\n"
+                compiled_text += mode_data.get("text", "") + "\n"
+                
+                # Run gather script if exists
+                gather_script = mode_data.get("gather_script")
+                if gather_script:
+                    try:
+                        script_res = agent.python_tool(gather_script)
+                        compiled_text += f"ДАННЫЕ РЕЖИМА:\n{script_res}\n"
+                    except Exception as e:
+                        compiled_text += f"Ошибка сбора данных режима: {e}\n"
+                compiled_text += "\n"
+
+        # 3. Inject into agent
+        agent.final_prompt = compiled_text
+        agent.blocked_tools = preset.get("blocked", [])
+        agent.settings_tools = preset.get("settings", {})
+        # ----------------------------
+
         msg_payload = {
             "role": "user", 
             "content": data.get("message", ""),
@@ -273,7 +309,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             finally:
                 if cid != 'temp':
                     try:
-                        if cid != 'temp': storage.save_chat_state(agent)
+                        storage.save_chat_state(agent)
                     except Exception as e:
                         print(f"Auto-save failed for {cid}: {e}")
 

@@ -138,6 +138,7 @@ def load_chat_state(id, get_chat):
                 # Basic fixups
                 if not getattr(chat, "name", False): chat.name = "New chat"
                 if not getattr(chat, "id", False): chat.id = id
+                chat.active_preset_id = data.get('active_preset_id', 'default')
                 if not getattr(chat, "web_queue", False): chat.web_queue = queue.Queue()
                 chat.busy_depth = 0
                 
@@ -180,6 +181,7 @@ def load_chat_state(id, get_chat):
 
     if not getattr(chat, "name", False): chat.name = "New chat"
     if not getattr(chat, "id", False): chat.id = id
+    chat.active_preset_id = data.get('active_preset_id', 'default')
                 
     saved_config = data.get("plugin_config", {})
     current_config = get_current_config()
@@ -217,7 +219,8 @@ def save_chat_state(chat):
         'id': chat.id,
         'updated_at': chat.updated_at,
         'messages': messages_json,
-        'plugin_config': chat.plugin_config
+        'plugin_config': chat.plugin_config,
+        'active_preset_id': getattr(chat, 'active_preset_id', 'default')
     }
 
     # Определение имени чата
@@ -335,4 +338,27 @@ def get_active_final_prompt_text():
     for p_id in active_params:
         if p_id in config.get('prompts', {}):
             text += config['prompts'][p_id].get('text', '') + '\n\n'
+    return text.strip()
+
+PRESETS_CONFIG_PATH = "presets.json"
+
+def get_presets_config():
+    if not os.path.exists(PRESETS_CONFIG_PATH):
+        return {"presets": {"default": {"name": "Стандартный", "prompt_ids": ["default"], "modes": [], "blocked": [], "settings": {}}}}
+    try:
+        with open(PRESETS_CONFIG_PATH, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except: return {"presets": {}}
+
+def get_preset(preset_id):
+    config = get_presets_config()
+    return config.get("presets", {}).get(preset_id, config.get("presets", {}).get("default"))
+
+def resolve_prompts_text(prompt_ids):
+    config = get_final_prompts_config()
+    text = ""
+    prompts = config.get("prompts", {})
+    for pid in prompt_ids:
+        if pid in prompts:
+            text += prompts[pid].get("text", "") + "\n\n"
     return text.strip()
