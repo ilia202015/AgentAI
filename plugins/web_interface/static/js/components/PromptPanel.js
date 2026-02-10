@@ -169,6 +169,7 @@ export default {
                                             </div>
                                             <div class="truncate">
                                                 <div class="text-xs font-semibold text-gray-100 truncate mb-0.5">{{ p.name }}</div>
+                                                <div v-if="store.defaultPresetId === id" class="text-[8px] text-amber-500 font-bold uppercase tracking-tighter">По умолчанию</div>
                                                 <div class="flex gap-1">
                                                     <span class="text-[8px] bg-white/5 px-1.5 py-0.5 rounded text-gray-500 uppercase">{{ p.prompt_ids.length }} систем</span>
                                                     <span class="text-[8px] bg-white/5 px-1.5 py-0.5 rounded text-gray-500 uppercase">{{ p.modes.length }} режимов</span>
@@ -177,6 +178,7 @@ export default {
                                         </div>
                                         <div class="flex items-center gap-2">
                                             <div v-if="store.activePresetId === id" class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_#10b981]"></div>
+                                            <button v-if="store.defaultPresetId !== id" @click.stop="setAsDefault(id)" class="p-2 text-gray-500 hover:text-amber-400 hover:bg-white/10 rounded-lg transition-all opacity-0 group-hover:opacity-100" title="Сделать по умолчанию"><i class="ph-bold ph-star"></i></button>
                                             <button @click.stop="selectPresetForEdit(id, p)" class="p-2 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-all opacity-0 group-hover:opacity-100">
                                                 <i class="ph-bold ph-pencil-simple"></i>
                                             </button>
@@ -273,6 +275,7 @@ export default {
             store.activePromptId = config.active_id;
             store.active_parameters = config.active_parameters || [];
             store.presets = config.presets || {};
+            store.defaultPresetId = config.default_preset_id || 'default';
         };
 
         const getPromptsByType = (type) => {
@@ -373,6 +376,14 @@ export default {
             }
         };
 
+        const setAsDefault = async (id) => {
+            const res = await api.setDefaultPreset(id);
+            if (res.status === 'ok') {
+                store.defaultPresetId = id;
+                store.addToast('Пресет по умолчанию изменен', 'success');
+            }
+        };
+
         onMounted(refresh);
         watch(() => store.isPromptPanelOpen, (val) => { if(val) refresh(); });
 
@@ -381,7 +392,7 @@ export default {
             createNewPrompt, selectIcon, savePrompt, setActivePrompt, deletePrompt, selectForEdit, closeEditor, 
             getPromptsByType, getTypeName, getTypeIcon,
             editPresetId, editPresetData, isCreatingPreset, createNewPreset, selectPresetForEdit,
-            togglePresetPrompt, togglePresetMode, togglePresetCommand, savePreset, deletePreset
+            togglePresetPrompt, togglePresetMode, togglePresetCommand, savePreset, deletePreset, setAsDefault
         };
     }
 }

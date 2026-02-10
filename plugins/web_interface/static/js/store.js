@@ -15,7 +15,7 @@ export const store = reactive({
     isPromptPanelOpen: false,
     isBgEnabled: localStorage.getItem('agent_bg_enabled') === 'true',
     presets: {}, 
-    activePresetId: 'default',
+    activePresetId: 'default', defaultPresetId: 'default',
     
     toasts: [],
     finalPrompts: {},

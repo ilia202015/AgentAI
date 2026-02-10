@@ -138,3 +138,21 @@ export async function deletePreset(id) {
     const res = await fetch(`${API_BASE}/presets/${id}`, { method: 'DELETE' });
     return await res.json();
 }
+
+export async function changeChatPreset(chatId, presetId) {
+    const res = await fetch(`${API_BASE}/chats/${chatId}/preset`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ preset_id: presetId })
+    });
+    return await res.json();
+}
+
+export async function setDefaultPreset(presetId) {
+    const res = await fetch(`${API_BASE}/presets/default`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: presetId })
+    });
+    return await res.json();
+}

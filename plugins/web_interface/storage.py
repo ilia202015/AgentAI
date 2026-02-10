@@ -220,7 +220,7 @@ def save_chat_state(chat):
         'updated_at': chat.updated_at,
         'messages': messages_json,
         'plugin_config': chat.plugin_config,
-        'active_preset_id': getattr(chat, 'active_preset_id', 'default')
+        'active_preset_id': getattr(chat, 'active_preset_id', get_presets_config().get('default_preset_id', 'default'))
     }
 
     # Определение имени чата
@@ -348,11 +348,14 @@ def save_presets_config(config):
         json.dump(config, f, ensure_ascii=False, indent=2)
 
 def get_presets_config():
-    config = {"presets": {"default": {"name": "Стандартный", "prompt_ids": ["default"], "modes": [], "commands": [], "blocked": [], "settings": {}}}}
+    config = {"default_preset_id": "default", "presets": {"default": {"name": "Стандартный", "prompt_ids": ["default"], "modes": [], "commands": [], "blocked": [], "settings": {}}}}
     if os.path.exists(PRESETS_CONFIG_PATH):
         try:
             with open(PRESETS_CONFIG_PATH, 'r', encoding='utf-8') as f:
-                config = json.load(f)
+                loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    if "presets" in loaded: config["presets"].update(loaded["presets"])
+                    if "default_preset_id" in loaded: config["default_preset_id"] = loaded["default_preset_id"]
         except Exception as e:
             print(f"Ошибка загрузки пресетов{e}")
 

@@ -208,6 +208,11 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 }
                 storage.save_presets_config(config)
                 self.send_json({"status": "ok", "id": p_id})
+            elif path == "/api/presets/default":
+                config = storage.get_presets_config()
+                config["default_preset_id"] = data.get("id", "default")
+                storage.save_presets_config(config)
+                self.send_json({"status": "ok"})
             elif path == "/api/stop": self.api_stop(data)
             elif path == "/api/chats": self.api_create_chat()
             elif path == "/api/temp": self.api_start_temp()
@@ -216,6 +221,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             elif path.endswith("/edit"): self.api_edit_message(path, data)
             elif path.endswith("/clear-context"): self.api_clear_context(path)
             elif path.endswith("/model"): self.api_change_model(path, data)
+            elif path.endswith("/preset"): self.api_change_preset(path, data)
             else: self.send_json_error(404, "Endpoint not found")
         except Exception as e:
             self.send_json_error(500, str(e))
@@ -430,6 +436,19 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         else:
             self.send_json_error(404, "PKL not found")
 
+    def api_change_preset(self, path, data):
+        cid = path.split("/")[-2]
+        agent = self.active_chats.get(cid)
+        if agent and getattr(agent, "busy_depth", 0) > 0:
+            return self.send_json_error(409, "Agent is busy")
+        
+        agent = self.get_agent_for_chat(cid)
+        if agent:
+            agent.active_preset_id = data.get("preset_id", "default")
+            if cid != 'temp': storage.save_chat_state(agent)
+            self.send_json({"status": "ok", "preset_id": agent.active_preset_id})
+        else: self.send_json_error(404, "Chat not found")
+
     def api_change_model(self, path, data):
         cid = path.split("/")[-2]
         agent = self.active_chats.get(cid)
@@ -459,7 +478,9 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_json(storage.list_chats())
         elif path == "/api/final-prompts":
             resp = storage.get_final_prompts_config()
-            resp["presets"] = storage.get_presets_config().get("presets", {})
+            presets_cfg = storage.get_presets_config()
+            resp["presets"] = presets_cfg.get("presets", {})
+            resp["default_preset_id"] = presets_cfg.get("default_preset_id", "default")
             self.send_json(resp)
         elif path == "/api/models":
             self.send_json(self.root_chat.models)

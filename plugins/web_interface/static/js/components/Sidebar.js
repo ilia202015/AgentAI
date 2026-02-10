@@ -61,7 +61,7 @@ export default {
                             <p class="text-xs">Чаты не найдены</p>
                         </div>
                         
-                        <div v-for="chat in filteredChats" :key="chat.id"
+                        <div v-for="(chat, index) in filteredChats" :key="chat.id"
                             @click="selectChat(chat.id)"
                             class="group relative p-3 rounded-xl cursor-pointer transition-all duration-200 border border-transparent"
                             :class="chat.id === store.currentChatId 
@@ -77,9 +77,30 @@ export default {
                             <div class="text-[11px] truncate opacity-50 leading-relaxed font-light">{{ chat.preview }}</div>
                             
                             <div class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-gray-900/80 backdrop-blur rounded-lg p-1 shadow-xl border border-white/10" :class="editingId === chat.id ? 'hidden' : ''">
+                                <button @click.stop="togglePresetMenu(chat.id)" 
+                                        class="p-1.5 hover:text-indigo-400 hover:bg-white/10 rounded-md transition-colors" 
+                                        :class="activePresetMenuId === chat.id ? 'text-indigo-400 bg-white/10' : ''"
+                                        title="Сменить пресет">
+                                    <i class="ph ph-layout"></i>
+                                </button>
                                 <button @click.stop="clearContext(chat.id)" class="p-1.5 hover:text-amber-400 hover:bg-white/10 rounded-md transition-colors" title="Очистить контекст (удалить PKL)"><i class="ph ph-eraser"></i></button>
                                 <button @click.stop="startRename(chat)" class="p-1.5 hover:text-blue-400 hover:bg-white/10 rounded-md transition-colors" title="Переименовать"><i class="ph ph-pencil-simple"></i></button>
                                 <button @click.stop="deleteChat(chat.id)" class="p-1.5 hover:text-red-400 hover:bg-white/10 rounded-md transition-colors" title="Удалить"><i class="ph ph-trash"></i></button>
+
+                                <!-- Меню пресетов (выровнено по правому краю контейнера) -->
+                                <div v-if="activePresetMenuId === chat.id" 
+                                     class="absolute right-0 w-48 bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl z-[100] p-1 animate-fade-in-up origin-top-right"
+                                     :class="index < 3 ? 'top-full mt-2' : 'bottom-full mb-2'">
+                                    <div class="text-[9px] font-bold text-gray-500 uppercase p-2 tracking-widest border-b border-white/5 mb-1">Выбор пресета</div>
+                                    <div class="max-h-48 overflow-y-auto custom-scrollbar">
+                                        <button v-for="(p, pid) in store.presets" :key="pid" @click.stop="selectPreset(chat.id, pid)"
+                                                class="w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between group transition-all"
+                                                :class="((chat.id === store.currentChatId && store.activePresetId === pid) || (chat.id !== store.currentChatId && chat.active_preset_id === pid)) ? 'bg-indigo-600/20 text-indigo-400' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'">
+                                            <span class="truncate">{{ p.name }}</span>
+                                            <i v-if="(chat.id === store.currentChatId && store.activePresetId === pid) || (chat.id !== store.currentChatId && chat.active_preset_id === pid)" class="ph-bold ph-check"></i>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -138,7 +159,11 @@ export default {
         const selectedModel = ref('');
         const isModelMenuOpen = ref(false);
         const modelMenuRef = ref(null);
-        
+        const editingId = ref(null);
+        const editName = ref('');
+        const editInput = ref(null);
+        const activePresetMenuId = ref(null);
+
         const refreshModels = async () => {
             const res = await api.fetchModels();
             if (Array.isArray(res)) {
@@ -163,6 +188,11 @@ export default {
             if (modelMenuRef.value && !modelMenuRef.value.contains(event.target)) {
                 isModelMenuOpen.value = false;
             }
+            if (activePresetMenuId.value) {
+                 const isBtn = event.target.closest('button[title="Сменить пресет"]');
+                 const isMenu = event.target.closest('.absolute.bottom-full.right-0');
+                 if (!isBtn && !isMenu) activePresetMenuId.value = null;
+            }
         };
 
         const clearContext = async (id) => {
@@ -177,10 +207,6 @@ export default {
                 }
             }
         };
-
-        const editingId = ref(null);
-        const editName = ref('');
-        const editInput = ref(null);
 
         const filteredChats = computed(() => {
             if (!searchQuery.value) return store.chats;
@@ -273,6 +299,18 @@ export default {
             if (Array.isArray(res)) store.chats = res;
         };
         
+        const togglePresetMenu = (id) => {
+            activePresetMenuId.value = activePresetMenuId.value === id ? null : id;
+        };
+        const selectPreset = async (chatId, presetId) => {
+            const res = await api.changeChatPreset(chatId, presetId);
+            if (res.status === 'ok') {
+                if (store.currentChatId === chatId) store.activePresetId = presetId;
+                store.addToast('Пресет изменен', 'success');
+            }
+            activePresetMenuId.value = null;
+        };
+
         onMounted(async () => {
              document.addEventListener('click', handleClickOutside);
              await refreshModels();
@@ -306,7 +344,7 @@ export default {
             startRename, 
             saveRename, 
             cancelRename, 
-            editInput
+            editInput, activePresetMenuId, togglePresetMenu, selectPreset
         };
     }
 }

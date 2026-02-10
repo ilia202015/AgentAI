@@ -1,4 +1,5 @@
 {
+  "default_preset_id": "default",
   "presets": {
     "default": {
       "name": "Стандартный",
