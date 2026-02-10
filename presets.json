@@ -17,6 +17,23 @@
       ],
       "blocked": [],
       "settings": {}
+    },
+    "protected": {
+      "name": "Безопасный",
+      "prompt_ids": [
+        "default"
+      ],
+      "modes": [],
+      "commands": [],
+      "blocked": [
+        "python",
+        "shell",
+        "user_profile",
+        "chat",
+        "sandbox",
+        "computer_use"
+      ],
+      "settings": {}
     }
   }
 }

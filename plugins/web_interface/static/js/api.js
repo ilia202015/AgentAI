@@ -124,3 +124,17 @@ export async function toggleParameter(id) {
     });
     return await res.json();
 }
+
+export async function savePreset(id, name, prompt_ids, modes, commands, blocked, settings) {
+    const res = await fetch(`${API_BASE}/presets`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, name, prompt_ids, modes, commands, blocked, settings })
+    });
+    return await res.json();
+}
+
+export async function deletePreset(id) {
+    const res = await fetch(`${API_BASE}/presets/${id}`, { method: 'DELETE' });
+    return await res.json();
+}

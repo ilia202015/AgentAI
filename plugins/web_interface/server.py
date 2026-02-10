@@ -195,6 +195,19 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                     self._refresh_active_agents_prompts()
                     self.send_json({"status": "ok"})
                 else: self.send_json_error(404, "Not found")
+            elif path == "/api/presets":
+                config = storage.get_presets_config()
+                p_id = data.get("id") or str(time.time())
+                config["presets"][p_id] = {
+                    "name": data.get("name", "New Preset"),
+                    "prompt_ids": data.get("prompt_ids", []),
+                    "modes": data.get("modes", []),
+                    "commands": data.get("commands", []),
+                    "blocked": data.get("blocked", []),
+                    "settings": data.get("settings", {})
+                }
+                storage.save_presets_config(config)
+                self.send_json({"status": "ok", "id": p_id})
             elif path == "/api/stop": self.api_stop(data)
             elif path == "/api/chats": self.api_create_chat()
             elif path == "/api/temp": self.api_start_temp()
@@ -237,6 +250,14 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                     storage.save_final_prompts_config(config)
                     self.send_json({"status": "deleted"})
                 else: self.send_json_error(404, "Not found")
+             elif path.startswith("/api/presets/"):
+                p_id = path.split("/")[-1]
+                config = storage.get_presets_config()
+                if p_id in config["presets"] and p_id != "default":
+                    del config["presets"][p_id]
+                    storage.save_presets_config(config)
+                    self.send_json({"status": "deleted"})
+                else: self.send_json_error(404, "Not found or protected")
              else:
                 cid = path.split("/")[-1]
                 if storage.delete_chat(cid):
