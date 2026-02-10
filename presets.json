@@ -10,24 +10,13 @@
         "sandbox",
         "HW"
       ],
+      "commands": [
+        "clear_user_profile",
+        "commit",
+        "test"
+      ],
       "blocked": [],
       "settings": {}
-    },
-    "protected": {
-      "name": "Безопасный",
-      "prompt_ids": [
-        "default"
-      ],
-      "modes": [
-      ],
-      "blocked": [
-        "python",
-        "shell",
-        "user_profile",
-        "chat",
-        "sandbox",
-        "computer_use"
-      ]
     }
   }
 }

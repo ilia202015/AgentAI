@@ -680,16 +680,24 @@ export default {
         
         const parameters = computed(() => {
             const res = [];
+            const activePreset = store.presets[store.activePresetId];
+            const allowedModes = activePreset?.modes || [];
             for (const [id, p] of Object.entries(store.finalPrompts)) {
-                if (p.type === 'parameter') res.push({ id, ...p });
+                if (p.type === 'parameter') {
+                    if (allowedModes.includes(id)) res.push({ id, ...p });
+                }
             }
             return res;
         });
 
         const commands = computed(() => {
             const res = [];
+            const activePreset = store.presets[store.activePresetId];
+            const allowedCommands = activePreset?.commands || [];
             for (const [id, p] of Object.entries(store.finalPrompts)) {
-                if (p.type === 'command') res.push({ id, ...p });
+                if (p.type === 'command') {
+                    if (allowedCommands.includes(id)) res.push({ id, ...p });
+                }
             }
             return res;
         });

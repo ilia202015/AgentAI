@@ -163,6 +163,7 @@ export default {
             store.finalPrompts = config.prompts || {};
             store.activePromptId = config.active_id;
             store.active_parameters = config.active_parameters || [];
+            store.presets = config.presets || {};
         };
 
         const getPromptsByType = (type) => {

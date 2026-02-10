@@ -342,13 +342,21 @@ def get_active_final_prompt_text():
 
 PRESETS_CONFIG_PATH = "presets.json"
 
+
+def save_presets_config(config):
+    with open(PRESETS_CONFIG_PATH, 'w', encoding='utf-8') as f:
+        json.dump(config, f, ensure_ascii=False, indent=2)
+
 def get_presets_config():
-    if not os.path.exists(PRESETS_CONFIG_PATH):
-        return {"presets": {"default": {"name": "Стандартный", "prompt_ids": ["default"], "modes": [], "blocked": [], "settings": {}}}}
-    try:
-        with open(PRESETS_CONFIG_PATH, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    except: return {"presets": {}}
+    config = {"presets": {"default": {"name": "Стандартный", "prompt_ids": ["default"], "modes": [], "commands": [], "blocked": [], "settings": {}}}}
+    if os.path.exists(PRESETS_CONFIG_PATH):
+        try:
+            with open(PRESETS_CONFIG_PATH, 'r', encoding='utf-8') as f:
+                config = json.load(f)
+        except Exception as e:
+            print(f"Ошибка загрузки пресетов{e}")
+
+    return config
 
 def get_preset(preset_id):
     config = get_presets_config()

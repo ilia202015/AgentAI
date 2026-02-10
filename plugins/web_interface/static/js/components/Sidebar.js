@@ -233,6 +233,7 @@ export default {
                     return; 
                 }
                 store.currentChatId = id;
+                store.activePresetId = data.chat.active_preset_id || 'default';
                 store.setMessages(data.chat.messages);
                 
                 if (data.chat.model) {

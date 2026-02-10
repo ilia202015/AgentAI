@@ -437,7 +437,9 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         if path == "/api/chats": 
             self.send_json(storage.list_chats())
         elif path == "/api/final-prompts":
-            self.send_json(storage.get_final_prompts_config())
+            resp = storage.get_final_prompts_config()
+            resp["presets"] = storage.get_presets_config().get("presets", {})
+            self.send_json(resp)
         elif path == "/api/models":
             self.send_json(self.root_chat.models)
         else: 
