@@ -43,6 +43,27 @@
           "sandbox/": "rwxld"
         }
       }
+    },
+    "1770839688.9621966": {
+      "name": "Разработчик",
+      "prompt_ids": [
+        "default"
+      ],
+      "modes": [
+        "planner",
+        "sandbox",
+        "knowledge_computer_use",
+        "knowledge_browser_use",
+        "knowledge_backend",
+        "knowledge_frontend"
+      ],
+      "commands": [],
+      "blocked": [],
+      "settings": {},
+      "fs_permissions": {
+        "global": "rwxld",
+        "paths": {}
+      }
     }
   }
 }

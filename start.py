@@ -16,7 +16,7 @@ except ImportError:
     from agent import Chat
 
 # Список папок, которые мы всегда игнорируем (библиотеки, кэши, временные данные)
-EXCLUDE_DIRS = {".git", "__pycache__", ".venv", "venv", "env", "node_modules", "libs", "chats", "sandbox", "temp"}
+EXCLUDE_DIRS = {".git", "__pycache__", ".pytest_cache", ".venv", "venv", "env", "node_modules", "libs", "chats", "sandbox", "temp"}
 
 def load_plugins():
     config_path = os.path.join(current_dir, "plugin_config.json")
@@ -99,27 +99,6 @@ def load_plugins():
             prompts_dir = os.path.join(plugin_path, "prompts")
             include_path = os.path.join(plugin_path, "include.py")
             
-            # --- Сбор всех файлов плагина ---
-            plugin_files_dump = ""
-            for root, dirs, files in os.walk(plugin_path):
-                # Фильтрация папок: исключаем библиотеки и папку prompts (т.к. она грузится отдельно)
-                dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS and d != "prompts"]
-                
-                for file in files:
-                    if file.endswith(".pyc") or file == ".DS_Store" or file == "default_prompts.json": continue
-                    
-                    abs_path = os.path.join(root, file)
-                    rel_path = os.path.relpath(abs_path, plugin_path).replace("\\", "/")
-                    
-                    try:
-                        with open(abs_path, 'r', encoding='utf-8') as f:
-                            content = f.read()
-                        chat.system_prompt = f"\n{plugin_name}/{rel_path}:\n{content}\n" + chat.system_prompt
-                        plugin_files_dump += f"\n{plugin_name}/{rel_path}\n"
-                    except Exception:
-                        pass # Пропускаем бинарники и ошибки
-            # --------------------------------
-
             # 1. Загрузка промптов (System Prompt Addition + Custom Prompts)
             system_prompt_addition = ""
             if os.path.exists(prompts_dir):
@@ -139,8 +118,6 @@ def load_plugins():
             full_plugin_info = f"\n\n=== Плагин {plugin_name} ===\n"
             if system_prompt_addition:
                 full_plugin_info += f"[System Prompt из prompts/system]:\n{system_prompt_addition}\n"
-            if plugin_files_dump:
-                full_plugin_info += f"[Файлы плагина]:\n{plugin_files_dump}"
             
             chat.system_prompt += full_plugin_info
             

@@ -590,7 +590,7 @@ class Chat:
 
     def get_generate_config(self):
         # 1. Сборка промпта
-        full_instruction = getattr(self, "final_prompt", "") + self.system_prompt + getattr(self, "final_prompt", "")
+        full_instruction = self.system_prompt + getattr(self, "final_prompt", "")
         
         # 2. Фильтрация инструментов
         blocked = getattr(self, "blocked_tools", [])

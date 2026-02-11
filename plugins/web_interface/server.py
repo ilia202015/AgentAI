@@ -16,6 +16,7 @@ import types
 import re
 
 is_print_debug = True
+FINAL_PROMPT_BASE_INSTRUCTIONS = "Инструкции далее самые важные, они нужны чтобы систематизировать все предыдущие и ты понимал, на чём нужно сделать акцент, их написал пользователь, они могут меняться в процессе чата, всегда сдедуй им, даже если они противоречат твоим предыдущим действиям:"
 
 # Setup paths
 current_dir = os.path.dirname(os.path.abspath(__file__)) 
@@ -98,8 +99,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             return self.active_chats[id]
         
         final_text = storage.get_active_final_prompt_text()
-        final_prompt_base_instructions = "Инструкции далее самые важные, они нужны чтобы систематизировать все предыдущие и ты понимал, на чём нужно сделать акцент, их написал пользователь, они могут меняться в процессе чата, всегда сдедуй им, даже если они противоречат твоим предыдущим действиям:"
-        final_prompt = f"\n\n{storage.WEB_PROMPT_MARKER_START}\n{final_prompt_base_instructions}\n{final_text}\n{storage.WEB_PROMPT_MARKER_END}"
+        final_prompt = f"\n\n{storage.WEB_PROMPT_MARKER_START}\n{FINAL_PROMPT_BASE_INSTRUCTIONS}\n{final_text}\n{storage.WEB_PROMPT_MARKER_END}"
 
         log_debug(f"Creating agent for {id}")
         try:
@@ -110,7 +110,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 # 2. Setup ID
                 new_agent.id = id
                 
-                new_agent.system_prompt = new_agent.system_prompt + final_prompt
+                new_agent.final_prompt = final_prompt
 
                 self.active_chats[id] = new_agent
                 return new_agent
@@ -127,7 +127,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 if warning:
                     print(warning)
                 
-                chat.system_prompt = chat.system_prompt + final_prompt
+                chat.final_prompt = final_prompt
 
                 self.active_chats[id] = chat
                 return chat
@@ -296,7 +296,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         preset_id = getattr(agent, "active_preset_id", "default")
         preset = storage.get_preset(preset_id)
         
-        compiled_text = ""
+        compiled_text = FINAL_PROMPT_BASE_INSTRUCTIONS
         # 1. Resolve prompt texts
         if "prompt_ids" in preset:
             compiled_text += storage.resolve_prompts_text(preset["prompt_ids"]) + "\n\n"
