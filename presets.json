@@ -12,7 +12,9 @@
         "test",
         "clear_user_profile"
       ],
-      "blocked": [],
+      "blocked": [
+        "user_profile"
+      ],
       "settings": {},
       "fs_permissions": {
         "global": "rwxld",

@@ -486,6 +486,8 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             self.send_json(resp)
         elif path == "/api/models":
             self.send_json(self.root_chat.models)
+        elif path == "/api/tools":
+            self.send_json([{"name": t["function"]["name"], "description": t["function"].get("description", "")} for t in self.root_chat.tools])
         else: 
             self.send_json({})
 
