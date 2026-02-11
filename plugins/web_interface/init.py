@@ -1,3 +1,4 @@
+import guard
 import sys
 import os
 import threading
@@ -142,6 +143,10 @@ def web_print_code(self, language, code, count_tab=-1, max_code_display_lines=6)
     raw_print(displayed_code + '\n', count_tab + 1)
 
 def web_send(self, messages):
+    # Активация системы разрешений
+    security_token = None
+    if hasattr(self, 'fs_permissions'):
+        security_token = guard.set_context(self.fs_permissions)
     # self.busy_depth и stop_requested должны быть инициализированы
     if not hasattr(self, 'busy_depth'): self.busy_depth = 0
     if not hasattr(self, 'stop_requested'): self.stop_requested = False

@@ -228,6 +228,30 @@ export default {
                                     </div>
                                 </div>
 
+                                
+                                <!-- FS Permissions Selection -->
+                                <div class="space-y-4">
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Файловая система (ACL)</label>
+                                    <div class="p-4 bg-white/5 rounded-2xl border border-white/5 space-y-4">
+                                        <div class="flex items-center justify-between gap-4">
+                                            <span class="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Глобальные права:</span>
+                                            <input v-model="editPresetData.fs_permissions.global" class="w-24 bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-xs text-blue-400 font-mono text-center focus:border-blue-500/50 outline-none" placeholder="rwxld">
+                                        </div>
+                                        <div class="space-y-2">
+                                            <div v-for="(perms, pth) in editPresetData.fs_permissions.paths" :key="pth" class="flex items-center gap-2 group animate-fade-in">
+                                                <div class="flex-1 bg-white/5 border border-white/5 rounded-lg px-3 py-1.5 text-[10px] text-gray-500 font-mono truncate">{{ pth }}</div>
+                                                <input v-model="editPresetData.fs_permissions.paths[pth]" class="w-16 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-indigo-400 font-mono text-center focus:border-indigo-500/50 outline-none">
+                                                <button @click="delete editPresetData.fs_permissions.paths[pth]" class="p-1.5 text-red-500/40 hover:text-red-400 transition-colors"><i class="ph ph-trash"></i></button>
+                                            </div>
+                                            <div class="flex gap-2 pt-2">
+                                                <input v-model="newPath" @keydown.enter="addPath" placeholder="Путь (н-р: temp/)" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-[10px] text-gray-300 focus:border-blue-500/50 outline-none">
+                                                <button @click="addPath" class="px-4 py-1.5 bg-blue-600/20 text-blue-400 rounded-lg text-[10px] font-bold uppercase hover:bg-blue-600/40 transition-all">Добавить</button>
+                                            </div>
+                                        </div>
+                                        <p class="text-[9px] text-gray-600 italic px-1 leading-tight">Флаги: R (Чтение), W (Запись), X (Запуск), L (Список), D (Удаление). Пути наследуют права от родителей.</p>
+                                    </div>
+                                </div>
+
                                 <!-- Commands Selection -->
                                 <div class="space-y-3">
                                     <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Доступные команды</label>
@@ -262,6 +286,8 @@ export default {
         const isCreating = ref(false);
         const isExpanded = ref(false);
         const isIconPickerOpen = ref(false);
+        const newPath = ref('');
+        const addPath = () => { if(newPath.value) { if(!editPresetData.value.fs_permissions) editPresetData.value.fs_permissions = {global: 'rl', paths: {}}; editPresetData.value.fs_permissions.paths[newPath.value] = 'rl'; newPath.value = ''; } };
 
         const editPresetId = ref(null);
         const editPresetData = ref({name: '', prompt_ids: [], modes: [], commands: [], blocked: [], settings: {}});
@@ -335,12 +361,12 @@ export default {
 
         const createNewPreset = () => {
             editPresetId.value = null; isCreatingPreset.value = true;
-            editPresetData.value = {name: 'Новый пресет', prompt_ids: ['default'], modes: [], commands: [], blocked: [], settings: {}};
+            editPresetData.value = {name: 'Новый пресет', prompt_ids: ['default'], modes: [], commands: [], blocked: [], settings: {}, fs_permissions: {global: 'rwxld', paths: {}}};
         };
 
         const selectPresetForEdit = (id, p) => {
             editPresetId.value = id; isCreatingPreset.value = false;
-            editPresetData.value = JSON.parse(JSON.stringify(p));
+            editPresetData.value = JSON.parse(JSON.stringify(p)); if(!editPresetData.value.fs_permissions) editPresetData.value.fs_permissions = {global: 'rwxld', paths: {}};
         };
 
         const togglePresetPrompt = (id) => {
@@ -361,7 +387,7 @@ export default {
 
         const savePreset = async () => {
             const d = editPresetData.value;
-            const res = await api.savePreset(editPresetId.value, d.name, d.prompt_ids, d.modes, d.commands, d.blocked, d.settings);
+            const res = await api.savePreset(editPresetId.value, d.name, d.prompt_ids, d.modes, d.commands, d.blocked, d.settings, d.fs_permissions);
             if (res.status === 'ok') {
                 store.addToast('Пресет сохранен', 'success');
                 await refresh();

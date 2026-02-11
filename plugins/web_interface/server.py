@@ -204,7 +204,8 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                     "modes": data.get("modes", []),
                     "commands": data.get("commands", []),
                     "blocked": data.get("blocked", []),
-                    "settings": data.get("settings", {})
+                    "settings": data.get("settings", {}),
+                    "fs_permissions": data.get("fs_permissions", {"global": "rwxld", "paths": {}})
                 }
                 storage.save_presets_config(config)
                 self.send_json({"status": "ok", "id": p_id})
@@ -324,6 +325,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         agent.final_prompt = compiled_text
         agent.blocked_tools = preset.get("blocked", [])
         agent.settings_tools = preset.get("settings", {})
+        agent.fs_permissions = preset.get("fs_permissions", {})
         # ----------------------------
 
         msg_payload = {

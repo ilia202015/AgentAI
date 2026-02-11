@@ -17,24 +17,28 @@
         "test"
       ],
       "blocked": [],
-      "settings": {}
+      "settings": {},
+      "fs_permissions": {
+        "global": "rwxld",
+        "paths": {}
+      }
     },
-    "protected": {
+    "safe": {
       "name": "Безопасный",
       "prompt_ids": [
         "default"
       ],
       "modes": [],
       "commands": [],
-      "blocked": [
-        "python",
-        "shell",
-        "user_profile",
-        "chat",
-        "sandbox",
-        "computer_use"
-      ],
-      "settings": {}
+      "blocked": [],
+      "settings": {},
+      "fs_permissions": {
+        "global": "rl",
+        "paths": {
+          "temp/": "rwxld",
+          "sandbox/": "rwxld"
+        }
+      }
     }
   }
 }
