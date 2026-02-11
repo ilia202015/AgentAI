@@ -17,7 +17,7 @@
         "clear_user_profile"
       ],
       "blocked": [
-        "user_profile"
+        "chat"
       ],
       "settings": {},
       "fs_permissions": {
@@ -32,7 +32,9 @@
       ],
       "modes": [],
       "commands": [],
-      "blocked": [],
+      "blocked": [
+        "chat"
+      ],
       "settings": {},
       "fs_permissions": {
         "global": "rl",
