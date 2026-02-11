@@ -303,8 +303,12 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         # 2. Dynamic Gathering (Modes)
         final_prompts_config = storage.get_final_prompts_config()
         all_prompts = final_prompts_config.get("prompts", {})
+        globally_active_params = final_prompts_config.get("active_parameters", [])
         
-        active_modes = preset.get("modes", [])
+        preset_modes = preset.get("modes", [])
+        # Фильтруем режимы пресета по тем, что реально включены пользователем в UI
+        active_modes = [m for m in preset_modes if m in globally_active_params]
+        
         for mode_id in active_modes:
             if mode_id in all_prompts:
                 mode_data = all_prompts[mode_id]

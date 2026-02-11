@@ -6,7 +6,11 @@
       "prompt_ids": [
         "default"
       ],
-      "modes": [],
+      "modes": [
+        "planner",
+        "sandbox",
+        "HW"
+      ],
       "commands": [
         "commit",
         "test",
