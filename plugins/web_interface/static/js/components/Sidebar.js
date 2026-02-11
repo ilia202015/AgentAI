@@ -64,19 +64,21 @@ export default {
                         <div v-for="(chat, index) in filteredChats" :key="chat.id"
                             @click="selectChat(chat.id)"
                             class="group relative p-3 rounded-xl cursor-pointer transition-all duration-200 border border-transparent"
-                            :class="chat.id === store.currentChatId 
+                            :style="{ zIndex: activePresetMenuId === chat.id ? 50 : 1 }"
+                            :class="(chat.id === store.currentChatId || activePresetMenuId === chat.id) 
                                 ? 'bg-white/10 border-white/5 shadow-sm backdrop-blur-md' 
                                 : 'hover:bg-white/5 text-gray-400 hover:text-gray-200'"
                         >
                             <div v-if="editingId === chat.id" class="mb-1">
                                 <input ref="editInput" v-model="editName" @click.stop @keydown.enter="saveRename(chat)" @blur="saveRename(chat)" @keydown.esc="cancelRename" class="w-full bg-gray-950 text-white text-sm px-1 py-0.5 rounded border border-blue-500/50 focus:outline-none">
                             </div>
-                            <div v-else class="font-medium truncate text-sm mb-0.5 pr-6" :class="chat.id === store.currentChatId ? 'text-white' : ''">
+                            <div v-else class="font-medium truncate text-sm mb-0.5 pr-6" :class="(chat.id === store.currentChatId || activePresetMenuId === chat.id) ? 'text-white' : ''">
                                 {{ chat.name || 'Новый чат' }}
                             </div>
                             <div class="text-[11px] truncate opacity-50 leading-relaxed font-light">{{ chat.preview }}</div>
                             
-                            <div class="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-gray-900/80 backdrop-blur rounded-lg p-1 shadow-xl border border-white/10" :class="editingId === chat.id ? 'hidden' : ''">
+                            <div class="absolute right-2 top-1/2 -translate-y-1/2 transition-all duration-200 flex gap-1 bg-gray-900/80 backdrop-blur-md rounded-lg p-1 shadow-xl border border-white/10" 
+                                 :class="[editingId === chat.id ? 'hidden' : '', activePresetMenuId === chat.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100']">
                                 <button @click.stop="togglePresetMenu(chat.id)" 
                                         class="p-1.5 hover:text-indigo-400 hover:bg-white/10 rounded-md transition-colors" 
                                         :class="activePresetMenuId === chat.id ? 'text-indigo-400 bg-white/10' : ''"
@@ -87,15 +89,16 @@ export default {
                                 <button @click.stop="startRename(chat)" class="p-1.5 hover:text-blue-400 hover:bg-white/10 rounded-md transition-colors" title="Переименовать"><i class="ph ph-pencil-simple"></i></button>
                                 <button @click.stop="deleteChat(chat.id)" class="p-1.5 hover:text-red-400 hover:bg-white/10 rounded-md transition-colors" title="Удалить"><i class="ph ph-trash"></i></button>
 
-                                <!-- Меню пресетов (выровнено по правому краю контейнера) -->
+                                <!-- Меню пресетов -->
                                 <div v-if="activePresetMenuId === chat.id" 
-                                     class="absolute right-0 w-48 bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl z-[100] p-1 animate-fade-in-up origin-top-right"
+                                     class="absolute right-0 w-48 bg-gray-900 border border-white/10 rounded-xl shadow-2xl z-[100] p-1 animate-fade-in origin-top-right"
+                                     style="backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);"
                                      :class="index < 3 ? 'top-full mt-2' : 'bottom-full mb-2'">
                                     <div class="text-[9px] font-bold text-gray-500 uppercase p-2 tracking-widest border-b border-white/5 mb-1">Выбор пресета</div>
                                     <div class="max-h-48 overflow-y-auto custom-scrollbar">
                                         <button v-for="(p, pid) in store.presets" :key="pid" @click.stop="selectPreset(chat.id, pid)"
                                                 class="w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between group transition-all"
-                                                :class="((chat.id === store.currentChatId && store.activePresetId === pid) || (chat.id !== store.currentChatId && chat.active_preset_id === pid)) ? 'bg-indigo-600/20 text-indigo-400' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'">
+                                                :class="((chat.id === store.currentChatId && store.activePresetId === pid) || (chat.id !== store.currentChatId && chat.active_preset_id === pid)) ? 'bg-indigo-600/40 text-indigo-400' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'">
                                             <span class="truncate">{{ p.name }}</span>
                                             <i v-if="(chat.id === store.currentChatId && store.activePresetId === pid) || (chat.id !== store.currentChatId && chat.active_preset_id === pid)" class="ph-bold ph-check"></i>
                                         </button>
