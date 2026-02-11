@@ -156,3 +156,8 @@ export async function setDefaultPreset(presetId) {
     });
     return await res.json();
 }
+
+export async function fetchTools() {
+    const res = await fetch(`${API_BASE}/tools`);
+    return await res.json();
+}

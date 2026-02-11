@@ -6,15 +6,11 @@
       "prompt_ids": [
         "default"
       ],
-      "modes": [
-        "planner",
-        "sandbox",
-        "HW"
-      ],
+      "modes": [],
       "commands": [
-        "clear_user_profile",
         "commit",
-        "test"
+        "test",
+        "clear_user_profile"
       ],
       "blocked": [],
       "settings": {},

@@ -7,6 +7,7 @@ export const store = reactive({
     messages: [],
     isThinking: false,
     models: [],
+    allTools: [],
     currentModel: '',
     
     // UI State

@@ -252,6 +252,24 @@ export default {
                                     </div>
                                 </div>
 
+                                
+                                <!-- Blocked Tools Selection -->
+                                <div class="space-y-3">
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Заблокированные инструменты</label>
+                                    <div class="p-4 bg-red-500/5 rounded-2xl border border-red-500/10 space-y-3">
+                                        <div class="flex flex-wrap gap-2">
+                                            <div v-for="t in store.allTools" :key="t.name"
+                                                @click="togglePresetBlockedTool(t.name)"
+                                                class="px-3 py-1.5 rounded-lg border text-[10px] transition-all cursor-pointer flex items-center gap-2"
+                                                :class="editPresetData.blocked.includes(t.name) ? 'bg-red-500/20 border-red-500/40 text-red-400' : 'bg-white/5 border-transparent text-gray-500 hover:bg-white/10'">
+                                                <i class="ph ph-prohibit"></i>
+                                                <span class="truncate">{{ t.name }}</span>
+                                            </div>
+                                        </div>
+                                        <p class="text-[9px] text-gray-600 italic px-1 leading-tight">Инструменты, выбранные здесь, будут физически недоступны агенту при использовании этого пресета.</p>
+                                    </div>
+                                </div>
+
                                 <!-- Commands Selection -->
                                 <div class="space-y-3">
                                     <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Доступные команды</label>
@@ -301,7 +319,7 @@ export default {
             store.activePromptId = config.active_id;
             store.active_parameters = config.active_parameters || [];
             store.presets = config.presets || {};
-            store.defaultPresetId = config.default_preset_id || 'default';
+            store.defaultPresetId = config.default_preset_id || 'default'; const tools = await api.fetchTools(); if(Array.isArray(tools)) store.allTools = tools;
         };
 
         const getPromptsByType = (type) => {
@@ -366,7 +384,13 @@ export default {
 
         const selectPresetForEdit = (id, p) => {
             editPresetId.value = id; isCreatingPreset.value = false;
-            editPresetData.value = JSON.parse(JSON.stringify(p)); if(!editPresetData.value.fs_permissions) editPresetData.value.fs_permissions = {global: 'rwxld', paths: {}};
+            editPresetData.value = JSON.parse(JSON.stringify(p));
+            const d = editPresetData.value;
+            if(!d.fs_permissions) d.fs_permissions = {global: 'rwxld', paths: {}};
+            if(!d.blocked) d.blocked = [];
+            if(!d.modes) d.modes = [];
+            if(!d.commands) d.commands = [];
+            if(!d.prompt_ids) d.prompt_ids = [];
         };
 
         const togglePresetPrompt = (id) => {
@@ -378,6 +402,11 @@ export default {
             const idx = editPresetData.value.modes.indexOf(id);
             if (idx > -1) editPresetData.value.modes.splice(idx, 1);
             else editPresetData.value.modes.push(id);
+        };
+                const togglePresetBlockedTool = (name) => {
+            const idx = editPresetData.value.blocked.indexOf(name);
+            if (idx > -1) editPresetData.value.blocked.splice(idx, 1);
+            else editPresetData.value.blocked.push(name);
         };
         const togglePresetCommand = (id) => {
             const idx = editPresetData.value.commands.indexOf(id);
@@ -413,12 +442,13 @@ export default {
         onMounted(refresh);
         watch(() => store.isPromptPanelOpen, (val) => { if(val) refresh(); });
 
-        return { 
+                return { 
             store, activeTab, editPromptId, editPromptData, isCreating, isExpanded, isIconPickerOpen, commonIcons, 
             createNewPrompt, selectIcon, savePrompt, setActivePrompt, deletePrompt, selectForEdit, closeEditor, 
             getPromptsByType, getTypeName, getTypeIcon,
             editPresetId, editPresetData, isCreatingPreset, createNewPreset, selectPresetForEdit,
-            togglePresetPrompt, togglePresetMode, togglePresetCommand, savePreset, deletePreset, setAsDefault
+            togglePresetPrompt, togglePresetMode, togglePresetCommand, togglePresetBlockedTool, savePreset, deletePreset, setAsDefault,
+            newPath, addPath
         };
     }
 }
