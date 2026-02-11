@@ -63,6 +63,34 @@
       "type": "parameter",
       "icon": "ph-folder",
       "gather_script": "import os; result = os.listdir('.')"
+    },
+    "knowledge_computer_use": {
+      "name": "Знание: computer_use",
+      "text": "Ты активировал режим 'Знание: computer_use'. Ниже представлен актуальный исходный код модуля для анализа.",
+      "type": "parameter",
+      "icon": "ph-cpu",
+      "gather_script": "import os\ntarget_dir = 'plugins/computer_use'\nexclude_dirs = {'chats', 'temp', 'venv', '__pycache__', 'env', 'sandbox', 'node_modules', '.venv', '.git', 'libs'}\nresult_output = []\n\nif os.path.exists(target_dir):\n    for root, dirs, files in os.walk(target_dir):\n        dirs[:] = [d for d in dirs if d not in exclude_dirs]\n        for file in files:\n            if file.endswith(('.pyc', '.pyo', '.exe', '.dll', '.so', '.dylib')) or file == '.DS_Store':\n                continue\n            abs_path = os.path.join(root, file)\n            rel_path = os.path.relpath(abs_path, target_dir)\n            try:\n                with open(abs_path, 'r', encoding='utf-8', errors='ignore') as f:\n                    content = f.read()\n                result_output.append(f\"\\n--- {rel_path} ---\\n{content}\\n\")\n            except:\n                pass\n    result = \"\".join(result_output)\nelse:\n    result = f\"Директория {target_dir} не найдена.\""
+    },
+    "knowledge_browser_use": {
+      "name": "Знание: browser_use",
+      "text": "Ты активировал режим 'Знание: browser_use'. Ниже представлен актуальный исходный код модуля для анализа.",
+      "type": "parameter",
+      "icon": "ph-globe",
+      "gather_script": "import os\ntarget_dir = 'plugins/browser_use'\nexclude_dirs = {'chats', 'temp', 'venv', '__pycache__', 'env', 'sandbox', 'node_modules', '.venv', '.git', 'libs'}\nresult_output = []\n\nif os.path.exists(target_dir):\n    for root, dirs, files in os.walk(target_dir):\n        dirs[:] = [d for d in dirs if d not in exclude_dirs]\n        for file in files:\n            if file.endswith(('.pyc', '.pyo', '.exe', '.dll', '.so', '.dylib')) or file == '.DS_Store':\n                continue\n            abs_path = os.path.join(root, file)\n            rel_path = os.path.relpath(abs_path, target_dir)\n            try:\n                with open(abs_path, 'r', encoding='utf-8', errors='ignore') as f:\n                    content = f.read()\n                result_output.append(f\"\\n--- {rel_path} ---\\n{content}\\n\")\n            except:\n                pass\n    result = \"\".join(result_output)\nelse:\n    result = f\"Директория {target_dir} не найдена.\""
+    },
+    "knowledge_backend": {
+      "name": "Знание: backend",
+      "text": "Ты активировал режим 'Знание: backend'. Ниже представлен актуальный исходный код модуля для анализа.",
+      "type": "parameter",
+      "icon": "ph-gear",
+      "gather_script": "import os\ntarget_dir = 'plugins/web_interface'\nexclude_dirs = {'chats', 'static', 'temp', 'venv', '__pycache__', 'env', 'sandbox', 'node_modules', '.venv', '.git', 'libs'}\nresult_output = []\n\nif os.path.exists(target_dir):\n    for root, dirs, files in os.walk(target_dir):\n        dirs[:] = [d for d in dirs if d not in exclude_dirs]\n        for file in files:\n            if file.endswith(('.pyc', '.pyo', '.exe', '.dll', '.so', '.dylib')) or file == '.DS_Store':\n                continue\n            abs_path = os.path.join(root, file)\n            rel_path = os.path.relpath(abs_path, target_dir)\n            try:\n                with open(abs_path, 'r', encoding='utf-8', errors='ignore') as f:\n                    content = f.read()\n                result_output.append(f\"\\n--- {rel_path} ---\\n{content}\\n\")\n            except:\n                pass\n    result = \"\".join(result_output)\nelse:\n    result = f\"Директория {target_dir} не найдена.\""
+    },
+    "knowledge_frontend": {
+      "name": "Знание: frontend",
+      "text": "Ты активировал режим 'Знание: frontend'. Ниже представлен актуальный исходный код модуля для анализа.",
+      "type": "parameter",
+      "icon": "ph-layout",
+      "gather_script": "import os\ntarget_dir = 'plugins/web_interface/static'\nexclude_dirs = {'chats', 'temp', 'venv', '__pycache__', 'env', 'sandbox', 'node_modules', '.venv', '.git', 'libs'}\nresult_output = []\n\nif os.path.exists(target_dir):\n    for root, dirs, files in os.walk(target_dir):\n        dirs[:] = [d for d in dirs if d not in exclude_dirs]\n        for file in files:\n            if file.endswith(('.pyc', '.pyo', '.exe', '.dll', '.so', '.dylib')) or file == '.DS_Store':\n                continue\n            abs_path = os.path.join(root, file)\n            rel_path = os.path.relpath(abs_path, target_dir)\n            try:\n                with open(abs_path, 'r', encoding='utf-8', errors='ignore') as f:\n                    content = f.read()\n                result_output.append(f\"\\n--- {rel_path} ---\\n{content}\\n\")\n            except:\n                pass\n    result = \"\".join(result_output)\nelse:\n    result = f\"Директория {target_dir} не найдена.\""
     }
   }
 }
