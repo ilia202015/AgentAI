@@ -170,7 +170,8 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                     "name": data.get("name", "New Prompt"), 
                     "text": data.get("text", ""),
                     "type": data.get("type", "system"),
-                    "icon": data.get("icon", "ph-app-window")
+                    "icon": data.get("icon", "ph-app-window"),
+                    "gather_script": data.get("gather_script", "")
                 }
                 if data.get("make_active"): config["active_id"] = p_id
                 storage.save_final_prompts_config(config)

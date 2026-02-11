@@ -138,6 +138,11 @@ export default {
                                     <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Инструкция (Промпт)</label>
                                     <textarea v-model="editPromptData.text" class="flex-1 w-full min-h-[150px] bg-white/5 border border-white/10 rounded-2xl px-4 py-4 focus:outline-none focus:border-blue-500/50 text-xs font-mono resize-none text-gray-300 custom-scrollbar"></textarea>
                                 </div>
+                                <div v-if="editPromptData.type === 'parameter'" class="space-y-2">
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Скрипт сбора данных (Gather Script)</label>
+                                    <textarea v-model="editPromptData.gather_script" placeholder="Python код. Результат должен быть в переменной result..." class="w-full min-h-[100px] bg-white/5 border border-white/10 rounded-2xl px-4 py-4 focus:outline-none focus:border-blue-500/50 text-xs font-mono resize-none text-blue-300 custom-scrollbar"></textarea>
+                                    <p class="text-[9px] text-gray-600 italic px-1 leading-tight">Этот код выполняется агентом каждый раз при отправке сообщения в режиме, если режим активен. Результат выполнения кода добавляется в контекст.</p>
+                                </div>
                             </div>
                             <div class="flex justify-between items-center py-4 border-t border-white/10 mt-auto">
                                 <button v-if="editPromptId" @click="deletePrompt(editPromptId)" class="p-3 text-red-500/60 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all"><i class="ph-bold ph-trash text-lg"></i></button>
@@ -300,7 +305,7 @@ export default {
     setup() {
         const activeTab = ref('prompts');
         const editPromptId = ref(null);
-        const editPromptData = ref({name: '', text: '', type: 'system', icon: 'ph-app-window'});
+        const editPromptData = ref({name: '', text: '', type: 'system', icon: 'ph-app-window', gather_script: ''});
         const isCreating = ref(false);
         const isExpanded = ref(false);
         const isIconPickerOpen = ref(false);
@@ -336,13 +341,13 @@ export default {
         const selectForEdit = (id, p) => {
             isCreating.value = false;
             editPromptId.value = id;
-            editPromptData.value = { name: p.name, text: p.text, type: p.type || 'system', icon: p.icon || 'ph-app-window' };
+            editPromptData.value = { name: p.name, text: p.text, type: p.type || 'system', icon: p.icon || 'ph-app-window', gather_script: p.gather_script || '' };
         };
 
         const createNewPrompt = () => {
             editPromptId.value = null;
             isCreating.value = true;
-            editPromptData.value = {name: 'Новый промпт', text: '', type: 'system', icon: 'ph-robot'};
+            editPromptData.value = {name: 'Новый промпт', text: '', type: 'system', icon: 'ph-robot', gather_script: ''};
         };
 
         const selectIcon = (icon) => {
@@ -351,7 +356,7 @@ export default {
         };
 
         const savePrompt = async () => {
-            const res = await api.saveFinalPrompt(editPromptId.value, editPromptData.value.name, editPromptData.value.text, editPromptData.value.type, editPromptData.value.icon);
+            const res = await api.saveFinalPrompt(editPromptId.value, editPromptData.value.name, editPromptData.value.text, editPromptData.value.type, editPromptData.value.icon, editPromptData.value.gather_script);
             if (res.status === 'ok') {
                 store.addToast('Сохранено', 'success');
                 await refresh();
