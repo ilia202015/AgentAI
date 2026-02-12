@@ -352,7 +352,19 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             agent.fs_permissions = guard.intersect_acl_configs(acl_list)
         else:
             # Fallback к глобальным правам пресета или пустой строке
-            agent.fs_permissions = preset.get("fs_permissions", {"global": "", "paths": {}})
+            agent.fs_permissions = copy.deepcopy(preset.get("fs_permissions", {"global": "", "paths": {}}))
+
+        # --- FORCE CHAT ACCESS (System Override) ---
+        if cid:
+            if 'paths' not in agent.fs_permissions:
+                agent.fs_permissions['paths'] = {}
+            
+            # Агенту ВСЕГДА разрешен полный доступ к своим файлам состояния и изображениям
+            agent.fs_permissions['paths'][f"chats/{cid}.pkl"] = "rwxld"
+            agent.fs_permissions['paths'][f"chats/{cid}.pkl.tmp"] = "rwxld"
+            agent.fs_permissions['paths'][f"chats/{cid}.json"] = "rwxld"
+            agent.fs_permissions['paths'][f"chats/{cid}.json.tmp"] = "rwxld"
+            agent.fs_permissions['paths'][f"chats/{cid}/"] = "rwxld"
         # ----------------------------
 
         msg_payload = {
