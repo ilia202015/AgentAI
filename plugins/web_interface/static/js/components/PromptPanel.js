@@ -143,6 +143,29 @@ export default {
                                     <textarea v-model="editPromptData.gather_script" placeholder="Python код. Результат должен быть в переменной result..." class="w-full min-h-[100px] bg-white/5 border border-white/10 rounded-2xl px-4 py-4 focus:outline-none focus:border-blue-500/50 text-xs font-mono resize-none text-blue-300 custom-scrollbar"></textarea>
                                     <p class="text-[9px] text-gray-600 italic px-1 leading-tight">Этот код выполняется агентом каждый раз при отправке сообщения в режиме, если режим активен. Результат выполнения кода добавляется в контекст.</p>
                                 </div>
+
+                                <!-- Mode FS Permissions Selection -->
+                                <div v-if="editPromptData.type === 'parameter'" class="space-y-4">
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Файловая система (ACL)</label>
+                                    <div class="p-4 bg-white/5 rounded-2xl border border-white/5 space-y-4">
+                                        <div class="flex items-center justify-between gap-4">
+                                            <span class="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Глобальные права:</span>
+                                            <input v-model="editPromptData.fs_permissions.global" class="w-24 bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-xs text-blue-400 font-mono text-center focus:border-blue-500/50 outline-none" placeholder="rwxld">
+                                        </div>
+                                        <div class="space-y-2">
+                                            <div v-for="(perms, pth) in editPromptData.fs_permissions.paths" :key="pth" class="flex items-center gap-2 group animate-fade-in">
+                                                <div class="flex-1 bg-white/5 border border-white/5 rounded-lg px-3 py-1.5 text-[10px] text-gray-500 font-mono truncate">{{ pth }}</div>
+                                                <input v-model="editPromptData.fs_permissions.paths[pth]" class="w-16 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-indigo-400 font-mono text-center focus:border-indigo-500/50 outline-none">
+                                                <button @click="delete editPromptData.fs_permissions.paths[pth]" class="p-1.5 text-red-500/40 hover:text-red-400 transition-colors"><i class="ph ph-trash"></i></button>
+                                            </div>
+                                            <div class="flex gap-2 pt-2">
+                                                <input v-model="newPath" @keydown.enter="addPath" placeholder="Путь (н-р: temp/)" class="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-[10px] text-gray-300 focus:border-blue-500/50 outline-none">
+                                                <button @click="addPath" class="px-4 py-1.5 bg-blue-600/20 text-blue-400 rounded-lg text-[10px] font-bold uppercase hover:bg-blue-600/40 transition-all">Добавить</button>
+                                            </div>
+                                        </div>
+                                        <p class="text-[9px] text-gray-600 italic px-1 leading-tight">Флаги: R, W, X, L, D. Права режима пересекаются с правами пресета, ограничивая их.</p>
+                                    </div>
+                                </div>
                             </div>
                             <div class="flex justify-between items-center py-4 border-t border-white/10 mt-auto">
                                 <button v-if="editPromptId" @click="deletePrompt(editPromptId)" class="p-3 text-red-500/60 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all"><i class="ph-bold ph-trash text-lg"></i></button>
@@ -305,12 +328,18 @@ export default {
     setup() {
         const activeTab = ref('prompts');
         const editPromptId = ref(null);
-        const editPromptData = ref({name: '', text: '', type: 'system', icon: 'ph-app-window', gather_script: ''});
+        const editPromptData = ref({name: '', text: '', type: 'system', icon: 'ph-app-window', gather_script: '', fs_permissions: {global: '', paths: {}}});
         const isCreating = ref(false);
         const isExpanded = ref(false);
         const isIconPickerOpen = ref(false);
         const newPath = ref('');
-        const addPath = () => { if(newPath.value) { if(!editPresetData.value.fs_permissions) editPresetData.value.fs_permissions = {global: 'rl', paths: {}}; editPresetData.value.fs_permissions.paths[newPath.value] = 'rl'; newPath.value = ''; } };
+        const addPath = () => { 
+            if(!newPath.value) return;
+            const target = (activeTab.value === 'prompts') ? editPromptData.value : editPresetData.value;
+            if(!target.fs_permissions) target.fs_permissions = {global: '', paths: {}};
+            target.fs_permissions.paths[newPath.value] = 'rl'; 
+            newPath.value = ''; 
+        };
 
         const editPresetId = ref(null);
         const editPresetData = ref({name: '', prompt_ids: [], modes: [], commands: [], blocked: [], settings: {}});
@@ -341,13 +370,20 @@ export default {
         const selectForEdit = (id, p) => {
             isCreating.value = false;
             editPromptId.value = id;
-            editPromptData.value = { name: p.name, text: p.text, type: p.type || 'system', icon: p.icon || 'ph-app-window', gather_script: p.gather_script || '' };
+            editPromptData.value = { 
+                name: p.name, text: p.text, type: p.type || 'system', 
+                icon: p.icon || 'ph-app-window', gather_script: p.gather_script || '',
+                fs_permissions: p.fs_permissions || {global: '', paths: {}}
+            };
         };
 
         const createNewPrompt = () => {
             editPromptId.value = null;
             isCreating.value = true;
-            editPromptData.value = {name: 'Новый промпт', text: '', type: 'system', icon: 'ph-robot', gather_script: ''};
+            editPromptData.value = {
+                name: 'Новый промпт', text: '', type: 'system', icon: 'ph-robot', gather_script: '',
+                fs_permissions: {global: '', paths: {}}
+            };
         };
 
         const selectIcon = (icon) => {
@@ -356,7 +392,7 @@ export default {
         };
 
         const savePrompt = async () => {
-            const res = await api.saveFinalPrompt(editPromptId.value, editPromptData.value.name, editPromptData.value.text, editPromptData.value.type, editPromptData.value.icon, editPromptData.value.gather_script);
+            const res = await api.saveFinalPrompt(editPromptId.value, editPromptData.value.name, editPromptData.value.text, editPromptData.value.type, editPromptData.value.icon, editPromptData.value.gather_script, false, editPromptData.value.fs_permissions);
             if (res.status === 'ok') {
                 store.addToast('Сохранено', 'success');
                 await refresh();

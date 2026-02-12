@@ -93,11 +93,11 @@ export async function fetchFinalPrompts() {
     return await res.json();
 }
 
-export async function saveFinalPrompt(id, name, text, type = 'system', icon = 'ph-app-window', gather_script = '', makeActive = false) {
+export async function saveFinalPrompt(id, name, text, type = 'system', icon = 'ph-app-window', gather_script = '', makeActive = false, fs_permissions = null) {
     const res = await fetch(`${API_BASE}/final-prompts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, name, text, type, icon, gather_script, make_active: makeActive })
+        body: JSON.stringify({ id, name, text, type, icon, gather_script, make_active: makeActive, fs_permissions })
     });
     return await res.json();
 }
