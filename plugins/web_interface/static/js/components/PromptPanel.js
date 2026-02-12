@@ -328,7 +328,7 @@ export default {
     setup() {
         const activeTab = ref('prompts');
         const editPromptId = ref(null);
-        const editPromptData = ref({name: '', text: '', type: 'system', icon: 'ph-app-window', gather_script: '', fs_permissions: {global: '', paths: {}}});
+        const editPromptData = ref({name: '', text: '', type: 'system', icon: 'ph-app-window', gather_script: '', fs_permissions: {global: 'rwxld', paths: {}}});
         const isCreating = ref(false);
         const isExpanded = ref(false);
         const isIconPickerOpen = ref(false);
@@ -382,7 +382,7 @@ export default {
             isCreating.value = true;
             editPromptData.value = {
                 name: 'Новый промпт', text: '', type: 'system', icon: 'ph-robot', gather_script: '',
-                fs_permissions: {global: '', paths: {}}
+                fs_permissions: {global: 'rwxld', paths: {}}
             };
         };
 

@@ -61,7 +61,9 @@
         "commit",
         "test"
       ],
-      "blocked": [],
+      "blocked": [
+        "chat"
+      ],
       "settings": {},
       "fs_permissions": {
         "global": "rwxld",
