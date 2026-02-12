@@ -1,4 +1,3 @@
-import guard
 import sys
 import os
 import threading
@@ -33,6 +32,16 @@ except ImportError:
         spec = importlib.util.spec_from_file_location("storage", os.path.join(current_dir, "storage.py"))
         storage = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(storage)
+
+try:
+    import guard
+except ImportError:
+    try:
+        from . import guard
+    except ImportError:
+        spec = importlib.util.spec_from_file_location("guard", os.path.join(current_dir, "guard.py"))
+        guard = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(guard)
 
 
 # === WEB INTERFACE METHODS ===
