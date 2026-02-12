@@ -369,7 +369,8 @@ class Chat:
 
         elif action == "start":
             if not os.path.exists(sandbox_dir): self.sandbox_tool("create")
-            if state['process'] and state['process'].poll() is None: return f"Уже запущена (PID: {state['pid']})"
+            if state['process'] and state['process'].poll() is None: 
+                self.sandbox_tool("stop")
             port_to_try = 8080
             found_port = None
             while port_to_try < 8095:
@@ -378,7 +379,8 @@ class Chat:
                         found_port = port_to_try
                         break
                 port_to_try += 1
-            if not found_port: return "Нет свободных портов."
+            if not found_port: 
+                return "Нет свободных портов."
             env = os.environ.copy()
             env["PYTHONIOENCODING"] = "utf-8"
             proc = subprocess.Popen([sys.executable, 'start.py'], cwd=sandbox_dir, stdout=open(os.path.join(sandbox_dir, log_file), 'w', encoding='utf-8'), stderr=subprocess.STDOUT, env=env)

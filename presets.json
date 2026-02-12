@@ -57,6 +57,24 @@
         "knowledge_backend",
         "knowledge_frontend"
       ],
+      "commands": [
+        "commit",
+        "test"
+      ],
+      "blocked": [],
+      "settings": {},
+      "fs_permissions": {
+        "global": "rwxld",
+        "paths": {}
+      }
+    },
+    "1770902539.7172294": {
+      "name": "Архитектор",
+      "prompt_ids": [
+        "default",
+        "architect"
+      ],
+      "modes": [],
       "commands": [],
       "blocked": [],
       "settings": {},

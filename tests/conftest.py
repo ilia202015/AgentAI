@@ -38,7 +38,7 @@ def mock_agent(mock_client, tmp_path_factory, monkeypatch_module):
         self.current_key_index = 0
         self.prompts = {
             "system": "test", "python": "test", "chat": "test",
-            "user_profile": "{}", "save_code_changes": "test", "http": "test",
+            "user_profile": "{}", "http": "test",
             "shell": "test", "google_search": "test", "python_str": "test"
         }
         self.user_profile = "{}"
