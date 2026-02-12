@@ -189,13 +189,11 @@ def web_send(self, messages):
 
     self.busy_depth += 1
     try:
-        # Вызываем ОРИГИНАЛЬНЫЙ метод, сохраненный в классе
-        # Обращаемся к классу через type(self) или напрямую через сохраненный атрибут
+        # Вызываем ОРИГИНАЛЬНЫЙ метод
         original_send = getattr(self.__class__, '_original_send', None)
         if original_send:
             result = original_send(self, messages)
         else:
-            # Fallback если что-то пошло не так (рекурсия?)
             print("ERROR: _original_send not found!")
             return "Error: Internal agent error (send loop)"
         
@@ -207,6 +205,13 @@ def web_send(self, messages):
                 print(f"⚠️ Autosave failed: {e}")
         return result
     finally:
+        # СБРОС КОНТЕКСТА БЕЗОПАСНОСТИ (Fix Context Leak)
+        if security_token:
+            try:
+                guard.reset_context(security_token)
+            except Exception as e:
+                print(f"⚠️ Security context reset failed: {e}")
+
         self.busy_depth -= 1
         if self.busy_depth == 0:
             self.web_emit("finish", "done")

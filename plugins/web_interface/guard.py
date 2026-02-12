@@ -59,6 +59,49 @@ def get_permissions(path, config):
 
     return config.get('global', "")
 
+def intersect_flags(s1, s2):
+    """Возвращает пересечение флагов (только те, что есть в обоих строках)."""
+    if s1 is None or s2 is None: return ""
+    return "".join(c for c in s1 if c in s2)
+
+def intersect_acl_configs(configs):
+    """
+    Реализует строгое пересечение списка конфигураций ACL.
+    Итоговые права = Права(Config1) ∩ Права(Config2) ∩ ...
+    """
+    if not configs:
+        return {"global": "", "paths": {}}
+    
+    # Фильтруем пустые конфиги (трактуем None как запрет всего)
+    valid_configs = [c if c else {"global": "", "paths": {}} for c in configs]
+    
+    # 1. Пересечение Global
+    res_global = valid_configs[0].get("global", "")
+    for c in valid_configs[1:]:
+        res_global = intersect_flags(res_global, c.get("global", ""))
+        
+    # 2. Пересечение путей
+    all_path_keys = set()
+    for c in valid_configs:
+        all_path_keys.update(c.get("paths", {}).keys())
+        
+    res_paths = {}
+    for path in all_path_keys:
+        # Для каждого уникального пути вычисляем эффективные права в каждом конфиге
+        # (с учетом наследования от родительских папок или global)
+        effective_perms = [get_permissions(path, c) for c in valid_configs]
+        
+        # Пересекаем полученные права
+        p_flags = effective_perms[0]
+        for f in effective_perms[1:]:
+            p_flags = intersect_flags(p_flags, f)
+        
+        # Сохраняем только если права отличаются от итогового global (для лаконичности)
+        # или если это важный узел. Но для безопасности лучше сохранить все явно.
+        res_paths[path] = p_flags
+        
+    return {"global": res_global, "paths": res_paths}
+
 def check_access(path, required_mode):
     """Основная функция проверки доступа."""
     ctx = security_context.get()

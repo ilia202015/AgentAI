@@ -43,6 +43,7 @@ except Exception as e:
 
 try:
     import serialization
+    import guard
 except ImportError:
     log_debug(f"Serialization import failed")
     serialization = None
@@ -330,7 +331,27 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         agent.final_prompt = compiled_text
         agent.blocked_tools = preset.get("blocked", [])
         agent.settings_tools = preset.get("settings", {})
-        agent.fs_permissions = preset.get("fs_permissions", {})
+        
+        # --- ACL INTERSECTION ---
+        acl_list = []
+        # 1. ACL из Пресета
+        if "fs_permissions" in preset:
+            acl_list.append(preset["fs_permissions"])
+        
+        # 2. ACL из всех активных Режимов
+        for mode_id in active_modes:
+            if mode_id in all_prompts:
+                mode_acl = all_prompts[mode_id].get("fs_permissions")
+                if mode_acl:
+                    acl_list.append(mode_acl)
+        
+        # Если есть хотя бы один ACL, вычисляем пересечение. 
+        # Если конфигов нет, guard.intersect_acl_configs вернет пустые права.
+        if acl_list:
+            agent.fs_permissions = guard.intersect_acl_configs(acl_list)
+        else:
+            # Fallback к глобальным правам пресета или пустой строке
+            agent.fs_permissions = preset.get("fs_permissions", {"global": "", "paths": {}})
         # ----------------------------
 
         msg_payload = {
