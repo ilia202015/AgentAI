@@ -152,6 +152,33 @@ class Chat:
                     tools_dict_additional[tool["function"]["name"]].append(parameter)
         return tools_dict_required, tools_dict_additional
 
+    def _extract_retry_delay(self, err_str):
+        import re, datetime
+        # Паттерны для поиска секунд в различных форматах ответов Google
+        patterns = [
+            r"Please retry in (\d+\.?\d*)s",
+            r"retryDelay':\s*'(\d+)s'",
+            r"\"seconds\":\s*(\d+)",
+            r"retryAfter\":\s*\"(\d+)s\"",
+            r"Quota exceeded.*?(\d+)s"
+        ]
+        for p in patterns:
+            match = re.search(p, err_str)
+            if match: return float(match.group(1))
+        
+        # Поиск даты "retry after 2025-..."
+        date_match = re.search(r"retry after (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})", err_str)
+        if date_match:
+            try:
+                # Попытка парсинга ISO даты (может приходить от некоторых прокси/сервисов)
+                target = datetime.datetime.fromisoformat(date_match.group(1).replace('Z', '+00:00'))
+                # Считаем разницу с текущим временем в UTC
+                now = datetime.datetime.now(datetime.timezone.utc)
+                diff = (target - now).total_seconds()
+                return max(diff, 1.0)
+            except: pass
+        return None
+
     def _initialize_tools(self):
         with open(f"{self.agent_dir}/tools.json", 'r', encoding="utf8") as f: 
             self.tools = json.load(f)["tools"]
@@ -612,12 +639,15 @@ class Chat:
         )
 
     def _process_request(self):
-        while True:
+        max_retries = 100
+        attempt = 0
+        while attempt < max_retries:
+            attempt += 1
             try:
                 # Rate limiter
                 delay = 60 / self.model_rpm - (time.time() - self.last_send_time)
                 if delay > 0:
-                    self.print(f"Жду {delay:.2f} секунд")
+                    if delay > 1: self.print(f"Жду {delay:.2f} секунд")
                     time.sleep(delay)
                 self.last_send_time = time.time()
 
@@ -636,10 +666,35 @@ class Chat:
                 res = self._handle_stream(stream)
                 if res:
                     return res
+                # Если res is None, значит _handle_stream попросил ретрай (например, из-за 429 или сетевой ошибки)
+                continue
 
             except Exception as e:
-                error_msg = f"Произошла ошибка API: {e}\n\n{traceback.format_exc()}"
+                err_str = str(e)
+                # Список ошибок для повторной попытки на этапе создания стрима
+                retry_errors = [
+                    "429", "Resource has been exhausted", # Лимиты
+                    "500", "502", "503", "504",            # Ошибки сервера
+                    "EOF occurred in violation of protocol", # SSL/EOF
+                    "UNEXPECTED_EOF_WHILE_READING",
+                    "RemoteProtocolError",
+                    "ConnectError",
+                    "DeadlineExceeded",
+                    "Service Unavailable"
+                ]
+                
+                if any(msg in err_str for msg in retry_errors) and attempt < max_retries:
+                    # Пытаемся вытянуть точную задержку из ошибки
+                    extracted_delay = self._extract_retry_delay(err_str)
+                    wait_time = extracted_delay if extracted_delay is not None else 0.1
+                    print(f"\n⚠️ Ошибка при создании соединения ({err_str[:50]}...). Попытка {attempt}/{max_retries}, жду {wait_time:.1f}с...")
+                    time.sleep(wait_time)
+                    continue
+                
+                error_msg = f"Произошла критическая ошибка API: {e}\n\n{traceback.format_exc()}"
                 self.print(f"\n❌ {error_msg}")
+                return error_msg
+
 
     def _handle_stream(self, stream):
         response_parts = []
@@ -679,33 +734,32 @@ class Chat:
 
         except Exception as e:
             e_trace = traceback.format_exc()
+            err_str = str(e)
+            
+            # Список ошибок для повторной попытки во время стрима
+            retry_errors = [
+                "429", "Resource has been exhausted",
+                "500", "502", "503", "504",
+                "EOF occurred in violation of protocol",
+                "UNEXPECTED_EOF_WHILE_READING",
+                "RemoteProtocolError",
+                "ConnectError",
+                "DeadlineExceeded"
+            ]
 
-            if "429" in str(e) or "Resource has been exhausted" in str(e):
-                wait_time = -1
-                try:
-                    # Поиск "Please retry in ...s" (самый точный способ из сообщения об ошибке)
-                    match = re.search(r"Please retry in (\d+\.?\d*)s", str(e))
-                    if match:
-                        wait_time = float(match.group(1))
-                    else:
-                        # Поиск в JSON-структуре 'retryDelay': '29s'
-                        match = re.search(r"retryDelay': '(\d+)s'", str(e))
-                        if match:
-                            wait_time = int(match.group(1))
-                except Exception as e:
-                    self.print(f"Ошибка обработки стрима: {e}\n{e_trace}")
-                    return f"Ошибка обработки стрима: {e}"
-                
-                if wait_time == -1:
-                    self.print(f"Ошибка обработки стрима: {e}\n{e_trace}")
-                    return f"Ошибка обработки стрима: {e}"
+            if any(msg in err_str for msg in retry_errors):
+                # Пытаемся вытянуть точную задержку из ошибки
+                extracted_delay = self._extract_retry_delay(err_str)
+                # Пытаемся вытянуть точную задержку из ошибки
+                wait_time = extracted_delay if extracted_delay is not None else 0.1
 
-                self.print(f"⚠️ Лимит исчерпан (429). Ожидание {wait_time:.1f}с...")
+                print(f"\n⚠️ Ошибка в процессе получения данных ({err_str[:50]}...). Ожидание {wait_time}с и повтор...")
                 time.sleep(wait_time + 1)
                 return None
             else:
-                self.print(f"Ошибка обработки стрима: {e}\n{e_trace}")
+                self.print(f"\n❌ Ошибка обработки стрима: {e}\n{e_trace}")
                 return f"Ошибка обработки стрима: {e}"
+
 
     def _execute_tool_calls(self, tool_calls):
         import json
