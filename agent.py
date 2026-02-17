@@ -291,11 +291,13 @@ class Chat:
         try:
             import requests
             from bs4 import BeautifulSoup
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         except ImportError:
             return "Ошибка: для работы этого инструмента необходимы библиотеки requests и beautifulsoup4."
         try:
             headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'}
-            response = requests.get(url, headers=headers, timeout=10)
+            response = requests.get(url, headers=headers, timeout=10, verify=False)
             response.raise_for_status()
             soup = BeautifulSoup(response.text, 'html.parser')
             for element in soup(["script", "style", "nav", "footer", "header", "aside"]):
@@ -306,7 +308,6 @@ class Chat:
             return '\n'.join(chunk for chunk in chunks if chunk)
         except Exception as e:
             return f"Ошибка при обработке URL {url}: {e}"
-
     def python_str_tool(self, text):
         return repr(text)
 
