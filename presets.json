@@ -84,6 +84,30 @@
         "global": "rwxld",
         "paths": {}
       }
+    },
+    "1771318395.561679": {
+      "name": "Ревьюер",
+      "prompt_ids": [
+        "default",
+        "1771094558.460067"
+      ],
+      "modes": [],
+      "commands": [],
+      "blocked": [
+        "python",
+        "chat",
+        "google_search",
+        "shell",
+        "user_profile",
+        "http",
+        "sandbox",
+        "python_str"
+      ],
+      "settings": {},
+      "fs_permissions": {
+        "global": "rl",
+        "paths": {}
+      }
     }
   }
 }
