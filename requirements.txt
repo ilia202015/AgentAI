@@ -1,5 +1,6 @@
+google-genai
+requests
 beautifulsoup4
 google-api-python-client
-openai
 requests
 dill
