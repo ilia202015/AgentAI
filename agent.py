@@ -70,7 +70,8 @@ class Chat:
         
         self.models = [ #(name, rpm)
             ("gemini-3-pro-preview", 25),
-            ("gemini-3-flash-preview", 1000)
+            ("gemini-3-flash-preview", 1000),
+            ("gemini-3.1-pro-preview", 25)
         ]
         self.model, self.model_rpm = self.models[1]
 

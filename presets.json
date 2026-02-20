@@ -78,7 +78,15 @@
       ],
       "modes": [],
       "commands": [],
-      "blocked": [],
+      "blocked": [
+        "user_profile",
+        "python_str",
+        "shell",
+        "python",
+        "chat",
+        "google_search",
+        "http"
+      ],
       "settings": {},
       "fs_permissions": {
         "global": "rwxld",
@@ -91,10 +99,14 @@
         "default",
         "1771094558.460067"
       ],
-      "modes": [],
+      "modes": [
+        "knowledge_computer_use",
+        "knowledge_browser_use",
+        "knowledge_frontend",
+        "knowledge_backend"
+      ],
       "commands": [],
       "blocked": [
-        "python",
         "chat",
         "google_search",
         "shell",
@@ -107,6 +119,27 @@
       "fs_permissions": {
         "global": "rl",
         "paths": {}
+      }
+    },
+    "1771405543.316683": {
+      "name": "Исполнитель",
+      "prompt_ids": [
+        "default"
+      ],
+      "modes": [],
+      "commands": [],
+      "blocked": [
+        "chat",
+        "user_profile",
+        "shell"
+      ],
+      "settings": {},
+      "fs_permissions": {
+        "global": "rl",
+        "paths": {
+          "temp/": "rwxld",
+          "sandbox/": "rwxld"
+        }
       }
     }
   }
