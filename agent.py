@@ -941,10 +941,12 @@ class Chat:
                     "RemoteProtocolError",
                     "ConnectError",
                     "DeadlineExceeded",
-                    "Service Unavailable"
+                    "Service Unavailable",
+                    "10054", "Удаленный хост принудительно разорвал существующее подключение",
+                    "Server disconnected without sending a response"
                 ]
                 
-                if any(msg in err_str for msg in retry_errors) and attempt < max_retries:
+                if any(msg.lower() in err_str.lower() for msg in retry_errors) and attempt < max_retries:
                     # Пытаемся вытянуть точную задержку из ошибки
                     extracted_delay = self._extract_retry_delay(err_str)
                     wait_time = extracted_delay if extracted_delay is not None else 0.1
@@ -1005,10 +1007,12 @@ class Chat:
                 "UNEXPECTED_EOF_WHILE_READING",
                 "RemoteProtocolError",
                 "ConnectError",
-                "DeadlineExceeded"
+                "DeadlineExceeded",
+                "10054", "Удаленный хост принудительно разорвал существующее подключение",
+                "Server disconnected without sending a response"
             ]
 
-            if any(msg in err_str for msg in retry_errors):
+            if any(msg.lower() in err_str.lower() for msg in retry_errors):
                 # Пытаемся вытянуть точную задержку из ошибки
                 extracted_delay = self._extract_retry_delay(err_str)
                 # Пытаемся вытянуть точную задержку из ошибки
