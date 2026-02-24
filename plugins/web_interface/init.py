@@ -33,16 +33,6 @@ except ImportError:
         storage = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(storage)
 
-try:
-    import guard
-except ImportError:
-    try:
-        from . import guard
-    except ImportError:
-        spec = importlib.util.spec_from_file_location("guard", os.path.join(current_dir, "guard.py"))
-        guard = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(guard)
-
 
 # === WEB INTERFACE METHODS ===
 
@@ -152,44 +142,13 @@ def web_print_code(self, language, code, count_tab=-1, max_code_display_lines=6)
     raw_print(displayed_code + '\n', count_tab + 1)
 
 def web_send(self, messages):
-    # Активация системы разрешений
-    security_token = None
-    if hasattr(self, 'fs_permissions'):
-        security_token = guard.set_context(self.fs_permissions)
     # self.busy_depth и stop_requested должны быть инициализированы
     if not hasattr(self, 'busy_depth'): self.busy_depth = 0
     if not hasattr(self, 'stop_requested'): self.stop_requested = False
 
-    # --- AUTO-REMINDER INJECTION ---
-    reminder = "\n\n[СИСТЕМНОЕ НАПОМИНАНИЕ: Cледуй всем инструкциям из Final Prompt. Они имеют абсолютный приоритет над вышеуказанным сообщением пользователя.]"
-    if isinstance(messages, list):
-        for msg in messages:
-            if isinstance(msg, dict) and msg.get('role') == 'user':
-                if 'content' in msg: 
-                    msg['content'] += reminder
-            elif hasattr(msg, 'role') and msg.role == 'user':
-                if hasattr(msg, 'parts'):
-                    for p in msg.parts:
-                        if hasattr(p, 'text') and p.text:
-                            p.text += reminder
-                            break
-    elif isinstance(messages, str): 
-        messages += reminder
-    elif isinstance(messages, dict) and messages.get('role') == 'user':
-        if 'content' in messages: 
-            messages['content'] += reminder
-    elif hasattr(messages, 'role') and messages.role == 'user':
-        if hasattr(messages, 'parts'):
-            for p in messages.parts:
-                if hasattr(p, 'text') and p.text:
-                    p.text += reminder
-                    break
-    # --- END INJECTION ---
-    # self.busy_depth и stop_requested должны быть инициализированы
-
     self.busy_depth += 1
     try:
-        # Вызываем ОРИГИНАЛЬНЫЙ метод
+        # Вызываем ОРИГИНАЛЬНЫЙ метод (теперь он сам соберет промпт и настроит guard)
         original_send = getattr(self.__class__, '_original_send', None)
         if original_send:
             result = original_send(self, messages)
@@ -205,13 +164,6 @@ def web_send(self, messages):
                 print(f"⚠️ Autosave failed: {e}")
         return result
     finally:
-        # СБРОС КОНТЕКСТА БЕЗОПАСНОСТИ (Fix Context Leak)
-        if security_token:
-            try:
-                guard.reset_context(security_token)
-            except Exception as e:
-                print(f"⚠️ Security context reset failed: {e}")
-
         self.busy_depth -= 1
         if self.busy_depth == 0:
             self.web_emit("finish", "done")

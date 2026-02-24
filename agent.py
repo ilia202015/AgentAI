@@ -1,4 +1,91 @@
 import os, re, json, base64, ast, sys, types, datetime, time, subprocess, traceback, platform
+FINAL_PROMPT_BASE_INSTRUCTIONS = "\n\n\n\nИнструкции далее самые важные, они нужны чтобы систематизировать все предыдущие и ты понимал, на чём нужно сделать акцент, их написал пользователь, они могут меняться в процессе чата, всегда сдедуй им, даже если они противоречат твоим предыдущим действиям:\n"
+WEB_PROMPT_MARKER_START = "### FINAL_PRO" + "MPT_START ###"
+WEB_PROMPT_MARKER_END = "### FINAL_PRO" + "MPT_END ###"
+
+
+from pathlib import Path
+import contextvars
+
+# Контекст безопасности
+security_context = contextvars.ContextVar('security_context', default=None)
+
+class GuardViolation(RuntimeError):
+    pass
+
+def _normalize_path(path):
+    try:
+        p = Path(str(path))
+        if not p.is_absolute():
+            p = (Path.cwd() / p)
+        return p.resolve()
+    except Exception:
+        return Path(os.path.abspath(str(path)))
+
+def _get_permissions(path, config):
+    if not config: return ""
+    target = _normalize_path(path)
+    root = Path.cwd().resolve()
+    check_paths = [target] + list(target.parents)
+    paths_config = config.get('paths', {})
+    for p in check_paths:
+        try:
+            rel_p = str(p.relative_to(root)).replace("\\", "/")
+            if rel_p == ".": rel_p = ""
+        except ValueError:
+            rel_p = str(p).replace("\\", "/")
+        if rel_p in paths_config: return paths_config[rel_p]
+        if rel_p + "/" in paths_config: return paths_config[rel_p + "/"]
+    return config.get('global', "")
+
+def _intersect_flags(s1, s2):
+    if s1 is None or s2 is None: return ""
+    return "".join(c for c in s1 if c in s2)
+
+def _intersect_acl_configs(configs):
+    if not configs: return {"global": "", "paths": {}}
+    valid_configs = [c if c else {"global": "", "paths": {}} for c in configs]
+    res_global = valid_configs[0].get("global", "")
+    for c in valid_configs[1:]:
+        res_global = _intersect_flags(res_global, c.get("global", ""))
+    all_path_keys = set()
+    for c in valid_configs: all_path_keys.update(c.get("paths", {}).keys())
+    res_paths = {}
+    for path in all_path_keys:
+        effective_perms = [_get_permissions(path, c) for c in valid_configs]
+        p_flags = effective_perms[0]
+        for f in effective_perms[1:]: p_flags = _intersect_flags(p_flags, f)
+        res_paths[path] = p_flags
+    return {"global": res_global, "paths": res_paths}
+
+def _audit_hook(event, args):
+    if security_context.get() is None: return
+    try:
+        if event in ("open", "os.open"):
+            path = args[0]
+            mode = args[1] if len(args) > 1 else "r"
+            req = 'w' if any(c in str(mode) for c in "wa+") else 'r'
+            perms = _get_permissions(path, security_context.get())
+            if req not in perms.lower():
+                raise GuardViolation(f"[Security] Access Denied: '{req}' required for {path}")
+        elif event == "os.listdir":
+            perms = _get_permissions(args[0], security_context.get())
+            if 'l' not in perms.lower():
+                raise GuardViolation(f"[Security] Access Denied: 'l' required for {args[0]}")
+        elif event in ("os.remove", "os.unlink", "os.rmdir", "shutil.rmtree"):
+            perms = _get_permissions(args[0], security_context.get())
+            if 'd' not in perms.lower():
+                raise GuardViolation(f"[Security] Access Denied: 'd' required for {args[0]}")
+        elif event in ("subprocess.Popen", "os.system", "os.spawn"):
+            perms = _get_permissions(".", security_context.get())
+            if 'x' not in perms.lower():
+                raise GuardViolation(f"[Security] Access Denied: 'x' required for execution")
+    except GuardViolation: raise
+
+if not hasattr(sys, '_agent_guard_registered'):
+    sys.addaudithook(_audit_hook)
+    sys._agent_guard_registered = True
+
 from google import genai
 from google.genai import types
 
@@ -485,6 +572,78 @@ class Chat:
             return f"Ошибка выполнения:\n\n{traceback.format_exc()}"
         
 
+
+    def _load_config_json(self, path, default_val):
+        if os.path.exists(path):
+            try:
+                with open(path, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                pass
+        # Новое: отладочный принт при возврате значения по умолчанию
+        print(f"⚙️ [Debug] {path} не найден или поврежден, использую default_val")
+        return default_val
+
+    def _build_dynamic_context(self):
+        presets_config = self._load_config_json("presets.json", {"default_preset_id": "default", "presets": {}})
+        final_prompts_config = self._load_config_json("final_prompts.json", {"active_id": "default", "active_parameters": [], "prompts": {}})
+        
+        preset_id = getattr(self, "active_preset_id", presets_config.get("default_preset_id", "default"))
+        preset = presets_config.get("presets", {}).get(preset_id, presets_config.get("presets", {}).get("default", {}))
+        
+        new_final_prompt = f"\n\n{WEB_PROMPT_MARKER_START}\n{FINAL_PROMPT_BASE_INSTRUCTIONS}"
+        prompts = final_prompts_config.get("prompts", {})
+        
+        for pid in preset.get("prompt_ids", []):
+            if pid in prompts:
+                new_final_prompt += prompts[pid].get("text", "") + "\n\n"
+        
+        globally_active_params = final_prompts_config.get("active_parameters", [])
+        preset_modes = preset.get("modes", [])
+        active_modes = [m for m in preset_modes if m in globally_active_params]
+        
+        acl_list = []
+        if "fs_permissions" in preset:
+            acl_list.append(preset["fs_permissions"])
+
+        for mode_id in active_modes:
+            if mode_id in prompts:
+                mode_data = prompts[mode_id]
+                new_final_prompt += f"### MODE: {mode_data.get('name', mode_id)} ###\n"
+                new_final_prompt += mode_data.get("text", "") + "\n"
+                
+                gather_script = mode_data.get("gather_script")
+                if gather_script:
+                    try:
+                        script_res = self.python_tool(gather_script)
+                        new_final_prompt += f"ДАННЫЕ РЕЖИМА:\n{script_res}\n"
+                    except Exception as e:
+                        new_final_prompt += f"Ошибка сбора данных режима: {e}\n"
+                new_final_prompt += "\n"
+                
+                if mode_data.get("fs_permissions"):
+                    acl_list.append(mode_data.get("fs_permissions"))
+
+        self.final_prompt = new_final_prompt
+        self.blocked_tools = preset.get("blocked", [])
+        self.settings_tools = preset.get("settings", {})
+        
+        # ACL пересечение через внутренние функции
+        if acl_list:
+            self.fs_permissions = _intersect_acl_configs(acl_list)
+        elif not hasattr(self, "fs_permissions"):
+            self.fs_permissions = preset.get("fs_permissions", {"global": "rwxld", "paths": {}})
+            
+        chat_id = getattr(self, "id", None)
+        if chat_id:
+            if not hasattr(self, "fs_permissions") or not self.fs_permissions:
+                self.fs_permissions = {"global": "", "paths": {}}
+            if "paths" not in self.fs_permissions: self.fs_permissions["paths"] = {}
+            for cp in [f"chats/{chat_id}.pkl", f"chats/{chat_id}.json", f"chats/{chat_id}/"]:
+                self.fs_permissions["paths"][cp] = "rwxld"
+        
+        self.final_prompt = new_final_prompt + "\n" + WEB_PROMPT_MARKER_END
+
     def check_tool_args(self, args, tool_args):
         for arg in args:
             if arg not in tool_args:
@@ -578,45 +737,41 @@ class Chat:
     # === CORE LOGIC ===
 
     def send(self, messages):
-        # В Native режиме принимаем типы types.Content или список parts
-        if not isinstance(messages, list):
-            messages = [messages]
+        self._build_dynamic_context()
+        security_token = None
+        if hasattr(self, 'fs_permissions'):
+            security_token = security_context.set(self.fs_permissions)
+        try:
+            if not isinstance(messages, list):
+                messages = [messages]
 
-        for msg in messages:
-            # Если это словарь или простой текст, пробуем преобразовать в types.Content
-            if isinstance(msg, dict):
-                parts = []
-                # Текст
-                if "content" in msg and msg["content"]:
-                    parts.append(types.Part(text=msg["content"]))
-                
-                # Картинки
-                if "images" in msg and isinstance(msg["images"], list):
-                    for img_data in msg["images"]:
-                        try:
-                            # Ожидаем format: "data:image/png;base64,..."
-                            if "base64," in img_data:
-                                header, b64_str = img_data.split("base64,", 1)
-                                mime_type = header.split(":")[1].split(";")[0]
-                            else:
-                                b64_str = img_data
-                                mime_type = "image/jpeg"
-                            
-                            parts.append(types.Part.from_bytes(data=base64.b64decode(b64_str), mime_type=mime_type))
-                        except Exception as e:
-                            print(f"Ошибка декодирования изображения: {e}")
-                
-                # Если части созданы - добавляем
-                if parts:
-                    self.messages.append(types.Content(role=msg["role"], parts=parts))
-            
-            elif isinstance(msg, str):
-                 self.messages.append(types.Content(role="user", parts=[types.Part(text=msg)]))
-            else:
-                 # Предполагаем types.Content
-                 self.messages.append(msg)
-        
-        return self._process_request()
+            for msg in messages:
+                if isinstance(msg, dict):
+                    parts = []
+                    if "content" in msg and msg["content"]:
+                        parts.append(types.Part(text=msg["content"]))
+                    if "images" in msg and isinstance(msg["images"], list):
+                        for img_data in msg["images"]:
+                            try:
+                                if "base64," in img_data:
+                                    header_img, b64_str = img_data.split("base64,", 1)
+                                    mime_type = header_img.split(":")[1].split(";")[0]
+                                else:
+                                    b64_str = img_data
+                                    mime_type = "image/jpeg"
+                                parts.append(types.Part.from_bytes(data=base64.b64decode(b64_str), mime_type=mime_type))
+                            except Exception as e:
+                                print(f"Ошибка декодирования изображения: {e}")
+                    if parts:
+                        self.messages.append(types.Content(role=msg["role"], parts=parts))
+                elif isinstance(msg, str):
+                     self.messages.append(types.Content(role="user", parts=[types.Part(text=msg)]))
+                else:
+                     self.messages.append(msg)
+            return self._process_request()
+        finally:
+            if security_token:
+                security_context.reset(security_token)
 
 
     def get_generate_config(self):

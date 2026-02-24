@@ -16,7 +16,7 @@ import types
 import re
 
 is_print_debug = True
-FINAL_PROMPT_BASE_INSTRUCTIONS = "\n\n\n\nИнструкции далее самые важные, они нужны чтобы систематизировать все предыдущие и ты понимал, на чём нужно сделать акцент, их написал пользователь, они могут меняться в процессе чата, всегда сдедуй им, даже если они противоречат твоим предыдущим действиям:\n"
+
 
 # Setup paths
 current_dir = os.path.dirname(os.path.abspath(__file__)) 
@@ -43,7 +43,7 @@ except Exception as e:
 
 try:
     import serialization
-    import guard
+# guard removed
 except ImportError:
     log_debug(f"Serialization import failed")
     serialization = None
@@ -99,9 +99,6 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         if id in self.active_chats: 
             return self.active_chats[id]
         
-        final_text = storage.get_active_final_prompt_text()
-        final_prompt = f"\n\n{storage.WEB_PROMPT_MARKER_START}\n{FINAL_PROMPT_BASE_INSTRUCTIONS}\n{final_text}\n{storage.WEB_PROMPT_MARKER_END}"
-
         log_debug(f"Creating agent for {id}")
         try:
             if id == 'temp':
@@ -111,7 +108,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 # 2. Setup ID
                 new_agent.id = id
                 
-                new_agent.final_prompt = final_prompt
+                # final_prompt is now handled dynamically in agent.py
 
                 self.active_chats[id] = new_agent
                 return new_agent
@@ -128,7 +125,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 if warning:
                     print(warning)
                 
-                chat.final_prompt = final_prompt
+                # final_prompt is now handled dynamically in agent.py
 
                 self.active_chats[id] = chat
                 return chat
@@ -294,78 +291,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         
         agent.stop_requested = False
 
-        # --- PRESET ORCHESTRATION ---
-        preset_id = getattr(agent, "active_preset_id", "default")
-        preset = storage.get_preset(preset_id)
-        
-        compiled_text = FINAL_PROMPT_BASE_INSTRUCTIONS
-        # 1. Resolve prompt texts
-        if "prompt_ids" in preset:
-            compiled_text += storage.resolve_prompts_text(preset["prompt_ids"]) + "\n\n"
-        
-        # 2. Dynamic Gathering (Modes)
-        final_prompts_config = storage.get_final_prompts_config()
-        all_prompts = final_prompts_config.get("prompts", {})
-        globally_active_params = final_prompts_config.get("active_parameters", [])
-        
-        preset_modes = preset.get("modes", [])
-        # Фильтруем режимы пресета по тем, что реально включены пользователем в UI
-        active_modes = [m for m in preset_modes if m in globally_active_params]
-        
-        for mode_id in active_modes:
-            if mode_id in all_prompts:
-                mode_data = all_prompts[mode_id]
-                compiled_text += f"### MODE: {mode_data.get('name', mode_id)} ###\n"
-                compiled_text += mode_data.get("text", "") + "\n"
-                
-                # Run gather script if exists
-                gather_script = mode_data.get("gather_script")
-                if gather_script:
-                    try:
-                        script_res = agent.python_tool(gather_script)
-                        compiled_text += f"ДАННЫЕ РЕЖИМА:\n{script_res}\n"
-                    except Exception as e:
-                        compiled_text += f"Ошибка сбора данных режима: {e}\n"
-                compiled_text += "\n"
-
-        # 3. Inject into agent
-        agent.final_prompt = compiled_text
-        agent.blocked_tools = preset.get("blocked", [])
-        agent.settings_tools = preset.get("settings", {})
-        
-        # --- ACL INTERSECTION ---
-        acl_list = []
-        # 1. ACL из Пресета
-        if "fs_permissions" in preset:
-            acl_list.append(preset["fs_permissions"])
-        
-        # 2. ACL из всех активных Режимов
-        for mode_id in active_modes:
-            if mode_id in all_prompts:
-                mode_acl = all_prompts[mode_id].get("fs_permissions")
-                if mode_acl:
-                    acl_list.append(mode_acl)
-        
-        # Если есть хотя бы один ACL, вычисляем пересечение. 
-        # Если конфигов нет, guard.intersect_acl_configs вернет пустые права.
-        if acl_list:
-            agent.fs_permissions = guard.intersect_acl_configs(acl_list)
-        else:
-            # Fallback к глобальным правам пресета или пустой строке
-            agent.fs_permissions = copy.deepcopy(preset.get("fs_permissions", {"global": "", "paths": {}}))
-
-        # --- FORCE CHAT ACCESS (System Override) ---
-        if cid:
-            if 'paths' not in agent.fs_permissions:
-                agent.fs_permissions['paths'] = {}
-            
-            # Агенту ВСЕГДА разрешен полный доступ к своим файлам состояния и изображениям
-            agent.fs_permissions['paths'][f"chats/{cid}.pkl"] = "rwxld"
-            agent.fs_permissions['paths'][f"chats/{cid}.pkl.tmp"] = "rwxld"
-            agent.fs_permissions['paths'][f"chats/{cid}.json"] = "rwxld"
-            agent.fs_permissions['paths'][f"chats/{cid}.json.tmp"] = "rwxld"
-            agent.fs_permissions['paths'][f"chats/{cid}/"] = "rwxld"
-        # ----------------------------
+        # Orchestration is now handled by agent.py's send()
 
         msg_payload = {
             "role": "user", 
@@ -602,16 +528,9 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
 
     def _refresh_active_agents_prompts(self):
-        final_text = storage.get_active_final_prompt_text()
-        marker_start = storage.WEB_PROMPT_MARKER_START
-        marker_end = storage.WEB_PROMPT_MARKER_END
-        base_instr = "Инструкции далее самые важные, они нужны чтобы систематизировать все предыдущие и ты понимал, на чём нужно сделать акцент, их написал пользователь, они могут меняться в процессе чата, всегда сдедуй им, даже если они противоречат твоим редыдущим действиям:"
-        for agent in self.active_chats.values():
-            if hasattr(agent, 'system_prompt'):
-                pattern = re.escape(marker_start) + r".*?" + re.escape(marker_end)
-                agent.system_prompt = re.sub(pattern, "", agent.system_prompt, flags=re.DOTALL).strip()
-                if final_text:
-                    agent.system_prompt += f"\n\n{marker_start}\n{base_instr}\n{final_text}\n{marker_end}"
+        # Logic moved to agent.py (_build_dynamic_context)
+        pass
+
     def handle_stream(self):
         self.send_response(200)
         self.send_header("Content-Type", "text/event-stream")

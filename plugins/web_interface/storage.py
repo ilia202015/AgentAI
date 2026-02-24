@@ -326,19 +326,7 @@ def save_final_prompts_config(config):
     with open(PROMPTS_CONFIG_PATH, 'w', encoding='utf-8') as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
 
-def get_active_final_prompt_text():
-    config = get_final_prompts_config()
-    text = ''
-    # 1. System Prompt
-    active_id = config.get('active_id')
-    if active_id and active_id in config.get('prompts', {}):
-        text += config['prompts'][active_id].get('text', '') + '\n\n'
-    # 2. Active Parameters
-    active_params = config.get('active_parameters', [])
-    for p_id in active_params:
-        if p_id in config.get('prompts', {}):
-            text += config['prompts'][p_id].get('text', '') + '\n\n'
-    return text.strip()
+
 
 PRESETS_CONFIG_PATH = "presets.json"
 
@@ -365,11 +353,4 @@ def get_preset(preset_id):
     config = get_presets_config()
     return config.get("presets", {}).get(preset_id, config.get("presets", {}).get("default"))
 
-def resolve_prompts_text(prompt_ids):
-    config = get_final_prompts_config()
-    text = ""
-    prompts = config.get("prompts", {})
-    for pid in prompt_ids:
-        if pid in prompts:
-            text += prompts[pid].get("text", "") + "\n\n"
-    return text.strip()
+
