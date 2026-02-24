@@ -273,6 +273,97 @@ class Chat:
         for tool in self.tools:
             tool["function"]["description"] = self.prompts.get(tool["function"]["name"], tool["function"]["description"])
 
+    def set_preset(self, preset_id):
+        """Смена текущего пресета"""
+        self.active_preset_id = preset_id
+        self._build_dynamic_context()
+        return f"Пресет изменен на {preset_id}"
+
+    def set_mode(self, *mode_ids):
+        """Включение режимов (параметров)"""
+        config = self._load_config_json("final_prompts.json", {"active_parameters": []})
+        active_params = set(config.get("active_parameters", []))
+        added = [mid for mid in mode_ids if mid not in active_params]
+        
+        if added:
+            active_params.update(added)
+            config["active_parameters"] = list(active_params)
+            import json
+            with open("final_prompts.json", "w", encoding="utf-8") as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+            self._build_dynamic_context()
+        return f"Режимы включены: {', '.join(added)}" if added else "Режимы уже включены"
+
+    def reset_mode(self, *mode_ids):
+        """Выключение режимов (параметров)"""
+        config = self._load_config_json("final_prompts.json", {"active_parameters": []})
+        active_params = set(config.get("active_parameters", []))
+        removed = [mid for mid in mode_ids if mid in active_params] if '*' not in mode_ids else active_params
+        
+        if removed:
+            active_params.difference_update(removed)
+            config["active_parameters"] = list(active_params)
+            import json
+            with open("final_prompts.json", "w", encoding="utf-8") as f:
+                json.dump(config, f, ensure_ascii=False, indent=2)
+            self._build_dynamic_context()
+        return f"Режимы отключены: {', '.join(removed)}" if removed else "Режимы не были активны"
+    
+    def ai_get(self, question, target_type=str, max_len=500, clean_history=True, max_retries=3):
+        """
+        Геттер данных от ИИ.
+        target_type: тип (int, str, bool, float, list, dict)
+        clean_history: если True, запрос и ответ удаляются из self.messages
+        """
+        type_name = target_type.__name__ if hasattr(target_type, "__name__") else str(target_type)
+        instruction = f"Выдай ответ ТОЛЬКО в формате типа {type_name}. Никакого лишнего текста, пояснений или Markdown-разметки."
+        if(target_type == str):
+            instruction += f"Максимальная длина {max_len} символов."
+        
+        full_question = f"{question}\n\nИНСТРУКЦИЯ: {instruction}"
+        history_len_before = len(self.messages)
+        
+        old_mode = self.output_mode
+        self.output_mode = "auto"
+
+        try:
+            for attempt in range(max_retries):
+                response = self.send(full_question)
+                text_res = response if isinstance(response, str) else str(response)
+                # Очистка от Markdown блоков
+                text_res = re.sub(r'```[a-z]*\n', '', text_res, flags=re.IGNORECASE)
+                text_res = text_res.replace('```', '').strip()
+                
+                try:
+                    if target_type == str:
+                        result_val = text_res[:max_len]
+                    elif target_type in (list, dict):
+                        import ast
+                        result_val = ast.literal_eval(text_res)
+                        if not isinstance(result_val, target_type): raise TypeError(f"Expected {type_name}")
+                    elif target_type == bool:
+                        low = text_res.lower()
+                        if low in ('true', 'yes', '1'): result_val = True
+                        elif low in ('false', 'no', '0'): result_val = False
+                        else: raise ValueError("Invalid boolean")
+                    else:
+                        # Для int, float и других типов, поддерживающих конструктор от строки
+                        # Пытаемся найти числовое значение в строке если это int/float
+                        if target_type in (int, float):
+                            match = re.search(r'-?\d+\.?\d*', text_res)
+                            if match: text_res = match.group()
+                        result_val = target_type(text_res)
+                    
+                    if clean_history: self.messages = self.messages[:history_len_before]
+                    return result_val
+                except Exception as e:
+                    if attempt == max_retries - 1:
+                        if clean_history: self.messages = self.messages[:history_len_before]
+                        raise e
+                    full_question = f"Ошибка интерпретации ответа как {type_name}: {e}. Попробуй еще раз, строго соблюдая формат."
+        finally:
+            self.output_mode = old_mode
+
     def __getstate__(self):
         state = self.__dict__.copy()
         # Удаляем несериализуемые объекты
