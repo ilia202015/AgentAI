@@ -170,6 +170,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                     "type": data.get("type", "system"),
                     "icon": data.get("icon", "ph-app-window"),
                     "gather_script": data.get("gather_script", ""),
+                    "exec_script": data.get("exec_script", ""),
                     "fs_permissions": data.get("fs_permissions")
                 }
                 if data.get("make_active"): config["active_id"] = p_id
@@ -195,6 +196,18 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                     self._refresh_active_agents_prompts()
                     self.send_json({"status": "ok"})
                 else: self.send_json_error(404, "Not found")
+            elif path == "/api/final-prompts/exec":
+                cid = data.get("chatId")
+                p_id = data.get("promptId")
+                agent = self.get_agent_for_chat(cid)
+                config = storage.get_final_prompts_config()
+                prompt = config.get("prompts", {}).get(p_id)
+                if prompt and prompt.get("exec_script") and agent:
+                    log_debug(f"Executing command script for {p_id}")
+                    # We use python_tool which writes to agent.local_env['result']
+                    res = agent.python_tool(prompt["exec_script"])
+                    self.send_json({"status": "ok", "result": res})
+                else: self.send_json_error(404, "Prompt or script not found")
             elif path == "/api/presets":
                 config = storage.get_presets_config()
                 p_id = data.get("id") or str(time.time())

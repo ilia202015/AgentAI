@@ -702,8 +702,26 @@ export default {
             return res;
         });
 
-        const runCommand = (cmd) => {
-            inputText.value = `[КОМАНДА: ${cmd.name}]\n${cmd.text}`;
+        const runCommand = async (cmd) => {
+            let fullText = `[КОМАНДА: ${cmd.name}]\n${cmd.text}`;
+            
+            if (cmd.exec_script) {
+                store.isThinking = true;
+                try {
+                    const res = await api.execCommandScript(store.currentChatId, cmd.id);
+                    if (res.status === 'ok') {
+                        fullText += `\n\nРЕЗУЛЬТАТ ВЫПОЛНЕНИЯ:\n${res.result}`;
+                    } else {
+                        store.addToast("Ошибка скрипта команды", "error");
+                    }
+                } catch (e) {
+                    store.addToast("Ошибка выполнения команды", "error");
+                } finally {
+                    store.isThinking = false;
+                }
+            }
+            
+            inputText.value = fullText;
             send();
         };
 

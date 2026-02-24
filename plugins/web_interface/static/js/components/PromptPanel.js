@@ -144,6 +144,11 @@ export default {
                                     <p class="text-[9px] text-gray-600 italic px-1 leading-tight">Этот код выполняется агентом каждый раз при отправке сообщения в режиме, если режим активен. Результат выполнения кода добавляется в контекст.</p>
                                 </div>
 
+                                                                <div v-if="editPromptData.type === 'command'" class="space-y-2">
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Скрипт выполнения (Exec Script)</label>
+                                    <textarea v-model="editPromptData.exec_script" placeholder="Python код. Результат будет в переменной result..." class="w-full min-h-[100px] bg-white/5 border border-white/10 rounded-2xl px-4 py-4 focus:outline-none focus:border-blue-500/50 text-xs font-mono resize-none text-emerald-400 custom-scrollbar"></textarea>
+                                    <p class="text-[9px] text-gray-600 italic px-1 leading-tight">Выполняется при нажатии на кнопку команды. Результат записывается после текста промпта.</p>
+                                </div>
                                 <!-- Mode FS Permissions Selection -->
                                 <div v-if="editPromptData.type === 'parameter'" class="space-y-4">
                                     <label class="text-[10px] font-bold text-gray-500 uppercase tracking-widest px-1">Файловая система (ACL)</label>
@@ -328,7 +333,7 @@ export default {
     setup() {
         const activeTab = ref('prompts');
         const editPromptId = ref(null);
-        const editPromptData = ref({name: '', text: '', type: 'system', icon: 'ph-app-window', gather_script: '', fs_permissions: {global: 'rwxld', paths: {}}});
+        const editPromptData = ref({name: '', text: '', type: 'system', icon: 'ph-app-window', gather_script: '', exec_script: '', fs_permissions: {global: 'rwxld', paths: {}}});
         const isCreating = ref(false);
         const isExpanded = ref(false);
         const isIconPickerOpen = ref(false);
@@ -372,7 +377,7 @@ export default {
             editPromptId.value = id;
             editPromptData.value = { 
                 name: p.name, text: p.text, type: p.type || 'system', 
-                icon: p.icon || 'ph-app-window', gather_script: p.gather_script || '',
+                icon: p.icon || 'ph-app-window', gather_script: p.gather_script || '', exec_script: p.exec_script || '',
                 fs_permissions: p.fs_permissions || {global: '', paths: {}}
             };
         };
@@ -381,7 +386,7 @@ export default {
             editPromptId.value = null;
             isCreating.value = true;
             editPromptData.value = {
-                name: 'Новый промпт', text: '', type: 'system', icon: 'ph-robot', gather_script: '',
+                name: 'Новый промпт', text: '', type: 'system', icon: 'ph-robot', gather_script: '', exec_script: '',
                 fs_permissions: {global: 'rwxld', paths: {}}
             };
         };
@@ -392,7 +397,7 @@ export default {
         };
 
         const savePrompt = async () => {
-            const res = await api.saveFinalPrompt(editPromptId.value, editPromptData.value.name, editPromptData.value.text, editPromptData.value.type, editPromptData.value.icon, editPromptData.value.gather_script, false, editPromptData.value.fs_permissions);
+            const res = await api.saveFinalPrompt(editPromptId.value, editPromptData.value.name, editPromptData.value.text, editPromptData.value.type, editPromptData.value.icon, editPromptData.value.gather_script, false, editPromptData.value.fs_permissions, editPromptData.value.exec_script);
             if (res.status === 'ok') {
                 store.addToast('Сохранено', 'success');
                 await refresh();

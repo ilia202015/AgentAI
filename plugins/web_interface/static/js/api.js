@@ -93,11 +93,11 @@ export async function fetchFinalPrompts() {
     return await res.json();
 }
 
-export async function saveFinalPrompt(id, name, text, type = 'system', icon = 'ph-app-window', gather_script = '', makeActive = false, fs_permissions = null) {
+export async function saveFinalPrompt(id, name, text, type = 'system', icon = 'ph-app-window', gather_script = '', makeActive = false, fs_permissions = null, exec_script = '') {
     const res = await fetch(`${API_BASE}/final-prompts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, name, text, type, icon, gather_script, make_active: makeActive, fs_permissions })
+        body: JSON.stringify({ id, name, text, type, icon, gather_script, make_active: makeActive, fs_permissions, exec_script })
     });
     return await res.json();
 }
@@ -159,5 +159,14 @@ export async function setDefaultPreset(presetId) {
 
 export async function fetchTools() {
     const res = await fetch(`${API_BASE}/tools`);
+    return await res.json();
+}
+
+export async function execCommandScript(chatId, promptId) {
+    const res = await fetch(`${API_BASE}/final-prompts/exec`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatId, promptId })
+    });
     return await res.json();
 }
