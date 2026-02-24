@@ -662,7 +662,20 @@ class Chat:
         except Exception as e:
             return f"Ошибка выполнения:\n\n{traceback.format_exc()}"
         
-
+    def add_message(self, message: str):
+        if not self.messages or self.messages[-1].role == 'model':
+            # Если истории нет или последнее сообщение от модели — создаем новое сообщение от пользователя
+            self.messages.append(types.Content(role="user", parts=[types.Part(text=message)]))
+        else:
+            # Иначе ищем последнюю текстовую часть в текущем сообщении и дополняем её
+            for part in reversed(self.messages[-1].parts):
+                if hasattr(part, 'text') and part.text is not None:
+                    part.text += '\n' + message
+                    break
+            else:
+                # Если в сообщении не было текста (например, только инструменты или фото), 
+                # просто добавляем новую текстовую часть
+                self.messages[-1].parts.append(types.Part(text=message))
 
     def _load_config_json(self, path, default_val):
         if os.path.exists(path):
