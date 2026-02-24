@@ -146,9 +146,11 @@ def web_send(self, messages):
     if not hasattr(self, 'busy_depth'): self.busy_depth = 0
     if not hasattr(self, 'stop_requested'): self.stop_requested = False
 
-    self.busy_depth += 1
+    is_locked = getattr(self, '_busy_lock', False)
+    if not is_locked:
+        self.busy_depth += 1
     try:
-        # Вызываем ОРИГИНАЛЬНЫЙ метод (теперь он сам соберет промпт и настроит guard)
+        # Вызываем ОРИГИНАЛЬНЫЙ метод
         original_send = getattr(self.__class__, '_original_send', None)
         if original_send:
             result = original_send(self, messages)
@@ -164,9 +166,10 @@ def web_send(self, messages):
                 print(f"⚠️ Autosave failed: {e}")
         return result
     finally:
-        self.busy_depth -= 1
-        if self.busy_depth == 0:
-            self.web_emit("finish", "done")
+        if not is_locked:
+            self.busy_depth -= 1
+            if self.busy_depth == 0:
+                self.web_emit("finish", "done")
 
 def web_handle_stream(self, stream):
     # Push new thought buffer

@@ -205,7 +205,11 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 if prompt and prompt.get("exec_script") and agent:
                     log_debug(f"Executing command script for {p_id}")
                     # We use python_tool which writes to agent.local_env['result']
-                    res = agent.python_tool(prompt["exec_script"])
+                    agent._busy_lock = True
+                    try:
+                        res = agent.python_tool(prompt["exec_script"])
+                    finally:
+                        agent._busy_lock = False
                     self.send_json({"status": "ok", "result": res})
                 else: self.send_json_error(404, "Prompt or script not found")
             elif path == "/api/presets":
