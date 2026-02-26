@@ -305,15 +305,25 @@ class Chat:
             self._build_dynamic_context()
         return f"Режимы отключены: {', '.join(removed)}" if removed else "Режимы не были активны"
 
-    def get_active_modes(self):
-        """Возвращает список ID только активных режимов для текущего чата."""
-        return json.dumps(getattr(self, "active_modes", []), ensure_ascii=False)
+    def get_аctive_modes(self):
+        """Возвращает список ID режимов, которые реально активны (пересечение выбранных и разрешенных пресетом)."""
+        try:
+            presets_config = self._load_config_json("presets.json", {"default_preset_id": "default", "presets": {}})
+            preset_id = getattr(self, "active_preset_id", presets_config.get("default_preset_id", "default"))
+            preset = presets_config.get("presets", {}).get(preset_id, presets_config.get("presets", {}).get("default", {}))
+            
+            globally_active = getattr(self, "active_modes", [])
+            preset_allowed = preset.get("modes", [])
+            
+            return [m for m in preset_allowed if m in globally_active]
+        except:
+            return getattr(self, "active_modes", [])
 
     def list_mode(self):
         try:
             config = self._load_config_json("final_prompts.json", {})
             prompts = config.get("prompts", {})
-            active = getattr(self, "active_modes", [])
+            active = self.get_аctive_modes()
             
             modes_info = []
             for p_id, p_data in prompts.items():
@@ -763,7 +773,13 @@ class Chat:
             if not hasattr(self, "fs_permissions") or not self.fs_permissions:
                 self.fs_permissions = {"global": "", "paths": {}}
             if "paths" not in self.fs_permissions: self.fs_permissions["paths"] = {}
-            for cp in [f"chats/{chat_id}.pkl", f"chats/{chat_id}.json", f"chats/{chat_id}/"]:
+            for cp in [
+                f"chats/{chat_id}.pkl", 
+                f"chats/{chat_id}.json", 
+                f"chats/{chat_id}.pkl.tmp", 
+                f"chats/{chat_id}.json.tmp", 
+                f"chats/{chat_id}/"
+            ]:
                 self.fs_permissions["paths"][cp] = "rwxld"
         
         self.final_prompt = new_final_prompt + "\n" + WEB_PROMPT_MARKER_END

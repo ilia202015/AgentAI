@@ -378,7 +378,7 @@ export default {
             editPromptData.value = { 
                 name: p.name, text: p.text, type: p.type || 'system', 
                 icon: p.icon || 'ph-app-window', gather_script: p.gather_script || '', exec_script: p.exec_script || '',
-                fs_permissions: p.fs_permissions || {global: '', paths: {}}
+                fs_permissions: p.fs_permissions || {global: 'rwxld', paths: {}}
             };
         };
 

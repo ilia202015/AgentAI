@@ -475,7 +475,7 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
             cid = path.split("/")[-2]
             agent = self.get_agent_for_chat(cid)
             if agent:
-                self.send_json(getattr(agent, "active_modes", []))
+                self.send_json(agent.get_аctive_modes())
             else: self.send_json_error(404, "Chat not found")
         if path == "/api/chats": 
             self.send_json(storage.list_chats())
