@@ -14,7 +14,8 @@
       "commands": [
         "commit",
         "test",
-        "clear_user_profile"
+        "clear_user_profile",
+        "1771958664.0126593"
       ],
       "blocked": [
         "chat"

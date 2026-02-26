@@ -263,6 +263,7 @@ export default {
                 }
                 store.currentChatId = id;
                 store.activePresetId = data.chat.active_preset_id || 'default';
+                store.active_parameters = data.chat.active_modes || [];
                 store.setMessages(data.chat.messages);
                 
                 if (data.chat.model) {

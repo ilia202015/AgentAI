@@ -114,7 +114,7 @@ export const store = reactive({
     
     async toggleParameter(id) {
         const api = await import('./api.js');
-        const res = await api.toggleParameter(id);
+        const res = await api.toggleParameter(id, this.currentChatId);
         if (res.status === 'ok') {
             this.active_parameters = res.active_parameters;
         }

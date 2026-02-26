@@ -106,7 +106,7 @@ export async function selectFinalPrompt(id) {
     const res = await fetch(`${API_BASE}/final-prompts/select`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
+        body: JSON.stringify({ id, chatId })
     });
     return await res.json();
 }
@@ -116,11 +116,11 @@ export async function deleteFinalPrompt(id) {
     return await res.json();
 }
 
-export async function toggleParameter(id) {
+export async function toggleParameter(id, chatId = null) {
     const res = await fetch(`${API_BASE}/final-prompts/toggle-parameter`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id })
+        body: JSON.stringify({ id, chatId })
     });
     return await res.json();
 }
@@ -168,5 +168,10 @@ export async function execCommandScript(chatId, promptId) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chatId, promptId })
     });
+    return await res.json();
+}
+
+export async function fetchActiveModes(chatId) {
+    const res = await fetch(`${API_BASE}/chats/${chatId}/modes`);
     return await res.json();
 }

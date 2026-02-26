@@ -178,15 +178,28 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                 self._refresh_active_agents_prompts()
                 self.send_json({"status": "ok", "id": p_id})
             elif path == "/api/final-prompts/toggle-parameter":
-                config = storage.get_final_prompts_config()
+                cid = data.get("chatId")
                 p_id = data.get("id")
-                active_params = config.get("active_parameters", [])
-                if p_id in active_params: active_params.remove(p_id)
-                else: active_params.append(p_id)
-                config["active_parameters"] = active_params
-                storage.save_final_prompts_config(config)
-                self._refresh_active_agents_prompts()
-                self.send_json({"status": "ok", "active_parameters": active_params})
+                agent = self.get_agent_for_chat(cid) if cid else None
+                
+                if agent:
+                    active_params = getattr(agent, "active_modes", [])
+                    if p_id in active_params:
+                        agent.reset_mode(p_id)
+                    else:
+                        agent.set_mode(p_id)
+                    if cid != 'temp':
+                        storage.save_chat_state(agent)
+                    self.send_json({"status": "ok", "active_parameters": agent.active_modes})
+                else:
+                    # Global fallback if no chatId (for new chats template)
+                    config = storage.get_final_prompts_config()
+                    active_params = config.get("active_parameters", [])
+                    if p_id in active_params: active_params.remove(p_id)
+                    else: active_params.append(p_id)
+                    config["active_parameters"] = active_params
+                    storage.save_final_prompts_config(config)
+                    self.send_json({"status": "ok", "active_parameters": active_params})
             elif path == "/api/final-prompts/select":
                 config = storage.get_final_prompts_config()
                 p_id = data.get("id")
@@ -458,6 +471,12 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
         if is_print_debug:
             print(f"handle_api_get({path}, {query})")
 
+        elif path.startswith("/api/chats/") and path.endswith("/modes"):
+            cid = path.split("/")[-2]
+            agent = self.get_agent_for_chat(cid)
+            if agent:
+                self.send_json(getattr(agent, "active_modes", []))
+            else: self.send_json_error(404, "Chat not found")
         if path == "/api/chats": 
             self.send_json(storage.list_chats())
         elif path == "/api/final-prompts":

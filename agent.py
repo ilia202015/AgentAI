@@ -154,6 +154,7 @@ class Chat:
         self.final_prompt = ""
         self.blocked_tools = []
         self.settings_tools = {}
+        self.active_modes = self._load_config_json("final_prompts.json", {}).get("active_parameters", [])
         
         self.models = [ #(name, rpm)
             ("gemini-3-pro-preview", 25),
@@ -280,36 +281,54 @@ class Chat:
         return f"Пресет изменен на {preset_id}"
 
     def set_mode(self, *mode_ids):
-        """Включение режимов (параметров)"""
-        config = self._load_config_json("final_prompts.json", {"active_parameters": []})
-        active_params = set(config.get("active_parameters", []))
-        added = [mid for mid in mode_ids if mid not in active_params]
+        """Включение режимов (параметров) для текущего чата"""
+        if not hasattr(self, "active_modes"):
+            self.active_modes = self._load_config_json("final_prompts.json", {}).get("active_parameters", [])
         
+        added = [mid for mid in mode_ids if mid not in self.active_modes]
         if added:
-            active_params.update(added)
-            config["active_parameters"] = list(active_params)
-            import json
-            with open("final_prompts.json", "w", encoding="utf-8") as f:
-                json.dump(config, f, ensure_ascii=False, indent=2)
+            self.active_modes.extend(added)
             self._build_dynamic_context()
         return f"Режимы включены: {', '.join(added)}" if added else "Режимы уже включены"
 
     def reset_mode(self, *mode_ids):
-        """Выключение режимов (параметров)"""
-        config = self._load_config_json("final_prompts.json", {"active_parameters": []})
-        active_params = set(config.get("active_parameters", []))
-        removed = [mid for mid in mode_ids if mid in active_params] if '*' not in mode_ids else active_params
+        """Выключение режимов (параметров) для текущего чата"""
+        if not hasattr(self, "active_modes"):
+            self.active_modes = self._load_config_json("final_prompts.json", {}).get("active_parameters", [])
+        
+        active_params = set(self.active_modes)
+        removed = [mid for mid in mode_ids if mid in active_params] if '*' not in mode_ids else list(active_params)
         
         if removed:
             active_params.difference_update(removed)
-            config["active_parameters"] = list(active_params)
-            import json
-            with open("final_prompts.json", "w", encoding="utf-8") as f:
-                json.dump(config, f, ensure_ascii=False, indent=2)
+            self.active_modes = list(active_params)
             self._build_dynamic_context()
         return f"Режимы отключены: {', '.join(removed)}" if removed else "Режимы не были активны"
-    
-    def ai_get(self, question, target_type=str, max_len=500, clean_history=True, max_retries=3):
+
+    def get_active_modes(self):
+        """Возвращает список ID только активных режимов для текущего чата."""
+        return json.dumps(getattr(self, "active_modes", []), ensure_ascii=False)
+
+    def list_mode(self):
+        try:
+            config = self._load_config_json("final_prompts.json", {})
+            prompts = config.get("prompts", {})
+            active = getattr(self, "active_modes", [])
+            
+            modes_info = []
+            for p_id, p_data in prompts.items():
+                if p_data.get("type") == "parameter":
+                    modes_info.append({
+                        "id": p_id,
+                        "name": p_data.get("name", p_id),
+                        "active": p_id in active,
+                        "icon": p_data.get("icon", "ph-gear")
+                    })
+            return json.dumps(modes_info, ensure_ascii=False, indent=2)
+        except Exception as e:
+            return f"Ошибка при получении списка режимов: {e}"
+
+    def ai_get(self, question, target_type=str, max_len=500, clean_history=True, max_retries=50):
         """
         Геттер данных от ИИ.
         target_type: тип (int, str, bool, float, list, dict)
@@ -359,6 +378,7 @@ class Chat:
                 except Exception as e:
                     if attempt == max_retries - 1:
                         if clean_history: self.messages = self.messages[:history_len_before]
+                        self.print("Попытки исчерпаны")
                         raise e
                     full_question = f"Ошибка интерпретации ответа как {type_name}: {e}. Попробуй еще раз, строго соблюдая формат."
         finally:
@@ -702,7 +722,7 @@ class Chat:
             if pid in prompts:
                 new_final_prompt += prompts[pid].get("text", "") + "\n\n"
         
-        globally_active_params = final_prompts_config.get("active_parameters", [])
+        globally_active_params = getattr(self, "active_modes", final_prompts_config.get("active_parameters", []))
         preset_modes = preset.get("modes", [])
         active_modes = [m for m in preset_modes if m in globally_active_params]
         
