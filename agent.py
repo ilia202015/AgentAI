@@ -90,9 +90,6 @@ from google import genai
 from google.genai import types
 
 class Chat:
-    local_env = dict()
-    result = ''
-
     @staticmethod
     def _get_full_console_info():
         report = []
@@ -144,6 +141,8 @@ class Chat:
         return "\n".join(report)
 
     def __init__(self, output_mode="user", count_tab=0, print_to_console=False):
+        self.local_env = dict()
+        self.result = ''
         self.agent_dir = "."
         self.output_mode = output_mode
         self.count_tab = count_tab
