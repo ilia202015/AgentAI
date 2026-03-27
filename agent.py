@@ -337,7 +337,7 @@ class Chat:
         except Exception as e:
             return f"Ошибка при получении списка режимов: {e}"
 
-    def ai_get(self, question, target_type=str, max_len=500, clean_history=True, max_retries=50):
+    def ai_get(self, question, target_type=str, max_len=500, clean_history=True, max_retries=10):
         """
         Геттер данных от ИИ.
         target_type: тип (int, str, bool, float, list, dict)
@@ -358,9 +358,6 @@ class Chat:
             for attempt in range(max_retries):
                 response = self.send(full_question)
                 text_res = response if isinstance(response, str) else str(response)
-                # Очистка от Markdown блоков
-                text_res = re.sub(r'```[a-z]*\n', '', text_res, flags=re.IGNORECASE)
-                text_res = text_res.replace('```', '').strip()
                 
                 try:
                     if target_type == str:
@@ -382,14 +379,17 @@ class Chat:
                             if match: text_res = match.group()
                         result_val = target_type(text_res)
                     
-                    if clean_history: self.messages = self.messages[:history_len_before]
+                    if clean_history: 
+                        self.messages = self.messages[:history_len_before]
                     return result_val
                 except Exception as e:
                     if attempt == max_retries - 1:
-                        if clean_history: self.messages = self.messages[:history_len_before]
+                        if clean_history: 
+                            self.messages = self.messages[:history_len_before]
                         self.print("Попытки исчерпаны")
                         raise e
                     full_question = f"Ошибка интерпретации ответа как {type_name}: {e}. Попробуй еще раз, строго соблюдая формат."
+                    self.print(f"Ошибка в ai_get, неверный формат, response: {response}\n")
         finally:
             self.output_mode = old_mode
 
@@ -1016,7 +1016,7 @@ class Chat:
                             self.print_thought(part.text, flush=True, end='')
                         else:
                             self.print(part.text, flush=True, end='')
-                        full_response_text += part.text
+                            full_response_text += part.text
                     
                     if part.function_call:
                         tool_calls_buffer.append(part.function_call)
@@ -1026,7 +1026,9 @@ class Chat:
             self.messages.append(types.Content(role="model", parts=response_parts))
 
             if tool_calls_buffer:
-                return self._execute_tool_calls(tool_calls_buffer)
+                res = self._execute_tool_calls(tool_calls_buffer)
+                if res:
+                    full_response_text += res
 
             return full_response_text 
 
