@@ -1,4 +1,4 @@
-import os, re, json, base64, ast, sys, types, datetime, time, subprocess, traceback, platform
+import os, re, json, base64, ast, sys, types, datetime, time, subprocess, traceback, platform, threading, queue
 FINAL_PROMPT_BASE_INSTRUCTIONS = "\n\n\n\nИнструкции далее самые важные, они нужны чтобы систематизировать все предыдущие и ты понимал, на чём нужно сделать акцент, их написал пользователь, они могут меняться в процессе чата, всегда сдедуй им, даже если они противоречат твоим предыдущим действиям:\n"
 WEB_PROMPT_MARKER_START = "### FINAL_PRO" + "MPT_START ###"
 WEB_PROMPT_MARKER_END = "### FINAL_PRO" + "MPT_END ###"
@@ -88,6 +88,100 @@ if not hasattr(sys, '_agent_guard_registered'):
 
 from google import genai
 from google.genai import types
+
+class ShellSession:
+    def __init__(self):
+        self.stdout_queue = queue.Queue()
+        self.stderr_queue = queue.Queue()
+        
+        shell_cmd = "cmd.exe" if os.name == "nt" else "bash"
+        self.process = subprocess.Popen(
+            [shell_cmd],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            bufsize=0,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
+        )
+        
+        self.stdout_thread = threading.Thread(target=self._read_stream, args=(self.process.stdout, self.stdout_queue), daemon=True)
+        self.stderr_thread = threading.Thread(target=self._read_stream, args=(self.process.stderr, self.stderr_queue), daemon=True)
+        self.stdout_thread.start()
+        self.stderr_thread.start()
+
+    def _decode(self, data_bytes):
+        if not data_bytes: return ""
+        for enc in ['utf-8', 'cp866', 'cp1251']:
+            try:
+                return data_bytes.decode(enc)
+            except UnicodeDecodeError:
+                continue
+        return data_bytes.decode('utf-8', errors='replace')
+
+    def _read_stream(self, stream, q):
+        while True:
+            try:
+                data = stream.read1(4096) if hasattr(stream, 'read1') else stream.read(4096)
+                if not data:
+                    break
+                q.put(data)
+            except ValueError:
+                break
+            except Exception:
+                break
+
+    def write(self, command):
+        if self.process.poll() is not None:
+            return "ОШИБКА: Процесс оболочки завершён."
+        try:
+            if not command.endswith(chr(10)):
+                command += chr(10)
+            enc = 'cp866' if os.name == 'nt' else 'utf-8'
+            self.process.stdin.write(command.encode(enc))
+            self.process.stdin.flush()
+            return "Команда отправлена."
+        except Exception as e:
+            return f"Ошибка записи в stdin: {e}"
+
+    def read(self):
+        stdout_parts = []
+        stderr_parts = []
+        
+        while True:
+            try:
+                stdout_parts.append(self.stdout_queue.get_nowait())
+            except queue.Empty:
+                break
+                
+        while True:
+            try:
+                stderr_parts.append(self.stderr_queue.get_nowait())
+            except queue.Empty:
+                break
+                
+        return {
+            "stdout": self._decode(b"".join(stdout_parts)),
+            "stderr": self._decode(b"".join(stderr_parts)),
+            "status": self.process.poll()
+        }
+
+    def close(self):
+        try:
+            if self.process.poll() is None:
+                self.process.terminate()
+                self.process.wait(timeout=2)
+        except Exception:
+            try:
+                self.process.kill()
+            except Exception:
+                pass
+        
+        for stream in [self.process.stdin, self.process.stdout, self.process.stderr]:
+            try:
+                if stream:
+                    stream.close()
+            except Exception:
+                pass
 
 class Chat:
     @staticmethod
@@ -233,7 +327,7 @@ class Chat:
         tools_dict_additional = {}
         for tool in self.tools:
             tools_dict_required[tool["function"]["name"]] = tool["function"]["parameters"]["required"]
-            for parameter in tool["function"]["parameters"].keys():
+            for parameter in tool["function"]["parameters"]["properties"].keys():
                 if parameter not in tool["function"]["parameters"]["required"]:
                     if tool["function"]["name"] not in tools_dict_additional:
                         tools_dict_additional[tool["function"]["name"]] = []
@@ -400,6 +494,9 @@ class Chat:
         if 'client' in state:
             del state['client']
         
+        if 'shell_session' in state:
+            del state['shell_session']
+        
         # local_env оставляем (по требованию), 
         # но ответственность за его содержимое лежит на пользователе.
         return state
@@ -459,41 +556,79 @@ class Chat:
         except Exception as e:
             return f"Ошибка: {e}"
 
-    def shell_tool(self, command, timeout=120):
-        try:
-            import subprocess, json, os
-            cf = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == 'nt' else 0
-            process = subprocess.Popen(
-                command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                creationflags=cf
-            )
-            
-            def decode_bytes(data):
-                if not data: return ""
-                for enc in ['utf-8', 'cp866', 'cp1251']:
-                    try:
-                        return data.decode(enc)
-                    except (UnicodeDecodeError, AttributeError):
-                        continue
-                return data.decode('utf-8', errors='replace')
+    def _get_shell_session(self):
+        if 'shell' not in self.local_env or getattr(self.local_env['shell'], 'process', None) is None or self.local_env['shell'].process.poll() is not None:
+            self.local_env['shell'] = ShellSession()
+        return self.local_env['shell']
 
-            try:
-                stdout_bytes, stderr_bytes = process.communicate(timeout=timeout)
-                stdout = decode_bytes(stdout_bytes)
-                stderr = decode_bytes(stderr_bytes)
-                return json.dumps({"returncode": process.returncode, "stdout": stdout, "stderr": stderr}, ensure_ascii=False, indent=2)
-            except subprocess.TimeoutExpired:
-                if os.name == 'nt':
-                    subprocess.run(f'taskkill /F /T /PID {process.pid}', capture_output=True, shell=True)
-                else:
-                    import signal
-                    try:
-                        os.killpg(os.getpgid(process.pid), signal.SIGKILL)
-                    except:
-                        process.kill()
-                return json.dumps({"returncode": -1, "stdout": "", "stderr": f"Ошибка: Команда выполнялась дольше {timeout} секунд и была ПРИНУДИТЕЛЬНО прервана."}, ensure_ascii=False, indent=2)
+    def shell_tool(self, action='run', command='', input_text='', timeout=5):
+        try:
+            if 'shell_session' not in self.local_env or getattr(self.local_env['shell_session'], 'process', None) is None or self.local_env['shell_session'].process.poll() is not None:
+                self.shell_session = ShellSession()
+            session = self.shell_session
+            
+            if action == 'run':
+                if not command:
+                    return json.dumps({"status": "error", "stdout": "", "stderr": "Команда не указана.", "instruction": ""}, ensure_ascii=False, indent=2)
+                
+                res = session.write(command)
+                if res and "ОШИБКА" in res:
+                    return json.dumps({"status": "error", "stdout": "", "stderr": res, "instruction": ""}, ensure_ascii=False, indent=2)
+                
+                # Активное ожидание вывода или завершения
+                start_time = time.time()
+                while time.time() - start_time < timeout:
+                    time.sleep(0.2)
+                    if session.process.poll() is not None:
+                        break
+                        
+            elif action == 'read':
+                pass # Сразу переходим к чтению ниже
+                
+            elif action == 'input':
+                if not input_text:
+                    return json.dumps({"status": "error", "stdout": "", "stderr": "Текст для ввода (input_text) не указан.", "instruction": ""}, ensure_ascii=False, indent=2)
+                
+                res = session.write(input_text)
+                if res and "ОШИБКА" in res:
+                    return json.dumps({"status": "error", "stdout": "", "stderr": res, "instruction": ""}, ensure_ascii=False, indent=2)
+                
+                # Короткое активное ожидание реакции на ввод
+                start_time = time.time()
+                while time.time() - start_time < 1.0:
+                    time.sleep(0.2)
+                    if session.process.poll() is not None:
+                        break
+                        
+            elif action == 'interrupt':
+                # TODO: Реализовать отправку SIGINT (Ctrl+C) дочернему процессу вместо полного завершения сессии
+                session.close()
+                self.local_env['shell_session'] = None
+                
+                return json.dumps({
+                    "status": "exited(interrupted)",
+                    "stdout": "Сессия прервана и закрыта.",
+                    "stderr": "",
+                    "instruction": "Команда прервана. Для выполнения новых команд будет создана новая сессия."
+                }, ensure_ascii=False, indent=2)
+                
+            else:
+                return json.dumps({"status": "error", "stdout": "", "stderr": f"Неизвестное действие: {action}", "instruction": ""}, ensure_ascii=False, indent=2)
+
+            # Единый блок формирования ответа для успешных действий: run, read, input
+            output = session.read()
+            status_val = "running" if output["status"] is None else f"exited({output['status']})"
+            instruction = "Команда еще выполняется. Вы можете прочитать продолжение (action='read'), отправить ввод (action='input') или прервать (action='interrupt')." if output["status"] is None else "Команда завершена."
+            
+            return json.dumps({
+                "status": status_val, 
+                "stdout": output["stdout"], 
+                "stderr": output["stderr"], 
+                "instruction": instruction
+            }, ensure_ascii=False, indent=2)
+            
         except Exception as e:
-            return json.dumps({"returncode": -1, "stdout": "", "stderr": f"Критическая ошибка при выполнении команды: {str(e)}"}, ensure_ascii=False, indent=2)
+            return json.dumps({"status": "error", "stdout": "", "stderr": str(e)}, ensure_ascii=False, indent=2)
 
     def http_tool(self, url):
         try:

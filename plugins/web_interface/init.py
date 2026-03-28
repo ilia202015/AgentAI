@@ -172,6 +172,11 @@ def web_send(self, messages):
                 self.web_emit("finish", "done")
 
 def web_handle_stream(self, stream):
+    cid = getattr(self, "id", None)
+    if cid and cid != 'temp':
+        try: storage.save_chat_state(self)
+        except: pass
+        
     # Push new thought buffer
     if not hasattr(self, '_web_thought_stack'): self._web_thought_stack = []
     self._web_thought_stack.append("")
@@ -201,11 +206,6 @@ def web_handle_stream(self, stream):
                      msg._web_thoughts = thoughts
 
     finally:
-        cid = getattr(self, "id", None)
-        if cid and cid != 'temp':
-            try: storage.save_chat_state(self)
-            except: pass
-            
         if self._web_thought_stack:
             self._web_thought_stack.pop()
             

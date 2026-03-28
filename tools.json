@@ -76,17 +76,31 @@
           "type": "object",
           "properties": {
             "command": {
-              "type": "string",
-              "description": "Команда для выполнения."
+              "type": "STRING",
+              "description": "Команда для выполнения (используется только при action=\"run\")."
             },
             "timeout": {
-              "type": "integer",
-              "description": "Максимальное время выполнения команды в секундах. По умолчанию 120.",
-              "default": 120
+              "type": "INTEGER",
+              "description": "Soft timeout в секундах (по умолчанию 5). Максимальное время ожидания ответа перед тем как вернуть управление (процесс продолжит работу в фоне).",
+              "default": 5
+            },
+            "action": {
+              "type": "STRING",
+              "enum": [
+                "run",
+                "read",
+                "input",
+                "interrupt"
+              ],
+              "description": "Действие с интерактивной оболочкой: run (запуск команды), read (чтение накопившегося вывода), input (отправка текста в stdin), interrupt (прерывание текущего процесса)."
+            },
+            "input_text": {
+              "type": "STRING",
+              "description": "Текст для передачи в стандартный ввод (stdin) процесса (используется только при action=\"input\"). Обязательно добавляйте символ переноса строки \\n в конце, если программа ожидает нажатия Enter."
             }
           },
           "required": [
-            "command"
+            "action"
           ]
         }
       }
