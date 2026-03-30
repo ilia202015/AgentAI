@@ -155,6 +155,8 @@ def _get_preview(messages):
     return "Empty chat"
 
 def load_chat_state(id, get_chat):
+    if is_print_debug:
+        print(f"load_chat_state({id})")
     ensure_chats_dir()
     pkl_path = os.path.join(CHATS_DIR, f"{id}.pkl")
     json_path = os.path.join(CHATS_DIR, f"{id}.json")
@@ -162,7 +164,11 @@ def load_chat_state(id, get_chat):
     if os.path.exists(pkl_path) and os.path.getsize(pkl_path) > 0:
         try:
             with open(pkl_path, 'rb') as f:
+                if is_print_debug:
+                    print(f"dill...")
                 chat = dill.load(f)
+                if is_print_debug:
+                    print(f"end")
                 if not getattr(chat, "name", False): chat.name = "New chat"
                 if not getattr(chat, "id", False): chat.id = id
                 if not getattr(chat, "active_preset_id", False): chat.active_preset_id = 'default'

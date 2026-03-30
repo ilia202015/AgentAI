@@ -786,7 +786,7 @@ class Chat:
         try:
             self.local_env["self"] = self
             self.local_env["result"] = ''
-            exec(code, globals(), self.local_env)
+            exec(code, self.local_env, self.local_env)
             return str(self.local_env["result"])
         except Exception as e:
             return f"Ошибка выполнения:\n\n{traceback.format_exc()}"
