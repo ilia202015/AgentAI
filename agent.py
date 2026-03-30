@@ -94,7 +94,7 @@ class ShellSession:
         self.stdout_queue = queue.Queue()
         self.stderr_queue = queue.Queue()
         
-        shell_cmd = "cmd.exe" if os.name == "nt" else "bash"
+        shell_cmd = "pwsh" if os.name == "nt" else "bash"
         self.process = subprocess.Popen(
             [shell_cmd],
             stdin=subprocess.PIPE,
@@ -561,70 +561,35 @@ class Chat:
             self.local_env['shell'] = ShellSession()
         return self.local_env['shell']
 
-    def shell_tool(self, action='run', command='', input_text='', timeout=5):
+    def shell_tool(self, action='read', input='', delay=3):
+        import time, json
         try:
-            if 'shell_session' not in self.local_env or getattr(self.local_env['shell_session'], 'process', None) is None or self.local_env['shell_session'].process.poll() is not None:
+            if not getattr(self, "shell_session", None) or not getattr(self.shell_session, 'process', None) or self.shell_session.process.poll() is not None:
                 self.shell_session = ShellSession()
             session = self.shell_session
             
-            if action == 'run':
-                if not command:
-                    return json.dumps({"status": "error", "stdout": "", "stderr": "Команда не указана.", "instruction": ""}, ensure_ascii=False, indent=2)
-                
-                res = session.write(command)
-                if res and "ОШИБКА" in res:
-                    return json.dumps({"status": "error", "stdout": "", "stderr": res, "instruction": ""}, ensure_ascii=False, indent=2)
-                
-                # Активное ожидание вывода или завершения
-                start_time = time.time()
-                while time.time() - start_time < timeout:
-                    time.sleep(0.2)
-                    if session.process.poll() is not None:
-                        break
-                        
-            elif action == 'read':
-                pass # Сразу переходим к чтению ниже
-                
-            elif action == 'input':
-                if not input_text:
-                    return json.dumps({"status": "error", "stdout": "", "stderr": "Текст для ввода (input_text) не указан.", "instruction": ""}, ensure_ascii=False, indent=2)
-                
-                res = session.write(input_text)
-                if res and "ОШИБКА" in res:
-                    return json.dumps({"status": "error", "stdout": "", "stderr": res, "instruction": ""}, ensure_ascii=False, indent=2)
-                
-                # Короткое активное ожидание реакции на ввод
-                start_time = time.time()
-                while time.time() - start_time < 1.0:
-                    time.sleep(0.2)
-                    if session.process.poll() is not None:
-                        break
-                        
-            elif action == 'interrupt':
-                # TODO: Реализовать отправку SIGINT (Ctrl+C) дочернему процессу вместо полного завершения сессии
+            if action == 'reboot':
                 session.close()
-                self.local_env['shell_session'] = None
+                self.shell_session = None
+                return json.dumps({"status": "rebooted", "stdout": "", "stderr": ""}, ensure_ascii=False, indent=2)
                 
-                return json.dumps({
-                    "status": "exited(interrupted)",
-                    "stdout": "Сессия прервана и закрыта.",
-                    "stderr": "",
-                    "instruction": "Команда прервана. Для выполнения новых команд будет создана новая сессия."
-                }, ensure_ascii=False, indent=2)
+            elif action == 'write':
+                if not input:
+                    return json.dumps({"status": "error", "stdout": "", "stderr": "Параметр 'input' обязателен для действия 'write'."}, ensure_ascii=False, indent=2)
+                res = session.write(input)
                 
+            elif action == 'read':
+                pass
             else:
-                return json.dumps({"status": "error", "stdout": "", "stderr": f"Неизвестное действие: {action}", "instruction": ""}, ensure_ascii=False, indent=2)
+                return json.dumps({"status": "error", "stdout": "", "stderr": f"Неизвестное действие: {action}"}, ensure_ascii=False, indent=2)
 
-            # Единый блок формирования ответа для успешных действий: run, read, input
+            time.sleep(delay)
             output = session.read()
             status_val = "running" if output["status"] is None else f"exited({output['status']})"
-            instruction = "Команда еще выполняется. Вы можете прочитать продолжение (action='read'), отправить ввод (action='input') или прервать (action='interrupt')." if output["status"] is None else "Команда завершена."
-            
             return json.dumps({
                 "status": status_val, 
                 "stdout": output["stdout"], 
-                "stderr": output["stderr"], 
-                "instruction": instruction
+                "stderr": output["stderr"]
             }, ensure_ascii=False, indent=2)
             
         except Exception as e:
