@@ -698,11 +698,6 @@ class Chat:
 
             try:
                 copy_recursive(".", sandbox_dir)
-                prompts_path = os.path.join(sandbox_dir, "final_prompts.json")
-                if not os.path.exists(prompts_path):
-                    default_p = "plugins/web_interface/default_prompts.json"
-                    if os.path.exists(default_p):
-                        shutil.copy2(default_p, prompts_path)
                 return "Песочница создана успешно."
             except Exception as e:
                 return f"Ошибка при создании: {str(e)}"
@@ -866,16 +861,17 @@ class Chat:
         self.settings_tools = preset.get("settings", {})
         
         # ACL пересечение через внутренние функции
-        if acl_list:
+        if hasattr(self, "fs_permissions") and "custom" in self.fs_permissions and self.fs_permissions["custom"]:
+            pass
+        elif acl_list:
             self.fs_permissions = _intersect_acl_configs(acl_list)
         elif not hasattr(self, "fs_permissions"):
             self.fs_permissions = preset.get("fs_permissions", {"global": "rwxld", "paths": {}})
             
         chat_id = getattr(self, "id", None)
         if chat_id:
-            if not hasattr(self, "fs_permissions") or not self.fs_permissions:
-                self.fs_permissions = {"global": "", "paths": {}}
-            if "paths" not in self.fs_permissions: self.fs_permissions["paths"] = {}
+            if "paths" not in self.fs_permissions: 
+                self.fs_permissions["paths"] = {}
             for cp in [
                 f"chats/{chat_id}.pkl", 
                 f"chats/{chat_id}.json", 

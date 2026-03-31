@@ -71,7 +71,7 @@
         "paths": {}
       }
     },
-    "1770902539.7172294": {
+    "architect": {
       "name": "Архитектор",
       "prompt_ids": [
         "default",
@@ -123,25 +123,27 @@
         "paths": {}
       }
     },
-    "1771405543.316683": {
-      "name": "Исполнитель",
+    "tester": {
+      "name": "Тестировщик",
       "prompt_ids": [
-        "default"
+        "default",
+        "1774944985.3518405"
       ],
-      "modes": [],
+      "modes": [
+        "knowledge_frontend",
+        "knowledge_backend",
+        "knowledge_computer_use",
+        "knowledge_browser_use"
+      ],
       "commands": [],
       "blocked": [
         "chat",
-        "user_profile",
-        "shell"
+        "user_profile"
       ],
       "settings": {},
       "fs_permissions": {
-        "global": "rl",
-        "paths": {
-          "temp/": "rwxld",
-          "sandbox/": "rwxld"
-        }
+        "global": "rwxld",
+        "paths": {}
       }
     }
   }
