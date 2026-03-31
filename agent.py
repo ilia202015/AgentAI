@@ -89,6 +89,8 @@ if not hasattr(sys, '_agent_guard_registered'):
 from google import genai
 from google.genai import types
 
+default_genai_client = None
+
 class ShellSession:
     def __init__(self):
         self.stdout_queue = queue.Queue()
@@ -256,9 +258,8 @@ class Chat:
         ]
         self.model, self.model_rpm = self.models[1]
 
-        self._load_config()
-        self.client = genai.Client(api_key=self.ai_key)
-        
+        self._setup_client()
+
         system_prompt_parts = [
             "Код файла agent.py:", self.self_code,
             f"Режим вывода: {self.output_mode}", 
@@ -274,6 +275,18 @@ class Chat:
         self.messages = [] 
 
         self._initialize_tools()
+
+    def _setup_client(self):
+        global default_genai_client
+        try:
+            if not hasattr(self, 'ai_key') or not self.ai_key:
+                self._load_config()
+            if not default_genai_client:
+                default_genai_client = genai.Client(api_key=self.ai_key)
+            self.client = default_genai_client
+        except Exception as e:
+            print(f"Ошибка в _setup_client: {e}")
+        
 
     def _load_config(self):
         self.gemini_keys = []
@@ -503,16 +516,7 @@ class Chat:
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        try:
-            from google import genai
-            if hasattr(self, 'ai_key') and self.ai_key:
-                 self.client = genai.Client(api_key=self.ai_key)
-            elif hasattr(self, '_load_config'):
-                 self._load_config()
-                 if hasattr(self, 'ai_key'):
-                    self.client = genai.Client(api_key=self.ai_key)
-        except Exception as e:
-            print(f"Error restoring Chat client: {e}")
+        self._setup_client()
 
     # === TOOLS IMPLEMENTATION ===
 
@@ -1261,7 +1265,7 @@ class Chat:
         with open(f"{self.agent_dir}/keys/gemini.key_num", 'w', encoding="utf8") as f:
             f.write(str(self.current_key_index))
         self.ai_key = self.gemini_keys[self.current_key_index]
-        self.client = genai.Client(api_key=self.ai_key)
+        self._setup_client()
         self.print(f"🔑 Превышен лимит запросов. Переключаюсь на следующий ключ ({self.current_key_index + 1}/{len(self.gemini_keys)}).")
 
 def main():
