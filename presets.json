@@ -145,6 +145,36 @@
         "global": "rwxld",
         "paths": {}
       }
+    },
+    "1775136326.5048244": {
+      "name": "Ручной режим проектирования",
+      "prompt_ids": [
+        "default"
+      ],
+      "modes": [
+        "knowledge_backend",
+        "knowledge_browser_use",
+        "knowledge_computer_use",
+        "knowledge_frontend",
+        "sandbox",
+        "1775136659.6099539"
+      ],
+      "commands": [
+        "1775137010.5945556",
+        "1775137069.6075037",
+        "1775137178.3295863",
+        "1775137349.0399544",
+        "1775136942.761031",
+        "1775138890.063349"
+      ],
+      "blocked": [
+        "chat"
+      ],
+      "settings": {},
+      "fs_permissions": {
+        "global": "rwxld",
+        "paths": {}
+      }
     }
   }
 }
