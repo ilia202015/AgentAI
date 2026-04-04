@@ -56,3 +56,26 @@ class Projector:
             return f"{context}\n\nИНСТРУКЦИЯ: Проведи рефакторинг кода текущего этапа для улучшения его качества и читаемости без изменения бизнес-логики."
         
         return f"Неизвестное действие: {action}"
+
+    def run_to_block_end(self, auto_mode=False):
+        if self.b_idx >= len(self.blocks):
+            return 'Проект завершен.'
+        
+        block = self.blocks[self.b_idx]
+        steps = block.get('steps', [])
+        
+        prompt_end = "\n\nСейчас ты работаешь в авто-режиме, выполни шаг и выведи \"OK\" в качестве ответа (без лишнего текста)\n"
+
+        if self.s_idx == len(steps):
+            prompt = self.get_prompt('next')
+            if prompt:
+                self.chat.print(prompt + prompt_end)
+                self.chat.send(prompt + prompt_end)
+        
+        while self.s_idx < len(steps) - 1:
+            prompt = self.get_prompt('next')
+            if prompt:
+                self.chat.print(prompt + prompt_end)
+                self.chat.send(prompt + prompt_end)
+                
+        return self.get_prompt('next') + (prompt_end if auto_mode else "\n\nВыход из авто-режима, давай нормальные ответы\n")

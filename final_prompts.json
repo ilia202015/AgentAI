@@ -180,7 +180,7 @@
       "type": "command",
       "icon": "ph-play-circle",
       "gather_script": "",
-      "exec_script": "from projector import Projector\nprompt = \"Верни текущий подробный план строго в формате Python dict: {'blocks': [{'name': 'Название блока', 'steps': ['описание шага 1', 'описание шага 2']}]}\"\ntry:\n    plan_dict = self.ai_get(prompt, target_type=dict, clean_history=False)\n    self.projector = Projector(self, plan_dict)\n    self.set_preset('preset_developer')\n    result = \"✅ План успешно загружен в Projector. Режим автоматически переключен на 'Проектировщик: разработка'.\\ВАЖНО: НИЧЕГО НЕ ДЕЛАЙ БЕЗ ЯВНОЙ КОМАНДЫ\"\nexcept Exception as e:\n    result = f\"❌ Ошибка при извлечении плана: {e}\\n\"",
+      "exec_script": "from projector import Projector\nprompt = \"Верни текущий подробный план строго в формате Python dict: {'blocks': [{'name': 'Название блока', 'steps': ['описание шага 1', 'описание шага 2']}]}\"\ntry:\n    plan_dict = self.ai_get(prompt, target_type=dict, clean_history=False)\n    self.projector = Projector(self, plan_dict)\n    self.set_preset('preset_developer')\n    result = \"✅ План успешно загружен в Projector. Режим автоматически переключен на 'Проектировщик: разработка'.\\ВАЖНО: НИЧЕГО НЕ ДЕЛАЙ БЕЗ ЯВНОЙ КОМАНДЫ. В качестве ответа подтверди, что готов начинать.\"\nexcept Exception as e:\n    result = f\"❌ Ошибка при извлечении плана: {e}\\n\"",
       "fs_permissions": {
         "global": "rwxld",
         "paths": {}
@@ -241,6 +241,18 @@
       "icon": "ph-broom",
       "gather_script": "",
       "exec_script": "if hasattr(self, 'projector'):\n    result = self.projector.get_prompt('refactor')\nelse:\n    result = '❌ Ошибка: объект Projector не найден. Вернитесь в режим планирования и нажмите Старт.'",
+      "fs_permissions": {
+        "global": "rwxld",
+        "paths": {}
+      }
+    },
+    "cmd_dev_auto_block": {
+      "name": "До конца блока",
+      "text": "",
+      "type": "command",
+      "icon": "ph-fast-forward-circle",
+      "gather_script": "",
+      "exec_script": "if hasattr(self, 'projector'):\n    result = self.projector.run_to_block_end()\nelse:\n    result = '❌ Ошибка: объект Projector не найден.'",
       "fs_permissions": {
         "global": "rwxld",
         "paths": {}

@@ -188,6 +188,7 @@
       ],
       "commands": [
         "cmd_dev_next",
+        "cmd_dev_auto_block",
         "cmd_dev_find_bug",
         "cmd_dev_analyze",
         "cmd_dev_fix",
