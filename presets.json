@@ -146,8 +146,36 @@
         "paths": {}
       }
     },
-    "1775136326.5048244": {
-      "name": "Ручной режим проектирования",
+    "preset_planner": {
+      "name": "Проектировщик: планирование",
+      "prompt_ids": [
+        "default",
+        "param_planner_system"
+      ],
+      "modes": [
+        "knowledge_backend",
+        "knowledge_browser_use",
+        "knowledge_computer_use",
+        "knowledge_frontend",
+        "param_planner_system",
+        "sandbox"
+      ],
+      "commands": [
+        "cmd_planner_plan",
+        "cmd_planner_details",
+        "cmd_planner_start"
+      ],
+      "blocked": [
+        "chat"
+      ],
+      "settings": {},
+      "fs_permissions": {
+        "global": "lr",
+        "paths": {}
+      }
+    },
+    "preset_developer": {
+      "name": "Проектировщик: разработка",
       "prompt_ids": [
         "default"
       ],
@@ -156,16 +184,14 @@
         "knowledge_browser_use",
         "knowledge_computer_use",
         "knowledge_frontend",
-        "sandbox",
-        "1775136659.6099539"
+        "sandbox"
       ],
       "commands": [
-        "1775137010.5945556",
-        "1775137069.6075037",
-        "1775137178.3295863",
-        "1775137349.0399544",
-        "1775136942.761031",
-        "1775138890.063349"
+        "cmd_dev_next",
+        "cmd_dev_find_bug",
+        "cmd_dev_analyze",
+        "cmd_dev_fix",
+        "cmd_dev_refactor"
       ],
       "blocked": [
         "chat"

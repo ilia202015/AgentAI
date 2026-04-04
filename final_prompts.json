@@ -138,70 +138,10 @@
         "paths": {}
       }
     },
-    "1775136659.6099539": {
-      "name": "Проектирование",
-      "text": "Ты в режиме Проектирование.\nПользователь тебе даст ТЗ, ты должен подробно спланировать его реализацию, НО НЕ РЕАЛИЗОВЫВАТЬ (менять файлы тебе запрещено).\nТВОЯ ОСНОВНАЯ ЗАДАЧА: РАЗБИТЬ ЗАДАЧУ НА МИКРО-ШАГИ И ПРЕДОСТАВИТЬ ПОЛЬЗОВАТЕЛЮ ПЛАН.\n\nПлан должен состоять из крупных блоков (например, backend и frontend), а также из микро-шагов (создать файл, создать класс)\n\nСНАЧАЛА ПИШИ КРАТКИЙ ПЛАН ИЗ КРУПНЫХ БЛОКОВ, ЗАТЕМ ПОДРОБНЫЙ ПЛАН СО ВСЕМИ МИКРО-ШАГАМИ",
-      "type": "parameter",
-      "icon": "ph-strategy",
-      "gather_script": "",
-      "exec_script": "",
-      "fs_permissions": {
-        "global": "rl",
-        "paths": {}
-      }
-    },
-    "1775136942.761031": {
-      "name": "Начинай",
-      "text": "План одобрен, начинай реализацию с ПЕРВОГО шага плана, выполни ТОЛЬКО его.",
-      "type": "command",
-      "icon": "ph-wrench",
-      "gather_script": "",
-      "exec_script": "",
-      "fs_permissions": {
-        "global": "rwxld",
-        "paths": {}
-      }
-    },
-    "1775137010.5945556": {
-      "name": "Далее",
-      "text": "Выполняй следующий шаг плана, ТОЛЬКО ОДИН ШАГ.",
-      "type": "command",
-      "icon": "ph-wrench",
-      "gather_script": "",
-      "exec_script": "",
-      "fs_permissions": {
-        "global": "rwxld",
-        "paths": {}
-      }
-    },
-    "1775137069.6075037": {
-      "name": "Тест",
-      "text": "Протестируй реализацию ПОСЛЕДНЕГО выполненного шага, ТОЛЬКО ПОСЛЕДНЕГО.\nДай подробный отчёт, НЕ МЕНЯЙ КОД, НЕ ИСПРАВЛЯЙ БАГИ ПРИ ОБНАРУЖЕНИИ.\n\nТесты:\n1) Запуск и чтение логов.\n2) Импорт файлов внутри python_tool и unit-тест",
-      "type": "command",
-      "icon": "ph-test-tube",
-      "gather_script": "",
-      "exec_script": "",
-      "fs_permissions": {
-        "global": "rwxld",
-        "paths": {}
-      }
-    },
-    "1775137178.3295863": {
-      "name": "Рефакторинг",
-      "text": "Улучши качество кода ПОСЛЕДНЕГО шага, ТОЛЬКО ПОСЛЕДНЕГО.",
-      "type": "command",
-      "icon": "ph-magic-wand",
-      "gather_script": "",
-      "exec_script": "",
-      "fs_permissions": {
-        "global": "rwxld",
-        "paths": {}
-      }
-    },
-    "1775137349.0399544": {
-      "name": "Анализ",
-      "text": "Проанализируй реализацию на баги, костыли, удобство пользования и качество кода ПОСЛЕДНЕГО выполненного шага, ТОЛЬКО ПОСЛЕДНЕГО.\nДай подробный отчёт, НЕ МЕНЯЙ КОД, НЕ ЧЕГО ИСПРАВЛЯЙ.",
-      "type": "command",
+    "param_planner_system": {
+      "name": "Планирование",
+      "text": "Ты в режиме 'Проектировщик: планирование'. Твоя задача разбить крупную задачу на блоки, а блоки на микро-шаги. Тебе ЗАПРЕЩЕНО изменять файлы проекта или писать рабочий код. Только анализ и составление планов. Следуй указаниям пользователя.",
+      "type": "system",
       "icon": "ph-brain",
       "gather_script": "",
       "exec_script": "",
@@ -210,17 +150,71 @@
         "paths": {}
       }
     },
-    "1775138890.063349": {
-      "name": "Исправь",
-      "text": "Исправь реализацию (устрани баги) ПОСЛЕДНЕГО шага, ТОЛЬКО ПОСЛЕДНЕГО.",
+    "cmd_planner_plan": {
+      "name": "План",
+      "text": "Составь крупный план реализации ТЗ, состоящий из логических блоков (например: Настройка БД, Backend, Frontend, Деплой). Затем каждый блок распиши на микро-шаги.",
       "type": "command",
-      "icon": "ph-gear",
+      "icon": "ph-list-bullets",
       "gather_script": "",
       "exec_script": "",
       "fs_permissions": {
         "global": "rwxld",
         "paths": {}
       }
+    },
+    "cmd_planner_details": {
+      "name": "Подробнее",
+      "text": "Разбей каждый из написанных блоков на микро-шаги. Каждый шаг должен быть максимально атомарным и содержать конкретные действия (например: создать файл auth.py, реализовать класс Auth).",
+      "type": "command",
+      "icon": "ph-magnifying-glass-plus",
+      "gather_script": "",
+      "exec_script": "",
+      "fs_permissions": {
+        "global": "rwxld",
+        "paths": {}
+      }
+    },
+    "cmd_planner_start": {
+      "type": "command",
+      "name": "Старт",
+      "exec_script": "from projector import Projector\nprompt = \"Верни текущий подробный план строго в формате Python dict: {'blocks': [{'name': 'Название блока', 'steps': ['описание шага 1', 'описание шага 2']}]}\"\ntry:\n    plan_dict = self.ai_get(prompt, target_type=dict, max_retries=3)\n    self.projector = Projector(self, plan_dict)\n    self.set_preset('preset_developer')\n    self.send(\"✅ План успешно загружен в Projector. Режим автоматически переключен на 'Проектировщик: разработка'.\\nНажми 'Далее' для начала работы над первым шагом.\")\nexcept Exception as e:\n    self.send(f\"❌ Ошибка при извлечении плана: {e}\\nПопробуй еще раз или попроси меня переформатировать план.\")",
+      "icon": "ph-play-circle",
+      "text": ""
+    },
+    "cmd_dev_next": {
+      "type": "command",
+      "name": "Далее",
+      "exec_script": "if hasattr(self, 'projector'):\n    prompt = self.projector.get_prompt('next')\n    if prompt: self.send(prompt)\nelse:\n    self.send('❌ Ошибка: объект Projector не найден. Вернитесь в режим планирования и нажмите Старт.')",
+      "icon": "ph-arrow-right",
+      "text": ""
+    },
+    "cmd_dev_find_bug": {
+      "type": "command",
+      "name": "Поиск бага",
+      "exec_script": "if hasattr(self, 'projector'):\n    prompt = self.projector.get_prompt('find_bug')\n    if prompt: self.send(prompt)\nelse:\n    self.send('❌ Ошибка: объект Projector не найден. Вернитесь в режим планирования и нажмите Старт.')",
+      "icon": "ph-bug",
+      "text": ""
+    },
+    "cmd_dev_analyze": {
+      "type": "command",
+      "name": "Анализ качества",
+      "exec_script": "if hasattr(self, 'projector'):\n    prompt = self.projector.get_prompt('analyze')\n    if prompt: self.send(prompt)\nelse:\n    self.send('❌ Ошибка: объект Projector не найден. Вернитесь в режим планирования и нажмите Старт.')",
+      "icon": "ph-chart-bar",
+      "text": ""
+    },
+    "cmd_dev_fix": {
+      "type": "command",
+      "name": "Багфикс",
+      "exec_script": "if hasattr(self, 'projector'):\n    prompt = self.projector.get_prompt('fix')\n    if prompt: self.send(prompt)\nelse:\n    self.send('❌ Ошибка: объект Projector не найден. Вернитесь в режим планирования и нажмите Старт.')",
+      "icon": "ph-wrench",
+      "text": ""
+    },
+    "cmd_dev_refactor": {
+      "type": "command",
+      "name": "Рефакторинг",
+      "exec_script": "if hasattr(self, 'projector'):\n    prompt = self.projector.get_prompt('refactor')\n    if prompt: self.send(prompt)\nelse:\n    self.send('❌ Ошибка: объект Projector не найден. Вернитесь в режим планирования и нажмите Старт.')",
+      "icon": "ph-broom",
+      "text": ""
     }
   }
 }
