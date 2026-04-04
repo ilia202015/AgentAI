@@ -175,46 +175,76 @@
       }
     },
     "cmd_planner_start": {
-      "type": "command",
       "name": "Старт",
-      "exec_script": "from projector import Projector\nprompt = \"Верни текущий подробный план строго в формате Python dict: {'blocks': [{'name': 'Название блока', 'steps': ['описание шага 1', 'описание шага 2']}]}\"\ntry:\n    plan_dict = self.ai_get(prompt, target_type=dict, max_retries=3)\n    self.projector = Projector(self, plan_dict)\n    self.set_preset('preset_developer')\n    self.send(\"✅ План успешно загружен в Projector. Режим автоматически переключен на 'Проектировщик: разработка'.\\nНажми 'Далее' для начала работы над первым шагом.\")\nexcept Exception as e:\n    self.send(f\"❌ Ошибка при извлечении плана: {e}\\nПопробуй еще раз или попроси меня переформатировать план.\")",
+      "text": "",
+      "type": "command",
       "icon": "ph-play-circle",
-      "text": ""
+      "gather_script": "",
+      "exec_script": "from projector import Projector\nprompt = \"Верни текущий подробный план строго в формате Python dict: {'blocks': [{'name': 'Название блока', 'steps': ['описание шага 1', 'описание шага 2']}]}\"\ntry:\n    plan_dict = self.ai_get(prompt, target_type=dict, clean_history=False)\n    self.projector = Projector(self, plan_dict)\n    self.set_preset('preset_developer')\n    result = \"✅ План успешно загружен в Projector. Режим автоматически переключен на 'Проектировщик: разработка'.\\ВАЖНО: НИЧЕГО НЕ ДЕЛАЙ БЕЗ ЯВНОЙ КОМАНДЫ\"\nexcept Exception as e:\n    result = f\"❌ Ошибка при извлечении плана: {e}\\n\"",
+      "fs_permissions": {
+        "global": "rwxld",
+        "paths": {}
+      }
     },
     "cmd_dev_next": {
-      "type": "command",
       "name": "Далее",
-      "exec_script": "if hasattr(self, 'projector'):\n    prompt = self.projector.get_prompt('next')\n    if prompt: self.send(prompt)\nelse:\n    self.send('❌ Ошибка: объект Projector не найден. Вернитесь в режим планирования и нажмите Старт.')",
+      "text": "",
+      "type": "command",
       "icon": "ph-arrow-right",
-      "text": ""
+      "gather_script": "",
+      "exec_script": "if hasattr(self, 'projector'):\n    result = self.projector.get_prompt('next')\nelse:\n    result = '❌ Ошибка: объект Projector не найден.'",
+      "fs_permissions": {
+        "global": "rwxld",
+        "paths": {}
+      }
     },
     "cmd_dev_find_bug": {
-      "type": "command",
       "name": "Поиск бага",
-      "exec_script": "if hasattr(self, 'projector'):\n    prompt = self.projector.get_prompt('find_bug')\n    if prompt: self.send(prompt)\nelse:\n    self.send('❌ Ошибка: объект Projector не найден. Вернитесь в режим планирования и нажмите Старт.')",
+      "text": "",
+      "type": "command",
       "icon": "ph-bug",
-      "text": ""
+      "gather_script": "",
+      "exec_script": "if hasattr(self, 'projector'):\n    result = self.projector.get_prompt('find_bug')\nelse:\n    result = '❌ Ошибка: объект Projector не найден.'",
+      "fs_permissions": {
+        "global": "rwxld",
+        "paths": {}
+      }
     },
     "cmd_dev_analyze": {
-      "type": "command",
       "name": "Анализ качества",
-      "exec_script": "if hasattr(self, 'projector'):\n    prompt = self.projector.get_prompt('analyze')\n    if prompt: self.send(prompt)\nelse:\n    self.send('❌ Ошибка: объект Projector не найден. Вернитесь в режим планирования и нажмите Старт.')",
+      "text": "",
+      "type": "command",
       "icon": "ph-chart-bar",
-      "text": ""
+      "gather_script": "",
+      "exec_script": "if hasattr(self, 'projector'):\n    result = self.projector.get_prompt('analyze')\nelse:\n    result = '❌ Ошибка: объект Projector не найден.'",
+      "fs_permissions": {
+        "global": "rwxld",
+        "paths": {}
+      }
     },
     "cmd_dev_fix": {
-      "type": "command",
       "name": "Багфикс",
-      "exec_script": "if hasattr(self, 'projector'):\n    prompt = self.projector.get_prompt('fix')\n    if prompt: self.send(prompt)\nelse:\n    self.send('❌ Ошибка: объект Projector не найден. Вернитесь в режим планирования и нажмите Старт.')",
+      "text": "",
+      "type": "command",
       "icon": "ph-wrench",
-      "text": ""
+      "gather_script": "",
+      "exec_script": "if hasattr(self, 'projector'):\n    result = self.projector.get_prompt('fix')\nelse:\n    result = '❌ Ошибка: объект Projector не найден.'",
+      "fs_permissions": {
+        "global": "rwxld",
+        "paths": {}
+      }
     },
     "cmd_dev_refactor": {
-      "type": "command",
       "name": "Рефакторинг",
-      "exec_script": "if hasattr(self, 'projector'):\n    prompt = self.projector.get_prompt('refactor')\n    if prompt: self.send(prompt)\nelse:\n    self.send('❌ Ошибка: объект Projector не найден. Вернитесь в режим планирования и нажмите Старт.')",
+      "text": "",
+      "type": "command",
       "icon": "ph-broom",
-      "text": ""
+      "gather_script": "",
+      "exec_script": "if hasattr(self, 'projector'):\n    result = self.projector.get_prompt('refactor')\nelse:\n    result = '❌ Ошибка: объект Projector не найден. Вернитесь в режим планирования и нажмите Старт.'",
+      "fs_permissions": {
+        "global": "rwxld",
+        "paths": {}
+      }
     }
   }
 }
