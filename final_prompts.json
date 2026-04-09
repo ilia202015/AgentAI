@@ -257,6 +257,18 @@
         "global": "rwxld",
         "paths": {}
       }
+    },
+    "cmd_dev_auto_project": {
+      "name": "Авто",
+      "text": "",
+      "type": "command",
+      "icon": "ph-magic-wand",
+      "gather_script": "",
+      "exec_script": "if hasattr(self, 'projector'):\n    result = self.projector.run_auto_project()\nelse:\n    result = '❌ Ошибка: объект Projector не найден.'",
+      "fs_permissions": {
+        "global": "rwxld",
+        "paths": {}
+      }
     }
   }
 }

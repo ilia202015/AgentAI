@@ -187,6 +187,7 @@
         "sandbox"
       ],
       "commands": [
+        "cmd_dev_auto_project",
         "cmd_dev_next",
         "cmd_dev_auto_block",
         "cmd_dev_find_bug",
