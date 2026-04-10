@@ -23,6 +23,23 @@ export const store = reactive({
     activePromptId: null,
     active_parameters: [], 
     
+    
+    // Computed Metrics
+    get totalInputTokens() {
+        return this.messages.reduce((maxVal, msg) => Math.max(maxVal, msg.metrics?.total_context || 0), 0);
+    },
+    get totalCachedTokens() {
+        return this.messages.reduce((maxVal, msg) => Math.max(maxVal, msg.metrics?.cached_tokens || 0), 0);
+    },
+    get totalInputTime() {
+        return this.messages.reduce((sum, msg) => sum + (msg.metrics?.input_time || 0), 0);
+    },
+    get totalOutputTokens() {
+        return this.messages.reduce((sum, msg) => sum + (msg.metrics?.output_tokens || 0), 0);
+    },
+    get totalOutputTime() {
+        return this.messages.reduce((sum, msg) => sum + (msg.metrics?.output_time || 0), 0);
+    },
     setMessages(msgs) {
         if (!msgs) {
             this.messages = [];
@@ -73,7 +90,7 @@ export const store = reactive({
                  if (!hasImages) items.push({ type: 'images', content: m.images });
             }
 
-            return { ...m, items: items };
+            return { ...m, items: items, metrics: m.metrics || null };
         });
     },
     

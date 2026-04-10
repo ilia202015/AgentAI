@@ -242,6 +242,16 @@ const MessageBubble = defineComponent({
                     <div v-else-if="item.type === 'images'" class="flex flex-wrap gap-2 my-1" :class="msg.role === 'user' ? 'justify-end' : 'justify-start'"><div v-for="(img, idx) in item.content" :key="idx" class="relative group/image"><img :src="img" @click="$emit('zoom', img)" class="max-w-[300px] max-h-[300px] rounded-lg border border-white/10 object-cover cursor-zoom-in hover:opacity-90 transition-opacity" /></div></div>
                     <div v-else-if="item.type === 'text' && (item.content.trim() || isEditing)" class="relative max-w-full overflow-hidden transition-all shadow-lg w-full group/text" :class="[msg.role === 'user' ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-2xl rounded-tr-sm px-5 py-3.5 border border-white/10 w-auto self-end' : 'bg-gray-800/40 backdrop-blur-md border border-white/5 text-gray-100 rounded-2xl rounded-tl-sm px-6 py-5']"><div v-if="msg.role === 'user'" class="whitespace-pre-wrap font-sans text-sm leading-relaxed">{{ item.content }}</div><MarkdownContent v-else :content="item.content" /><div v-if="msg.role === 'assistant' || msg.role === 'model'" class="absolute top-2 right-2 opacity-0 group-hover/text:opacity-100 transition-opacity flex gap-1"><button @click="copyToClipboard(item.content, $event)" class="p-1.5 text-gray-500 hover:text-white hover:bg-white/10 rounded transition" title="Копировать"><i class="ph ph-copy"></i></button></div></div>
                 </div>
+                <!-- Метрики сообщения -->
+                <div v-if="msg.metrics && (msg.metrics.input_tokens || msg.metrics.output_tokens)" class="flex mt-1 text-[10px] opacity-50 font-mono tracking-wide" :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
+                    <div v-if="msg.role === 'user' && msg.metrics.input_tokens" class="flex items-center gap-1.5">
+                        <i class="ph ph-arrow-circle-up"></i> Вход: {{ msg.metrics.input_tokens }} токенов <span class="mx-0.5">•</span> {{ msg.metrics.input_time ? msg.metrics.input_time.toFixed(2) : 0 }} сек
+                    </div>
+                    <div v-else-if="(msg.role === 'model' || msg.role === 'assistant') && msg.metrics.output_tokens" class="flex items-center gap-1.5">
+                        <i class="ph ph-arrow-circle-down"></i> Выход: {{ msg.metrics.output_tokens }} токенов <span class="mx-0.5">•</span> {{ msg.metrics.output_time ? msg.metrics.output_time.toFixed(2) : 0 }} сек
+                    </div>
+                </div>
+
             </div>
         </div>
     `,
@@ -329,6 +339,39 @@ export default {
 
             <div class="flex-1 overflow-y-auto px-2 md:px-0 pt-16 md:pt-6 pb-48 space-y-8 scroll-smooth custom-scrollbar" 
                  ref="messagesContainer" @scroll="handleScroll">
+
+                <!-- Дашборд статистики сессии -->
+                <div v-if="filteredMessages.length > 0 && (store.totalInputTokens > 0 || store.totalOutputTokens > 0)" 
+                     class="w-[95%] mx-auto grid gap-3 mt-2 mb-6 opacity-70 hover:opacity-100 transition-opacity"
+                     :class="store.totalCachedTokens > 0 ? 'grid-cols-3' : 'grid-cols-2'">
+                     
+                    <div class="bg-gray-800/30 backdrop-blur-md border border-white/5 rounded-xl p-3 flex flex-col items-center justify-center text-center shadow-inner">
+                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Суммарный вход</div>
+                        <div class="flex items-end gap-2 text-blue-400">
+                            <span class="text-xl font-mono leading-none">{{ store.totalInputTokens }}</span>
+                            <span class="text-[10px] text-gray-500 mb-0.5">токенов</span>
+                        </div>
+                        <div class="text-xs text-gray-400 mt-0.5"><i class="ph ph-clock"></i> {{ store.totalInputTime.toFixed(2) }} сек</div>
+                    </div>
+                    
+                    <div v-if="store.totalCachedTokens > 0" class="bg-gray-800/30 backdrop-blur-md border border-white/5 rounded-xl p-3 flex flex-col items-center justify-center text-center shadow-inner">
+                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Кешировано</div>
+                        <div class="flex items-end gap-2 text-purple-400">
+                            <span class="text-xl font-mono leading-none">{{ store.totalCachedTokens }}</span>
+                            <span class="text-[10px] text-gray-500 mb-0.5">токенов</span>
+                        </div>
+                        <div class="text-[9px] text-gray-500 mt-0.5 uppercase tracking-widest">Context Caching</div>
+                    </div>
+
+                    <div class="bg-gray-800/30 backdrop-blur-md border border-white/5 rounded-xl p-3 flex flex-col items-center justify-center text-center shadow-inner">
+                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Суммарный выход</div>
+                        <div class="flex items-end gap-2 text-emerald-400">
+                            <span class="text-xl font-mono leading-none">{{ store.totalOutputTokens }}</span>
+                            <span class="text-[10px] text-gray-500 mb-0.5">токенов</span>
+                        </div>
+                        <div class="text-xs text-gray-400 mt-0.5"><i class="ph ph-clock"></i> {{ store.totalOutputTime.toFixed(2) }} сек</div>
+                    </div>
+                </div>
                 
                 <div v-if="filteredMessages.length === 0" class="h-full flex flex-col items-center justify-center text-center opacity-0 animate-fade-in-up" style="animation-delay: 0.1s; opacity: 1">
                     <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-gray-800 to-gray-700 flex items-center justify-center mb-6 shadow-2xl border border-white/5">

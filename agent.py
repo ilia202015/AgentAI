@@ -1059,6 +1059,8 @@ class Chat:
 
                 config = self.get_generate_config()
 
+                self._current_request_start_time = time.time()
+
                 stream = self.client.models.generate_content_stream(
                     model=self.model,
                     contents=self.messages,
@@ -1068,16 +1070,15 @@ class Chat:
                 res = self._handle_stream(stream)
                 if res:
                     return res
-                # Если res is None, значит _handle_stream попросил ретрай (например, из-за 429 или сетевой ошибки)
+                # Если res is None, значит _handle_stream попросил ретрай
                 continue
 
             except Exception as e:
                 err_str = str(e)
-                # Список ошибок для повторной попытки на этапе создания стрима
                 retry_errors = [
-                    "429", "Resource has been exhausted", # Лимиты
-                    "500", "502", "503", "504",            # Ошибки сервера
-                    "EOF occurred in violation of protocol", # SSL/EOF
+                    "429", "Resource has been exhausted",
+                    "500", "502", "503", "504",
+                    "EOF occurred in violation of protocol",
                     "UNEXPECTED_EOF_WHILE_READING",
                     "RemoteProtocolError",
                     "ConnectError",
@@ -1088,7 +1089,6 @@ class Chat:
                 ]
                 
                 if any(msg.lower() in err_str.lower() for msg in retry_errors) and attempt < max_retries:
-                    # Пытаемся вытянуть точную задержку из ошибки
                     extracted_delay = self._extract_retry_delay(err_str)
                     wait_time = extracted_delay if extracted_delay is not None else 0.1
                     print(f"\n⚠️ Ошибка при создании соединения ({err_str[:50]}...). Попытка {attempt}/{max_retries}, жду {wait_time:.1f}с...")
@@ -1099,22 +1099,41 @@ class Chat:
                 self.print(f"\n❌ {error_msg}")
                 return error_msg
 
-
     def _handle_stream(self, stream):
         response_parts = []
         tool_calls_buffer = []
         full_response_text = ""
         
+        start_time = getattr(self, '_current_request_start_time', time.time())
+        first_chunk_time = None
+        prompt_tokens = 0
+        candidates_tokens = 0
+        cached_tokens = 0
+        
         try:
             for chunk in stream:
-                if not chunk.candidates or not chunk.candidates[0].content or not chunk.candidates[0].content.parts:
+                if first_chunk_time is None:
+                    first_chunk_time = time.time()
+                
+                try:
+                    usage = getattr(chunk, 'usage_metadata', None)
+                    if usage:
+                        p_count = getattr(usage, 'prompt_token_count', 0)
+                        c_count = getattr(usage, 'candidates_token_count', 0)
+                        cache_count = getattr(usage, 'cached_content_token_count', 0)
+                        if p_count: prompt_tokens = p_count
+                        if c_count: candidates_tokens = c_count
+                        if cache_count: cached_tokens = cache_count
+                except:
+                    pass
+                        
+                if not getattr(chunk, 'candidates', None) or not chunk.candidates[0].content or not getattr(chunk.candidates[0].content, 'parts', None):
                     continue
                 
                 for part in chunk.candidates[0].content.parts:
                     response_parts.append(part)
                     
-                    if part.text:
-                        # FIX: Безопасный доступ к thought
+                    if getattr(part, 'text', None):
                         is_thought = getattr(part, 'thought', False)
                         if is_thought:
                             if self.print_to_console:
@@ -1124,12 +1143,68 @@ class Chat:
                             self.print(part.text, flush=True, end='')
                             full_response_text += part.text
                     
-                    if part.function_call:
+                    if getattr(part, 'function_call', None):
                         tool_calls_buffer.append(part.function_call)
 
             self.print("")
             
-            self.messages.append(types.Content(role="model", parts=response_parts))
+            end_time = time.time()
+            if first_chunk_time is None:
+                first_chunk_time = end_time
+                
+            input_time = first_chunk_time - start_time
+            output_time = end_time - first_chunk_time
+            
+            model_msg = types.Content(role="model", parts=response_parts)
+            self.messages.append(model_msg)
+
+            # --- МЕТРИКИ ---
+            last_user = None
+            for m in reversed(self.messages[:-1]):
+                if getattr(m, 'role', '') == 'user':
+                    last_user = m
+                    break
+            
+            if last_user:
+                if not hasattr(last_user, '_metrics'):
+                    last_user._metrics = {}
+                
+                if prompt_tokens > 0:
+                    # Ищем предыдущий известный total_context
+                    prev_context = 0
+                    prev_output = 0
+                    
+                    # Идем по истории до текущего пользователя и ищем предыдущие метрики
+                    found_prev = False
+                    for m in reversed(self.messages[:-2]):
+                        if getattr(m, 'role', '') == 'user' and hasattr(m, '_metrics') and 'total_context' in m._metrics:
+                            prev_context = m._metrics['total_context']
+                            found_prev = True
+                        elif getattr(m, 'role', '') == 'model' and hasattr(m, '_metrics') and 'output_tokens' in m._metrics and not found_prev:
+                            # Собираем все выходные токены моделей, которые были МЕЖДУ предыдущим юзером и текущим
+                            prev_output += m._metrics['output_tokens']
+                            
+                        if found_prev:
+                            break
+                    
+                    delta = prompt_tokens - (prev_context + prev_output)
+                    msg_tokens = max(0, delta) if prev_context > 0 else prompt_tokens
+                    
+                    last_user._metrics['input_tokens'] = msg_tokens
+                    
+                    # Сохраняем сырые данные для глобальной суммы
+                    last_user._metrics['total_context'] = prompt_tokens
+                    if cached_tokens > 0:
+                        last_user._metrics['cached_tokens'] = cached_tokens
+
+                last_user._metrics['input_time'] = input_time
+            
+            if not hasattr(model_msg, '_metrics'):
+                model_msg._metrics = {}
+            if candidates_tokens > 0:
+                model_msg._metrics['output_tokens'] = candidates_tokens
+            model_msg._metrics['output_time'] = output_time
+            # -------------
 
             if tool_calls_buffer:
                 res = self._execute_tool_calls(tool_calls_buffer)
@@ -1142,7 +1217,6 @@ class Chat:
             e_trace = traceback.format_exc()
             err_str = str(e)
             
-            # Список ошибок для повторной попытки во время стрима
             retry_errors = [
                 "429", "Resource has been exhausted",
                 "500", "502", "503", "504",
@@ -1156,18 +1230,14 @@ class Chat:
             ]
 
             if any(msg.lower() in err_str.lower() for msg in retry_errors):
-                # Пытаемся вытянуть точную задержку из ошибки
                 extracted_delay = self._extract_retry_delay(err_str)
-                # Пытаемся вытянуть точную задержку из ошибки
                 wait_time = extracted_delay if extracted_delay is not None else 0.1
-
                 print(f"\n⚠️ Ошибка в процессе получения данных ({err_str[:50]}...). Ожидание {wait_time}с и повтор...")
                 time.sleep(wait_time + 1)
                 return None
             else:
                 self.print(f"\n❌ Ошибка обработки стрима: {e}\n{e_trace}")
                 return f"Ошибка обработки стрима: {e}"
-
 
     def _execute_tool_calls(self, tool_calls):
         import json

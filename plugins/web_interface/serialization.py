@@ -68,6 +68,10 @@ def serialize_message(msg, chat_id=None):
     elif thoughts_list: data["thoughts"] = "\n".join(thoughts_list)
     else: data["thoughts"] = ""
     data["tools"] = getattr(msg, "_web_tools", []) if hasattr(msg, "_web_tools") else []
+    
+    metrics = getattr(msg, "_metrics", None)
+    if metrics: data["metrics"] = metrics
+    
     return data
 
 def serialize_history_for_web(messages, chat_id=None):
@@ -114,6 +118,10 @@ def serialize_history_for_web(messages, chat_id=None):
         else: data["thoughts"] = ""
         
         data["tools"] = getattr(msg, "_web_tools", []) if hasattr(msg, "_web_tools") else []
+        
+        metrics = getattr(msg, "_metrics", None)
+        if metrics: data["metrics"] = metrics
+        
         history.append(data)
     return history
 
@@ -121,6 +129,7 @@ def deserialize_message(data):
     if not isinstance(data, dict): return data
     thoughts = data.get("thoughts", None)
     tools = data.get("tools", None)
+    metrics = data.get("metrics", None)
     parts = []
     if "parts" in data:
         for p in data["parts"]:
@@ -142,6 +151,7 @@ def deserialize_message(data):
     msg = types.Content(role=data.get("role", "user"), parts=parts)
     if thoughts: msg._web_thoughts = thoughts
     if tools: msg._web_tools = tools
+    if metrics: msg._metrics = metrics
     return msg
 
 def serialize_history(messages, chat_id=None):
