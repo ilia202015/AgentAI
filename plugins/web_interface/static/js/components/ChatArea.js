@@ -526,15 +526,27 @@ export default {
             const merged = [];
             
             for (const msg of raw) {
+                const hasText = msg.content && msg.content.trim();
+                const hasTextItems = msg.items && msg.items.some(i => i.type === 'text' && i.content.trim());
+                const hasImages = msg.images && msg.images.length > 0;
+                const hasTools = msg.items && msg.items.some(i => i.type === 'tool');
+                const hasParts = msg.parts && msg.parts.length > 0;
+                
                 if (msg.role === 'user') {
-                    const hasText = msg.content && msg.content.trim();
-                    const hasItems = msg.items && msg.items.some(i => i.type === 'text' && i.content.trim());
-                    const hasImages = msg.images && msg.images.length > 0;
-                    if (!hasText && !hasItems && !hasImages && !(msg.parts && msg.parts.length > 0)) continue;
+                    if (!hasText && !hasTextItems && !hasImages && !hasTools && !hasParts) continue;
                 }
 
                 const last = merged.length > 0 ? merged[merged.length - 1] : null;
                 const isAgent = role => role === 'assistant' || role === 'model';
+
+                // Склеиваем ответы инструментов от пользователя с предыдущим сообщением агента
+                if (msg.role === 'user' && last && isAgent(last.role)) {
+                    if (!hasText && !hasTextItems && !hasImages && hasTools) {
+                        if (!last.items) last.items = [];
+                        last.items.push(...msg.items.filter(i => i.type === 'tool'));
+                        continue;
+                    }
+                }
 
                 if (last && isAgent(last.role) && isAgent(msg.role)) {
                     if (msg.items) {
