@@ -29,7 +29,7 @@ export const store = reactive({
         return this.messages.reduce((maxVal, msg) => Math.max(maxVal, msg.metrics?.total_context || 0), 0);
     },
     get totalCachedTokens() {
-        return this.messages.reduce((maxVal, msg) => Math.max(maxVal, msg.metrics?.cached_tokens || 0), 0);
+        return this.messages.reduce((sum, msg) => sum + (msg.metrics?.cached_tokens || 0), 0);
     },
     get totalUncachedTokens() {
         return this.messages.reduce((sum, msg) => sum + (msg.metrics?.uncached_tokens || 0), 0);
