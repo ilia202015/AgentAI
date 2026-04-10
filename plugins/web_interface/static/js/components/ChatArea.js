@@ -346,24 +346,42 @@ export default {
                 <!-- Дашборд статистики сессии -->
                 <div v-if="filteredMessages.length > 0 && (store.totalInputTokens > 0 || store.totalOutputTokens > 0)" 
                      class="w-[95%] mx-auto grid gap-3 mt-2 mb-6 opacity-70 hover:opacity-100 transition-opacity"
-                     :class="store.totalCachedTokens > 0 ? 'grid-cols-3' : 'grid-cols-2'">
+                     :class="store.totalCachedTokens > 0 ? 'grid-cols-5' : 'grid-cols-4'">
                      
                     <div class="bg-gray-800/30 backdrop-blur-md border border-white/5 rounded-xl p-3 flex flex-col items-center justify-center text-center shadow-inner">
-                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Суммарный вход</div>
-                        <div class="flex items-end gap-2 text-blue-400">
+                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Текущий контекст</div>
+                        <div class="flex items-end gap-2 text-orange-400">
+                            <span class="text-xl font-mono leading-none">{{ store.currentContextTokens }}</span>
+                            <span class="text-[10px] text-gray-500 mb-0.5">токенов</span>
+                        </div>
+                        <div class="text-[9px] text-gray-500 mt-0.5 uppercase tracking-widest">В окне модели</div>
+                    </div>
+
+                    <div class="bg-gray-800/30 backdrop-blur-md border border-white/5 rounded-xl p-3 flex flex-col items-center justify-center text-center shadow-inner">
+                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Пик контекста</div>
+                        <div class="flex items-end gap-2 text-indigo-400">
                             <span class="text-xl font-mono leading-none">{{ store.totalInputTokens }}</span>
+                            <span class="text-[10px] text-gray-500 mb-0.5">токенов</span>
+                        </div>
+                        <div class="text-[9px] text-gray-500 mt-0.5 uppercase tracking-widest">Максимальный объем</div>
+                    </div>
+
+                    <div class="bg-gray-800/30 backdrop-blur-md border border-white/5 rounded-xl p-3 flex flex-col items-center justify-center text-center shadow-inner" title="Суммарная нагрузка на API без учета кеша">
+                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Нагрузка API</div>
+                        <div class="flex items-end gap-2 text-blue-400">
+                            <span class="text-xl font-mono leading-none">{{ store.totalUncachedTokens }}</span>
                             <span class="text-[10px] text-gray-500 mb-0.5">токенов</span>
                         </div>
                         <div class="text-xs text-gray-400 mt-0.5"><i class="ph ph-clock"></i> {{ store.totalInputTime.toFixed(2) }} сек</div>
                     </div>
                     
                     <div v-if="store.totalCachedTokens > 0" class="bg-gray-800/30 backdrop-blur-md border border-white/5 rounded-xl p-3 flex flex-col items-center justify-center text-center shadow-inner">
-                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Кешировано</div>
+                        <div class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Кеш контекста</div>
                         <div class="flex items-end gap-2 text-purple-400">
                             <span class="text-xl font-mono leading-none">{{ store.totalCachedTokens }}</span>
                             <span class="text-[10px] text-gray-500 mb-0.5">токенов</span>
                         </div>
-                        <div class="text-[9px] text-gray-500 mt-0.5 uppercase tracking-widest">Context Caching</div>
+                        <div class="text-[9px] text-gray-500 mt-0.5 uppercase tracking-widest">Суммарный кеш</div>
                     </div>
 
                     <div class="bg-gray-800/30 backdrop-blur-md border border-white/5 rounded-xl p-3 flex flex-col items-center justify-center text-center shadow-inner">

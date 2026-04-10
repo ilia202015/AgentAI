@@ -43,6 +43,31 @@ export const store = reactive({
     get totalOutputTime() {
         return this.messages.reduce((sum, msg) => sum + (msg.metrics?.output_time || 0), 0);
     },
+    get currentContextTokens() {
+        if (this.messages.length === 0) return 0;
+        
+        let lastUserContext = 0;
+        for (let i = this.messages.length - 1; i >= 0; i--) {
+            if (this.messages[i].role === 'user' && this.messages[i].metrics?.total_context) {
+                lastUserContext = this.messages[i].metrics.total_context;
+                break;
+            }
+        }
+        
+        let lastModelOutput = 0;
+        for (let i = this.messages.length - 1; i >= 0; i--) {
+            if (this.messages[i].role === 'model' || this.messages[i].role === 'assistant') {
+                if (this.messages[i].metrics?.output_tokens) {
+                    lastModelOutput = this.messages[i].metrics.output_tokens;
+                }
+                break;
+            } else if (this.messages[i].role === 'user') {
+                break;
+            }
+        }
+        
+        return lastUserContext + lastModelOutput;
+    },
     setMessages(msgs) {
         if (!msgs) {
             this.messages = [];
