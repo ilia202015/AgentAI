@@ -1170,18 +1170,16 @@ class Chat:
                     last_user._metrics = {}
                 
                 if prompt_tokens > 0:
-                    # Ищем предыдущий известный total_context
+                    # 1. Считаем дельту (вес только текущего сообщения)
                     prev_context = 0
                     prev_output = 0
                     
-                    # Идем по истории до текущего пользователя и ищем предыдущие метрики
                     found_prev = False
                     for m in reversed(self.messages[:-2]):
                         if getattr(m, 'role', '') == 'user' and hasattr(m, '_metrics') and 'total_context' in m._metrics:
                             prev_context = m._metrics['total_context']
                             found_prev = True
                         elif getattr(m, 'role', '') == 'model' and hasattr(m, '_metrics') and 'output_tokens' in m._metrics and not found_prev:
-                            # Собираем все выходные токены моделей, которые были МЕЖДУ предыдущим юзером и текущим
                             prev_output += m._metrics['output_tokens']
                             
                         if found_prev:
@@ -1192,10 +1190,15 @@ class Chat:
                     
                     last_user._metrics['input_tokens'] = msg_tokens
                     
-                    # Сохраняем сырые данные для глобальной суммы
+                    # 2. Сохраняем сырые данные для глобальной суммы
                     last_user._metrics['total_context'] = prompt_tokens
+                    
+                    # 3. Кеш и оплачиваемые токены (uncached)
                     if cached_tokens > 0:
                         last_user._metrics['cached_tokens'] = cached_tokens
+                        last_user._metrics['uncached_tokens'] = prompt_tokens - cached_tokens
+                    else:
+                        last_user._metrics['uncached_tokens'] = prompt_tokens
 
                 last_user._metrics['input_time'] = input_time
             

@@ -31,6 +31,9 @@ export const store = reactive({
     get totalCachedTokens() {
         return this.messages.reduce((maxVal, msg) => Math.max(maxVal, msg.metrics?.cached_tokens || 0), 0);
     },
+    get totalUncachedTokens() {
+        return this.messages.reduce((sum, msg) => sum + (msg.metrics?.uncached_tokens || 0), 0);
+    },
     get totalInputTime() {
         return this.messages.reduce((sum, msg) => sum + (msg.metrics?.input_time || 0), 0);
     },
