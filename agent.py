@@ -337,16 +337,18 @@ class Chat:
             self.search_engine_id = f.read().strip()
 
     def _get_tools_dicts(self):
+        tool_names = []
         tools_dict_required = {}
         tools_dict_additional = {}
         for tool in self.tools:
+            tool_names.append(tool["function"]["name"])
             tools_dict_required[tool["function"]["name"]] = tool["function"]["parameters"]["required"]
             for parameter in tool["function"]["parameters"]["properties"].keys():
                 if parameter not in tool["function"]["parameters"]["required"]:
                     if tool["function"]["name"] not in tools_dict_additional:
                         tools_dict_additional[tool["function"]["name"]] = []
                     tools_dict_additional[tool["function"]["name"]].append(parameter)
-        return tools_dict_required, tools_dict_additional
+        return tools_dict_required, tools_dict_additional, tool_names
 
     def _extract_retry_delay(self, err_str):
         import re, datetime
@@ -894,9 +896,12 @@ class Chat:
         import json
         import copy
         
-        tools_dict_required, tools_dict_additional = self._get_tools_dicts()
+        tools_dict_required, tools_dict_additional, tool_names = self._get_tools_dicts()
         required = tools_dict_required.get(name, [])
         additional = tools_dict_additional.get(name, [])
+
+        if name not in tool_names:
+            return "Ошибка: неправильное название инструмента или инструмент не найден"
 
         # Логирование запроса
         if name == 'python' and 'code' in tool_args:

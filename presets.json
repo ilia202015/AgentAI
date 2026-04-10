@@ -166,7 +166,8 @@
         "cmd_planner_start"
       ],
       "blocked": [
-        "chat"
+        "chat",
+        "python"
       ],
       "settings": {},
       "fs_permissions": {
