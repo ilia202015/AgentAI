@@ -4,6 +4,7 @@ WEB_PROMPT_MARKER_START = "### FINAL_PRO" + "MPT_START ###"
 WEB_PROMPT_MARKER_END = "### FINAL_PRO" + "MPT_END ###"
 
 
+import dill
 from pathlib import Path
 import contextvars
 
@@ -515,12 +516,20 @@ class Chat:
             del state['shell_session']
             
         # Фильтруем local_env от опасных объектов (файлы, модули), чтобы dill не ломал систему
+                # Универсальный фильтр: оставляем только то, что реально может быть сериализовано
         if 'local_env' in state:
+            import pickle
             safe_env = {}
             for k, v in state['local_env'].items():
                 if isinstance(v, io.IOBase) or isinstance(v, types.ModuleType):
                     continue
-                safe_env[k] = v
+                try:
+                    # Пробуем сериализовать объект в памяти
+                    dill.dumps(v)
+                    safe_env[k] = v
+                except Exception:
+                    # Если не пиклится (файлы, локи, генераторы и т.д.) — пропускаем
+                    continue
             state['local_env'] = safe_env
             
         return state
