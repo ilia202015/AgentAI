@@ -283,16 +283,41 @@ const MessageBubble = defineComponent({
                 if (props.msg.images) rawItems.push({ type: 'images', content: props.msg.images });
             }
             const res = [];
+            const usedResults = new Set();
+            
             for (let i = 0; i < rawItems.length; i++) {
                 const item = rawItems[i];
-                if (item.type === 'tool' && item.title && item.title.startsWith("Запрос") && i + 1 < rawItems.length) {
-                    const next = rawItems[i+1];
-                    if (next.type === 'tool' && next.title && (next.title === `Результат ${item.title.substring(7).trim()}` || next.title.startsWith('Результат'))) {
-                        res.push({ type: 'pair', request: item, result: next });
-                        i++; continue;
+                
+                if (item.type === 'tool' && item.title && item.title.startsWith("Запрос")) {
+                    const toolName = item.title.substring(7).trim();
+                    let foundPair = false;
+                    
+                    // Ищем соответствующий результат впереди по массиву
+                    for (let j = i + 1; j < rawItems.length; j++) {
+                        const candidate = rawItems[j];
+                        if (candidate.type === 'tool' && 
+                            candidate.title && 
+                            candidate.title.startsWith("Результат") &&
+                            !usedResults.has(j)) {
+                            
+                            const resName = candidate.title.substring(10).trim();
+                            if (resName === toolName || !resName) {
+                                res.push({ type: 'pair', request: item, result: candidate });
+                                usedResults.add(j);
+                                foundPair = true;
+                                break;
+                            }
+                        }
                     }
+                    
+                    if (!foundPair) res.push(item);
+                } 
+                else if (item.type === 'tool' && item.title && item.title.startsWith("Результат")) {
+                    if (!usedResults.has(i)) res.push(item); // Одиночный результат, для которого не нашлось запроса
+                } 
+                else {
+                    res.push(item);
                 }
-                res.push(item);
             }
             return res;
         });

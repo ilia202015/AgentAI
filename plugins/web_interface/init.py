@@ -102,14 +102,8 @@ def web_print_thought(self, message, count_tab=-1, **kwargs):
 def web_print_code(self, language, code, count_tab=-1, max_code_display_lines=6):
     tool_data = {"title": str(language), "content": str(code)}
     
-    # Direct attach to last message
-    if self.messages:
-        last_msg = self.messages[-1]
-        if getattr(last_msg, 'role', '') == 'model':
-            if not hasattr(last_msg, '_web_tools'):
-                last_msg._web_tools = []
-            last_msg._web_tools.append(tool_data)
-    
+    # Отправляем только по вебсокету для live-отображения.
+    # В историю инструмент попадет автоматически через parts (function_call/response)
     self.web_emit("tool", tool_data)
 
     # Console Output (Logic from agent.py)

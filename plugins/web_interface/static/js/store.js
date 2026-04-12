@@ -81,9 +81,7 @@ export const store = reactive({
             
             if (m.thoughts) items.push({ type: 'thought', content: m.thoughts });
             
-            if (m.tools && Array.isArray(m.tools)) {
-                m.tools.forEach(t => items.push({ type: 'tool', ...t }));
-            }
+
             
             if (m.parts && Array.isArray(m.parts)) {
                 m.parts.forEach(p => {
@@ -93,17 +91,35 @@ export const store = reactive({
                         else items.push({ type: 'text', content: p.text });
                     } else if (p.image_url) {
                         items.push({ type: 'images', content: [p.image_url] });
-                    } else if (p.function_call) {
+                    } else if (p.function_call || p.functionCall) {
+                        const call = p.function_call || p.functionCall;
                          items.push({ 
                             type: 'tool', 
-                            title: `Запрос ${p.function_call.name}`, 
-                            content: typeof p.function_call.args === 'string' ? p.function_call.args : JSON.stringify(p.function_call.args, null, 2)
+                            title: `Запрос ${call.name}`, 
+                            content: typeof call.args === 'string' ? call.args : JSON.stringify(call.args, null, 2)
                         });
-                    } else if (p.function_response) {
+                    } else if (p.function_response || p.functionResponse) {
+                        const resp = p.function_response || p.functionResponse;
+                        let resContent = resp.response;
+                        
+                        // Извлекаем обертку {"result": ...} от agent.py
+                        if (resContent && typeof resContent === 'object' && 'result' in resContent) {
+                            resContent = resContent.result;
+                        }
+                        
+                        // Если внутри лежит JSON-строка (как от shell_tool), парсим её для красивого отображения
+                        if (typeof resContent === 'string') {
+                            try { resContent = JSON.stringify(JSON.parse(resContent), null, 2); } catch(e) {}
+                        } else if (typeof resContent === 'object') {
+                            resContent = JSON.stringify(resContent, null, 2);
+                        } else {
+                            resContent = String(resContent);
+                        }
+
                         items.push({ 
                             type: 'tool', 
-                            title: `Результат ${p.function_response.name}`, 
-                            content: typeof p.function_response.response === 'string' ? p.function_response.response : JSON.stringify(p.function_response.response, null, 2)
+                            title: `Результат ${resp.name}`, 
+                            content: resContent
                         });
                     }
                 });
