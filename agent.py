@@ -504,17 +504,25 @@ class Chat:
             self.output_mode = old_mode
 
     def __getstate__(self):
+        import io
+        import types
         state = self.__dict__.copy()
         # Удаляем несериализуемые объекты
-        # client: содержит локи и сетевые соединения
         if 'client' in state:
             del state['client']
         
         if 'shell_session' in state:
             del state['shell_session']
-        
-        # local_env оставляем (по требованию), 
-        # но ответственность за его содержимое лежит на пользователе.
+            
+        # Фильтруем local_env от опасных объектов (файлы, модули), чтобы dill не ломал систему
+        if 'local_env' in state:
+            safe_env = {}
+            for k, v in state['local_env'].items():
+                if isinstance(v, io.IOBase) or isinstance(v, types.ModuleType):
+                    continue
+                safe_env[k] = v
+            state['local_env'] = safe_env
+            
         return state
 
     def __setstate__(self, state):
