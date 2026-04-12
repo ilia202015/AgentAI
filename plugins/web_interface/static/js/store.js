@@ -93,10 +93,21 @@ export const store = reactive({
                         items.push({ type: 'images', content: [p.image_url] });
                     } else if (p.function_call || p.functionCall) {
                         const call = p.function_call || p.functionCall;
+                        let reqContent = call.args;
+                        if (typeof reqContent === 'object' && reqContent !== null) {
+                            // Если это python и там есть code, показываем чистый код, а не JSON
+                            if (call.name === 'python' && reqContent.code) {
+                                reqContent = reqContent.code;
+                            } else if (call.name === 'shell' && reqContent.input) {
+                                reqContent = reqContent.input;
+                            } else {
+                                reqContent = JSON.stringify(reqContent, null, 2);
+                            }
+                        }
                          items.push({ 
                             type: 'tool', 
                             title: `Запрос ${call.name}`, 
-                            content: typeof call.args === 'string' ? call.args : JSON.stringify(call.args, null, 2)
+                            content: reqContent
                         });
                     } else if (p.function_response || p.functionResponse) {
                         const resp = p.function_response || p.functionResponse;
