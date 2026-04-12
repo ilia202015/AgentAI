@@ -107,7 +107,8 @@ export const store = reactive({
                          items.push({ 
                             type: 'tool', 
                             title: `Запрос ${call.name}`, 
-                            content: reqContent
+                            content: reqContent,
+                            _msgMetrics: m.metrics
                         });
                     } else if (p.function_response || p.functionResponse) {
                         const resp = p.function_response || p.functionResponse;
@@ -130,7 +131,8 @@ export const store = reactive({
                         items.push({ 
                             type: 'tool', 
                             title: `Результат ${resp.name}`, 
-                            content: resContent
+                            content: resContent,
+                            _msgMetrics: m.metrics
                         });
                     }
                 });

@@ -277,10 +277,10 @@ const MessageBubble = defineComponent({
                 if (props.msg.thoughts) rawItems.push({ type: 'thought', content: props.msg.thoughts });
                 if (props.msg.parts) {
                     props.msg.parts.forEach(part => {
-                        if (part.text) rawItems.push({ type: 'text', content: part.text });
-                        else if (part.image_url) rawItems.push({ type: 'images', content: [part.image_url] });
-                        else if (part.function_call) rawItems.push({ type: 'tool', title: `Запрос ${part.function_call.name}`, content: JSON.stringify(part.function_call.args, null, 2) });
-                        else if (part.function_response) rawItems.push({ type: 'tool', title: `Результат ${part.function_response.name}`, content: JSON.stringify(part.function_response.response, null, 2) });
+                        if (part.text) rawItems.push({ type: 'text', content: part.text, _msgMetrics: props.msg.metrics });
+                        else if (part.image_url) rawItems.push({ type: 'images', content: [part.image_url], _msgMetrics: props.msg.metrics });
+                        else if (part.function_call) rawItems.push({ type: 'tool', title: `Запрос ${part.function_call.name}`, content: JSON.stringify(part.function_call.args, null, 2), _msgMetrics: props.msg.metrics });
+                        else if (part.function_response) rawItems.push({ type: 'tool', title: `Результат ${part.function_response.name}`, content: JSON.stringify(part.function_response.response, null, 2), _msgMetrics: props.msg.metrics });
                     });
                 }
                 if (rawItems.length === 0 && props.msg.content) rawItems.push({ type: 'text', content: props.msg.content });
