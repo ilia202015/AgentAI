@@ -79,6 +79,29 @@ const App = {
                         if (store.currentChatId === payload.chatId) {
                             if (payload.type === 'finish') {
                                 store.isThinking = false;
+                                if (payload.data && typeof payload.data === 'object') {
+                                    let foundUser = false, foundModel = false;
+                                    for (let i = store.messages.length - 1; i >= 0; i--) {
+                                        if (!foundModel && (store.messages[i].role === 'model' || store.messages[i].role === 'assistant')) {
+                                            if (payload.data.model_metrics) {
+                                                store.messages[i].metrics = payload.data.model_metrics;
+                                                if (store.messages[i].items) {
+                                                    store.messages[i].items.forEach(it => { it._msgMetrics = payload.data.model_metrics; });
+                                                }
+                                            }
+                                            foundModel = true;
+                                        } else if (!foundUser && store.messages[i].role === 'user') {
+                                            if (payload.data.user_metrics) {
+                                                store.messages[i].metrics = payload.data.user_metrics;
+                                                if (store.messages[i].items) {
+                                                    store.messages[i].items.forEach(it => { it._msgMetrics = payload.data.user_metrics; });
+                                                }
+                                            }
+                                            foundUser = true;
+                                        }
+                                        if (foundUser && foundModel) break;
+                                    }
+                                }
                             } else if (payload.type !== 'notification') {
                                 store.appendChunk(payload);
                             }

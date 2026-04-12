@@ -163,7 +163,22 @@ def web_send(self, messages):
         if not is_locked:
             self.busy_depth -= 1
             if self.busy_depth == 0:
-                self.web_emit("finish", "done")
+                metrics_data = {}
+                try:
+                    last_user = None
+                    last_model = None
+                    for m in reversed(self.messages):
+                        if getattr(m, 'role', '') == 'user' and not last_user:
+                            last_user = getattr(m, '_metrics', None)
+                        elif getattr(m, 'role', '') in ('model', 'assistant') and not last_model:
+                            last_model = getattr(m, '_metrics', None)
+                        if last_user and last_model: break
+                    
+                    if last_user: metrics_data['user_metrics'] = last_user
+                    if last_model: metrics_data['model_metrics'] = last_model
+                except Exception as e: pass
+                
+                self.web_emit("finish", metrics_data)
 
 def web_handle_stream(self, stream):
     cid = getattr(self, "id", None)
