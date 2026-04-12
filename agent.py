@@ -1207,6 +1207,7 @@ class Chat:
             if candidates_tokens > 0:
                 model_msg._metrics['output_tokens'] = candidates_tokens
             model_msg._metrics['output_time'] = output_time
+            model_msg._metrics['input_time'] = input_time
             # -------------
 
             if tool_calls_buffer:

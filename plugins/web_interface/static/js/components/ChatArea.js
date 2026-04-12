@@ -335,7 +335,8 @@ const MessageBubble = defineComponent({
                 const formatToolMetrics = (metrics, type) => {
             if (!metrics) return '';
             if (type === 'output' && metrics.output_tokens !== undefined) {
-                const time = metrics.output_time ? ` • ${metrics.output_time.toFixed(2)} сек` : '';
+                const timeVal = (metrics.output_time || 0) + (metrics.input_time || 0);
+                const time = timeVal > 0 ? ` • ${timeVal.toFixed(2)} сек` : '';
                 return `<span class="text-[10px] text-gray-500 font-normal ml-2 tracking-wide opacity-80">(Выход: ${metrics.output_tokens} токенов${time})</span>`;
             }
             if (type === 'input' && metrics.input_tokens !== undefined) {
