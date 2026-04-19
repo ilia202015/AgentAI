@@ -120,13 +120,14 @@ async function handleCommand(commandData) {
         }
 
         if (commandData.action === "navigate") {
-            await chrome.tabs.update(targetTabId, { url: commandData.url, active: true });
+            let newTab = await chrome.tabs.create({ url: commandData.url, active: true });
+            targetTabId = newTab.id;
             await new Promise(r => {
                 let l = (id, info) => { if (id === targetTabId && info.status === 'complete') { chrome.tabs.onUpdated.removeListener(l); r(); } };
                 chrome.tabs.onUpdated.addListener(l);
                 setTimeout(() => { chrome.tabs.onUpdated.removeListener(l); r(); }, 15000);
             });
-            result.message = "Navigated";
+            result.message = "Opened in new tab";
         } else if (commandData.action === "execute_actions") {
             await attachDebugger(targetTabId);
             try {
@@ -197,8 +198,39 @@ async function handleCommand(commandData) {
                 result.data = injection[0].result;
                 result.message = "DOM captured";
             } else {
-                throw new Error("Injection failed");
+                throw new Error("Injection failed (get_dom)");
             }
+        } else if (commandData.action === "get_raw_html") {
+            let injection = await chrome.scripting.executeScript({
+                target: { tabId: targetTabId },
+                func: () => document.documentElement.outerHTML
+            });
+            if (injection && injection[0]) {
+                result.data = injection[0].result;
+                result.message = "HTML captured";
+            } else {
+                throw new Error("Injection failed (get_raw_html)");
+            }
+        } else if (commandData.action === "execute_script") {
+            let injection = await chrome.scripting.executeScript({
+                target: { tabId: targetTabId },
+                func: (code) => {
+                    try {
+                        return { success: true, result: eval(code) };
+                    } catch (e) {
+                        return { success: false, error: e.message };
+                    }
+                },
+                args: [commandData.script]
+            });
+            if (injection && injection[0] && injection[0].result) {
+                result.data = injection[0].result;
+                result.message = "Script executed";
+            } else {
+                throw new Error("Injection failed (execute_script)");
+            }
+        } else {
+            throw new Error("Unknown action: " + commandData.action);
         }
     } catch (e) { result = { status: "error", message: e.message }; }
     result.message_id = msgId;

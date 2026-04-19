@@ -41,6 +41,17 @@ def browser_get_dom_tool(self):
     res = bridge.send_command({"action": "get_dom"}, timeout=15)
     return json.dumps(res, ensure_ascii=False)
 
+
+def browser_get_raw_html_tool(self):
+    bridge = get_bridge()
+    res = bridge.send_command({"action": "get_raw_html"}, timeout=15)
+    return json.dumps(res, ensure_ascii=False)
+
+def browser_execute_js_tool(self, script):
+    bridge = get_bridge()
+    res = bridge.send_command({"action": "execute_script", "script": script}, timeout=20)
+    return json.dumps(res, ensure_ascii=False)
+
 def main(chat, settings):
     bridge = get_bridge()
     bridge.init_bridge()
@@ -48,11 +59,16 @@ def main(chat, settings):
     chat.browser_open_tool = types.MethodType(browser_open_tool, chat)
     chat.browser_actions_tool = types.MethodType(browser_actions_tool, chat)
     chat.browser_get_dom_tool = types.MethodType(browser_get_dom_tool, chat)
+    chat.browser_get_raw_html_tool = types.MethodType(browser_get_raw_html_tool, chat)
+    chat.browser_execute_js_tool = types.MethodType(browser_execute_js_tool, chat)
+
     
+    
+    # Описания берутся из chat.prompts (загружены start.py из папки prompts/)
     browser_open_schema = {
         "function": {
             "name": "browser_open",
-            "description": "Открывает указанный URL в браузере и возвращает актуальный DOM или статус.",
+            "description": chat.prompts.get("browser_open", "Открывает URL"),
             "parameters": {
                 "type": "OBJECT",
                 "properties": { "url": { "type": "STRING" } },
@@ -64,7 +80,7 @@ def main(chat, settings):
     browser_actions_schema = {
         "function": {
             "name": "browser_actions",
-            "description": "Выполняет действия в браузере через CDP. Поддерживает click, type, press, search (поиск по селектору), read (чтение текста).",
+            "description": chat.prompts.get("browser_actions", "Действия в браузере"),
             "parameters": {
                 "type": "OBJECT",
                 "properties": { "actions": { "type": "STRING", "description": 'JSON массив действий. Пример: [{"action": "click", "selector": "#id"}, {"action": "read", "selector": ".class"}, {"action": "search", "query": "div.answer"}]' } },
@@ -73,21 +89,43 @@ def main(chat, settings):
         }
     }
     
-    chat.tools = [t for t in chat.tools if t["function"]["name"] not in ["browser_open", "browser_actions", "browser_get_dom"]]
-    chat.tools.append(browser_open_schema)
-    chat.tools.append(browser_actions_schema)
     browser_get_dom_schema = {
         "function": {
             "name": "browser_get_dom",
-            "description": "Возвращает текущий DOM дерева и список интерактивных элементов со страницы (теперь включая id и class).",
+            "description": chat.prompts.get("browser_get_dom", "Получить DOM"),
+            "parameters": { "type": "OBJECT", "properties": {}, "required": [] }
+        }
+    }
+    
+    browser_get_raw_html_schema = {
+        "function": {
+            "name": "browser_get_raw_html",
+            "description": chat.prompts.get("browser_get_raw_html", "Получить RAW HTML"),
+            "parameters": { "type": "OBJECT", "properties": {}, "required": [] }
+        }
+    }
+    
+    browser_execute_js_schema = {
+        "function": {
+            "name": "browser_execute_js",
+            "description": chat.prompts.get("browser_execute_js", "Выполнить JS"),
             "parameters": {
                 "type": "OBJECT",
-                "properties": {},
-                "required": []
+                "properties": { "script": { "type": "STRING", "description": "JS код для выполнения" } },
+                "required": ["script"]
             }
         }
     }
-    chat.tools.append(browser_get_dom_schema)
-        
-    print("[browser_use] Инициализирован безопасный бэкенд (Threaded Server, порт 8085) с поддержкой search и read")
+
+    # Удаляем старые версии инструментов если они были (для чистоты при перезагрузках)
+    chat.tools = [t for t in chat.tools if t["function"]["name"] not in ["browser_open", "browser_actions", "browser_get_dom", "browser_get_raw_html", "browser_execute_js"]]
+    
+    chat.tools.extend([
+        browser_open_schema, 
+        browser_actions_schema, 
+        browser_get_dom_schema, 
+        browser_get_raw_html_schema, 
+        browser_execute_js_schema
+    ])
+
     return chat
