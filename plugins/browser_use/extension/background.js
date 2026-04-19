@@ -38,14 +38,16 @@ async function detachDebugger(tabId) {
 }
 
 async function executeAction(tabId, action) {
+    let result = null;
     if (action.action === "click") {
         let exp = `
             (() => {
                 let el = null;
-                if ("${action.selector}".startsWith("//")) {
-                    el = document.evaluate("${action.selector}", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+                const sel = "${action.selector}";
+                if (sel.startsWith("//")) {
+                    el = document.evaluate(sel, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
                 } else {
-                    el = document.querySelector("${action.selector}");
+                    el = document.querySelector(sel);
                 }
                 if (!el) return null;
                 el.scrollIntoView({block: 'center', behavior: 'instant'});
@@ -66,8 +68,39 @@ async function executeAction(tabId, action) {
     } else if (action.action === "press") {
          await sendCDP(tabId, "Input.dispatchKeyEvent", { type: "keyDown", commands: [action.key] });
          await sendCDP(tabId, "Input.dispatchKeyEvent", { type: "keyUp", commands: [action.key] });
+    } else if (action.action === "search") {
+        let query = action.query || action.selector;
+        let exp = `
+            (() => {
+                const results = [];
+                const selector = "${query}";
+                const elements = document.querySelectorAll(selector);
+                elements.forEach(el => {
+                    results.push({
+                        tag: el.tagName.toLowerCase(),
+                        id: el.id,
+                        class: el.className,
+                        text: el.innerText.substring(0, 100),
+                        html: el.outerHTML.substring(0, 200)
+                    });
+                });
+                return results;
+            })()
+        `;
+        let evalRes = await sendCDP(tabId, "Runtime.evaluate", { expression: exp, returnByValue: true });
+        result = evalRes.result ? evalRes.result.value : [];
+    } else if (action.action === "read") {
+        let exp = `
+            (() => {
+                let el = document.querySelector("${action.selector}");
+                return el ? el.innerText : "Element not found";
+            })()
+        `;
+        let evalRes = await sendCDP(tabId, "Runtime.evaluate", { expression: exp, returnByValue: true });
+        result = evalRes.result ? evalRes.result.value : "Error reading";
     }
     await new Promise(r => setTimeout(r, 300));
+    return result;
 }
 
 async function handleCommand(commandData) {
@@ -97,8 +130,13 @@ async function handleCommand(commandData) {
         } else if (commandData.action === "execute_actions") {
             await attachDebugger(targetTabId);
             try {
-                for (let a of commandData.actions) await executeAction(targetTabId, a);
+                let results = [];
+                for (let a of commandData.actions) {
+                    let actionRes = await executeAction(targetTabId, a);
+                    results.push(actionRes);
+                }
                 result.message = "Done";
+                result.results = results;
             } finally { await detachDebugger(targetTabId); }
         } else if (commandData.action === "get_dom") {
             let injection = await chrome.scripting.executeScript({
@@ -126,6 +164,8 @@ async function handleCommand(commandData) {
                             return {
                                 tag: el.tagName.toLowerCase(),
                                 text: (el.innerText || el.value || el.getAttribute('aria-label') || "").trim().substring(0, 100),
+                                id: el.id,
+                                class: el.className,
                                 visible: rect.width > 0 && rect.height > 0
                             };
                         }).filter(e => e.visible);

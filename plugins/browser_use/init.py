@@ -6,7 +6,6 @@ import sys
 import importlib.util
 
 def get_bridge():
-    # Пытаемся найти уже загруженный модуль или загружаем заново
     if "bridge_mod" in sys.modules:
         return sys.modules["bridge_mod"]
     
@@ -65,22 +64,22 @@ def main(chat, settings):
     browser_actions_schema = {
         "function": {
             "name": "browser_actions",
-            "description": "Выполняет действия в браузере через CDP.",
+            "description": "Выполняет действия в браузере через CDP. Поддерживает click, type, press, search (поиск по селектору), read (чтение текста).",
             "parameters": {
                 "type": "OBJECT",
-                "properties": { "actions": { "type": "STRING" } },
+                "properties": { "actions": { "type": "STRING", "description": 'JSON массив действий. Пример: [{"action": "click", "selector": "#id"}, {"action": "read", "selector": ".class"}, {"action": "search", "query": "div.answer"}]' } },
                 "required": ["actions"]
             }
         }
     }
     
-    chat.tools = [t for t in chat.tools if t["function"]["name"] not in ["browser_open", "browser_actions"]]
+    chat.tools = [t for t in chat.tools if t["function"]["name"] not in ["browser_open", "browser_actions", "browser_get_dom"]]
     chat.tools.append(browser_open_schema)
     chat.tools.append(browser_actions_schema)
     browser_get_dom_schema = {
         "function": {
             "name": "browser_get_dom",
-            "description": "Возвращает текущий DOM дерева и список интерактивных элементов со страницы.",
+            "description": "Возвращает текущий DOM дерева и список интерактивных элементов со страницы (теперь включая id и class).",
             "parameters": {
                 "type": "OBJECT",
                 "properties": {},
@@ -89,7 +88,6 @@ def main(chat, settings):
         }
     }
     chat.tools.append(browser_get_dom_schema)
-
         
-    print("[browser_use] Инициализирован безопасный бэкенд (Threaded Server, порт 8085)")
+    print("[browser_use] Инициализирован безопасный бэкенд (Threaded Server, порт 8085) с поддержкой search и read")
     return chat
