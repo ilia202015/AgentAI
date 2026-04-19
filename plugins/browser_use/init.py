@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import importlib.util
+import time
 
 def get_bridge():
     if "bridge_mod" in sys.modules:
@@ -36,13 +37,17 @@ def browser_actions_tool(self, actions):
     return json.dumps(res, ensure_ascii=False)
 
 
-def browser_get_dom_tool(self):
+def browser_get_dom_tool(self, delay=0):
+    if float(delay) > 0:
+        time.sleep(float(delay))
     bridge = get_bridge()
     res = bridge.send_command({"action": "get_dom"}, timeout=15)
     return json.dumps(res, ensure_ascii=False)
 
 
-def browser_get_raw_html_tool(self):
+def browser_get_raw_html_tool(self, delay=0):
+    if float(delay) > 0:
+        time.sleep(float(delay))
     bridge = get_bridge()
     res = bridge.send_command({"action": "get_raw_html"}, timeout=15)
     return json.dumps(res, ensure_ascii=False)
@@ -93,7 +98,7 @@ def main(chat, settings):
         "function": {
             "name": "browser_get_dom",
             "description": chat.prompts.get("browser_get_dom", "Получить DOM"),
-            "parameters": { "type": "OBJECT", "properties": {}, "required": [] }
+            "parameters": { "type": "OBJECT", "properties": {"delay": {"type": "NUMBER", "description": "Задержка в секундах перед выполнением запроса (по умолчанию 0)"}}, "required": [] }
         }
     }
     
@@ -101,7 +106,7 @@ def main(chat, settings):
         "function": {
             "name": "browser_get_raw_html",
             "description": chat.prompts.get("browser_get_raw_html", "Получить RAW HTML"),
-            "parameters": { "type": "OBJECT", "properties": {}, "required": [] }
+            "parameters": { "type": "OBJECT", "properties": {"delay": {"type": "NUMBER", "description": "Задержка в секундах перед выполнением запроса (по умолчанию 0)"}}, "required": [] }
         }
     }
     
