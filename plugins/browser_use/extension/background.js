@@ -101,17 +101,41 @@ async function handleCommand(commandData) {
                 result.message = "Done";
             } finally { await detachDebugger(targetTabId); }
         } else if (commandData.action === "get_dom") {
-            // Используем scripting.executeScript вместо CDP для доступа к content world
             let injection = await chrome.scripting.executeScript({
                 target: { tabId: targetTabId },
                 func: () => {
-                    if (window.agentGetDOMContext) return window.agentGetDOMContext();
-                    // Fallback если content.js не загружен
-                    return { 
-                        url: window.location.href, 
-                        title: document.title, 
-                        text: document.body.innerText.substring(0, 2000),
-                        error: "content.js function not found, used fallback"
+                    const getDeepText = (root) => {
+                        let text = root.body ? root.body.innerText : "";
+                        try {
+                            const iframes = root.querySelectorAll('iframe');
+                            for (let f of iframes) {
+                                try {
+                                    if (f.contentDocument && f.contentDocument.body) {
+                                        text += "\n--- IFRAME: " + (f.id || f.name || "unnamed") + " ---\n" + getDeepText(f.contentDocument);
+                                    }
+                                } catch(e) { text += "\n[Blocked Iframe: " + f.src + "]"; }
+                            }
+                        } catch(e) {}
+                        return text;
+                    };
+                    
+                    const getInteractive = () => {
+                        const els = document.querySelectorAll('button, a, input, select, textarea, [role="button"]');
+                        return Array.from(els).map(el => {
+                            const rect = el.getBoundingClientRect();
+                            return {
+                                tag: el.tagName.toLowerCase(),
+                                text: (el.innerText || el.value || el.getAttribute('aria-label') || "").trim().substring(0, 100),
+                                visible: rect.width > 0 && rect.height > 0
+                            };
+                        }).filter(e => e.visible);
+                    };
+
+                    return {
+                        title: document.title,
+                        url: window.location.href,
+                        fullText: getDeepText(document),
+                        interactive: getInteractive()
                     };
                 }
             });
