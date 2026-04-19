@@ -158,17 +158,31 @@ async function handleCommand(commandData) {
                     };
                     
                     const getInteractive = () => {
-                        const els = document.querySelectorAll('button, a, input, select, textarea, [role="button"]');
-                        return Array.from(els).map(el => {
+                        const allElements = document.querySelectorAll('button, a, input, select, textarea, [role="button"], div, span, svg');
+                        return Array.from(allElements).map(el => {
                             const rect = el.getBoundingClientRect();
+                            const style = window.getComputedStyle(el);
+                            
+                            const isPointer = style.cursor === 'pointer';
+                            const hasClickAttr = el.onclick || el.getAttribute('onclick');
+                            
+                            const isStandardInteractive = ['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA'].includes(el.tagName);
+                            const isLikelyButton = isStandardInteractive || 
+                                                 el.getAttribute('role') === 'button' || 
+                                                 isPointer || hasClickAttr;
+
+                            const isVisible = rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+
+                            if (!isLikelyButton || !isVisible) return null;
+
                             return {
                                 tag: el.tagName.toLowerCase(),
                                 text: (el.innerText || el.value || el.getAttribute('aria-label') || "").trim().substring(0, 100),
                                 id: el.id,
                                 class: el.className,
-                                visible: rect.width > 0 && rect.height > 0
+                                visible: true
                             };
-                        }).filter(e => e.visible);
+                        }).filter(e => e && (e.text.length > 0 || e.tag === 'input' || e.tag === 'svg' || (e.class && e.class.includes('next'))));
                     };
 
                     return {
