@@ -1,6 +1,4 @@
-
 const SERVER_URL = "http://127.0.0.1:8085";
-// Глобальное состояние целевой вкладки
 let targetTabId = null;
 
 async function sendCDP(tabId, method, params = {}) {
@@ -56,24 +54,15 @@ async function executeAction(tabId, action) {
             })()
         `;
         let evalRes = await sendCDP(tabId, "Runtime.evaluate", { expression: exp, returnByValue: true });
-        
-        if (!evalRes.result || !evalRes.result.value) {
-            throw new Error("Element not found: " + action.selector);
-        }
-        
+        if (!evalRes.result || !evalRes.result.value) throw new Error("Element not found: " + action.selector);
         let coords = evalRes.result.value;
         await sendCDP(tabId, "Input.dispatchMouseEvent", { type: "mouseMoved", x: coords.x, y: coords.y });
         await sendCDP(tabId, "Input.dispatchMouseEvent", { type: "mousePressed", x: coords.x, y: coords.y, button: "left", clickCount: 1 });
         await sendCDP(tabId, "Input.dispatchMouseEvent", { type: "mouseReleased", x: coords.x, y: coords.y, button: "left", clickCount: 1 });
-        
     } else if (action.action === "type") {
-        if (action.selector) {
-            await executeAction(tabId, { action: "click", selector: action.selector });
-            await new Promise(r => setTimeout(r, 100));
-        }
-        for (let char of action.text) {
-            await sendCDP(tabId, "Input.dispatchKeyEvent", { type: "char", text: char });
-        }
+        if (action.selector) await executeAction(tabId, { action: "click", selector: action.selector });
+        await new Promise(r => setTimeout(r, 100));
+        for (let char of action.text) await sendCDP(tabId, "Input.dispatchKeyEvent", { type: "char", text: char });
     } else if (action.action === "press") {
          await sendCDP(tabId, "Input.dispatchKeyEvent", { type: "keyDown", commands: [action.key] });
          await sendCDP(tabId, "Input.dispatchKeyEvent", { type: "keyUp", commands: [action.key] });
@@ -84,89 +73,70 @@ async function executeAction(tabId, action) {
 async function handleCommand(commandData) {
     let msgId = commandData.message_id;
     let result = { status: "success" };
-    
     try {
-        // Умный поиск вкладки
         if (!targetTabId) {
             let tabs = await chrome.tabs.query({ active: true, currentWindow: true });
             if (!tabs.length) throw new Error("No active tab found");
             targetTabId = tabs[0].id;
         } else {
-            try {
-                await chrome.tabs.get(targetTabId); // Проверяем, жива ли вкладка
-            } catch(e) {
+            try { await chrome.tabs.get(targetTabId); } catch(e) {
                 let tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-                if (!tabs.length) throw new Error("Target tab closed and no active tab found");
+                if (!tabs.length) throw new Error("No active tab");
                 targetTabId = tabs[0].id;
             }
         }
 
         if (commandData.action === "navigate") {
             await chrome.tabs.update(targetTabId, { url: commandData.url, active: true });
-            await new Promise(resolve => {
-                let listener = (tId, info) => {
-                    if (tId === targetTabId && info.status === 'complete') {
-                        chrome.tabs.onUpdated.removeListener(listener);
-                        resolve();
-                    }
-                };
-                chrome.tabs.onUpdated.addListener(listener);
-                setTimeout(() => {
-                    chrome.tabs.onUpdated.removeListener(listener);
-                    resolve();
-                }, 10000);
+            await new Promise(r => {
+                let l = (id, info) => { if (id === targetTabId && info.status === 'complete') { chrome.tabs.onUpdated.removeListener(l); r(); } };
+                chrome.tabs.onUpdated.addListener(l);
+                setTimeout(() => { chrome.tabs.onUpdated.removeListener(l); r(); }, 15000);
             });
-            result.message = "Navigated to " + commandData.url;
-            
+            result.message = "Navigated";
         } else if (commandData.action === "execute_actions") {
             await attachDebugger(targetTabId);
             try {
-                for (let action of commandData.actions) {
-                    await executeAction(targetTabId, action);
+                for (let a of commandData.actions) await executeAction(targetTabId, a);
+                result.message = "Done";
+            } finally { await detachDebugger(targetTabId); }
+        } else if (commandData.action === "get_dom") {
+            // Используем scripting.executeScript вместо CDP для доступа к content world
+            let injection = await chrome.scripting.executeScript({
+                target: { tabId: targetTabId },
+                func: () => {
+                    if (window.agentGetDOMContext) return window.agentGetDOMContext();
+                    // Fallback если content.js не загружен
+                    return { 
+                        url: window.location.href, 
+                        title: document.title, 
+                        text: document.body.innerText.substring(0, 2000),
+                        error: "content.js function not found, used fallback"
+                    };
                 }
-                result.message = "Actions executed successfully";
-            } finally {
-                // Гарантированно отключаем дебаггер даже при ошибке
-                await detachDebugger(targetTabId);
+            });
+            if (injection && injection[0] && injection[0].result) {
+                result.data = injection[0].result;
+                result.message = "DOM captured";
+            } else {
+                throw new Error("Injection failed");
             }
         }
-    } catch (e) {
-        result = { status: "error", message: e.message };
-    }
-
+    } catch (e) { result = { status: "error", message: e.message }; }
     result.message_id = msgId;
-    
-    try {
-        await fetch(SERVER_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(result)
-        });
-    } catch (e) {
-        console.error("Failed to send response back to server:", e);
-    }
+    fetch(SERVER_URL, { method: "POST", body: JSON.stringify(result) }).catch(e => console.error(e));
 }
 
 async function pollServer() {
-    let backoff = 1000;
     while (true) {
         try {
-            let res = await fetch(SERVER_URL, { method: "GET" });
+            let res = await fetch(SERVER_URL);
             if (res.ok) {
-                backoff = 1000; // Сбрасываем backoff при успехе
-                let data = await res.json();
-                if (data.status === "command") {
-                    await handleCommand(data.data);
-                }
-            } else {
-                throw new Error("Server returned " + res.status);
+                let d = await res.json();
+                if (d.status === "command") await handleCommand(d.data);
             }
-        } catch (e) {
-            // Увеличиваем задержку до максимума 10 секунд
-            backoff = Math.min(backoff * 1.5, 10000);
-            await new Promise(r => setTimeout(r, backoff));
-        }
+        } catch (e) {}
+        await new Promise(r => setTimeout(r, 1000));
     }
 }
-
 pollServer();

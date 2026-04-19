@@ -88,7 +88,7 @@ if not hasattr(sys, '_agent_guard_registered'):
     sys._agent_guard_registered = True
 
 from google import genai
-from google.genai import types
+from google.genai import types as genai_types
 
 default_genai_client = None
 
@@ -273,7 +273,7 @@ class Chat:
         ]
         self.system_prompt = "\n".join(system_prompt_parts)
         
-        # История сообщений (Native Gemini Format: types.Content)
+        # История сообщений (Native Gemini Format: genai_types.Content)
         self.messages = [] 
 
         self._initialize_tools()
@@ -530,7 +530,7 @@ class Chat:
             self.chats[name] = Chat(output_mode="auto", count_tab=self.count_tab + 1)
         self.print(f"\n⚙️ Агент (авто, запрос, чат: {name}): " + message)
         # Отправляем сообщение как user
-        return self.chats[name].send(types.Content(role="user", parts=[types.Part(text=message)]))
+        return self.chats[name].send(genai_types.Content(role="user", parts=[genai_types.Part(text=message)]))
 
     def google_search_tool(self, query, num_results=10):
         try:
@@ -798,7 +798,7 @@ class Chat:
     def add_message(self, message: str):
         if not self.messages or self.messages[-1].role == 'model':
             # Если истории нет или последнее сообщение от модели — создаем новое сообщение от пользователя
-            self.messages.append(types.Content(role="user", parts=[types.Part(text=message)]))
+            self.messages.append(genai_types.Content(role="user", parts=[genai_types.Part(text=message)]))
         else:
             # Иначе ищем последнюю текстовую часть в текущем сообщении и дополняем её
             for part in reversed(self.messages[-1].parts):
@@ -808,7 +808,7 @@ class Chat:
             else:
                 # Если в сообщении не было текста (например, только инструменты или фото), 
                 # просто добавляем новую текстовую часть
-                self.messages[-1].parts.append(types.Part(text=message))
+                self.messages[-1].parts.append(genai_types.Part(text=message))
 
     def _load_config_json(self, path, default_val):
         if os.path.exists(path):
@@ -996,7 +996,7 @@ class Chat:
                 if isinstance(msg, dict):
                     parts = []
                     if "content" in msg and msg["content"]:
-                        parts.append(types.Part(text=msg["content"]))
+                        parts.append(genai_types.Part(text=msg["content"]))
                     if "images" in msg and isinstance(msg["images"], list):
                         for img_data in msg["images"]:
                             try:
@@ -1006,13 +1006,13 @@ class Chat:
                                 else:
                                     b64_str = img_data
                                     mime_type = "image/jpeg"
-                                parts.append(types.Part.from_bytes(data=base64.b64decode(b64_str), mime_type=mime_type))
+                                parts.append(genai_types.Part.from_bytes(data=base64.b64decode(b64_str), mime_type=mime_type))
                             except Exception as e:
                                 print(f"Ошибка декодирования изображения: {e}")
                     if parts:
-                        self.messages.append(types.Content(role=msg["role"], parts=parts))
+                        self.messages.append(genai_types.Content(role=msg["role"], parts=parts))
                 elif isinstance(msg, str):
-                     self.messages.append(types.Content(role="user", parts=[types.Part(text=msg)]))
+                     self.messages.append(genai_types.Content(role="user", parts=[genai_types.Part(text=msg)]))
                 else:
                      self.messages.append(msg)
             return self._process_request()
@@ -1034,12 +1034,12 @@ class Chat:
         
         tools_gemini = []
         for tool in allowed_tools_defs:
-            tools_gemini.append(types.Tool(function_declarations=[tool["function"]]))
+            tools_gemini.append(genai_types.Tool(function_declarations=[tool["function"]]))
 
-        return types.GenerateContentConfig(
+        return genai_types.GenerateContentConfig(
             tools=tools_gemini,
             system_instruction=full_instruction,
-            thinking_config=types.ThinkingConfig(include_thoughts=True),
+            thinking_config=genai_types.ThinkingConfig(include_thoughts=True),
         )
 
     def _process_request(self):
@@ -1157,7 +1157,7 @@ class Chat:
             input_time = first_chunk_time - start_time
             output_time = end_time - first_chunk_time
             
-            model_msg = types.Content(role="model", parts=response_parts)
+            model_msg = genai_types.Content(role="model", parts=response_parts)
             self.messages.append(model_msg)
 
             # --- МЕТРИКИ ---
@@ -1248,7 +1248,7 @@ class Chat:
     def _execute_tool_calls(self, tool_calls):
         import json
         import base64
-        from google.genai import types
+        from google.genai import types as genai_types
         
         response_parts = []
         
@@ -1314,8 +1314,8 @@ class Chat:
                             continue
                             
                         # Используем структуру для мультимодальных ответов инструментов
-                        fr_parts.append(types.FunctionResponsePart(
-                            inline_data=types.FunctionResponseBlob(
+                        fr_parts.append(genai_genai_types.FunctionResponsePart(
+                            inline_data=genai_genai_types.FunctionResponseBlob(
                                 mime_type=mime,
                                 data=data
                             )
@@ -1324,8 +1324,8 @@ class Chat:
                         self.print(f"Ошибка обработки изображения в ответе инструмента: {e}")
             
             # Создаем Part с ответом функции
-            response_parts.append(types.Part(
-                function_response=types.FunctionResponse(
+            response_parts.append(genai_types.Part(
+                function_response=genai_types.FunctionResponse(
                     name=name,
                     response=res_payload,
                     parts=fr_parts if fr_parts else None
@@ -1333,7 +1333,7 @@ class Chat:
             ))
         
         # Добавляем ответы инструментов в историю (от имени user по протоколу Gemini)
-        self.messages.append(types.Content(role="user", parts=response_parts))
+        self.messages.append(genai_types.Content(role="user", parts=response_parts))
 
         # Продолжаем диалог с новыми данными
         return self._process_request()

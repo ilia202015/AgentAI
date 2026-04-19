@@ -36,12 +36,19 @@ def browser_actions_tool(self, actions):
     res = bridge.send_command({"action": "execute_actions", "actions": actions_list}, timeout=30)
     return json.dumps(res, ensure_ascii=False)
 
+
+def browser_get_dom_tool(self):
+    bridge = get_bridge()
+    res = bridge.send_command({"action": "get_dom"}, timeout=15)
+    return json.dumps(res, ensure_ascii=False)
+
 def main(chat, settings):
     bridge = get_bridge()
     bridge.init_bridge()
     
     chat.browser_open_tool = types.MethodType(browser_open_tool, chat)
     chat.browser_actions_tool = types.MethodType(browser_actions_tool, chat)
+    chat.browser_get_dom_tool = types.MethodType(browser_get_dom_tool, chat)
     
     browser_open_schema = {
         "function": {
@@ -70,6 +77,19 @@ def main(chat, settings):
     chat.tools = [t for t in chat.tools if t["function"]["name"] not in ["browser_open", "browser_actions"]]
     chat.tools.append(browser_open_schema)
     chat.tools.append(browser_actions_schema)
+    browser_get_dom_schema = {
+        "function": {
+            "name": "browser_get_dom",
+            "description": "Возвращает текущий DOM дерева и список интерактивных элементов со страницы.",
+            "parameters": {
+                "type": "OBJECT",
+                "properties": {},
+                "required": []
+            }
+        }
+    }
+    chat.tools.append(browser_get_dom_schema)
+
         
     print("[browser_use] Инициализирован безопасный бэкенд (Threaded Server, порт 8085)")
     return chat
