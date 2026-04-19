@@ -1,7 +1,7 @@
 {
-  "settings": {
-  },
+  "settings": {},
   "list": [
-    "web_interface"
+    "web_interface",
+    "browser_use"
   ]
 }

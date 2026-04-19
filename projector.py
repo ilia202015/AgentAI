@@ -103,38 +103,40 @@ class Projector:
             
                 if self.b_idx >= len(self.blocks):
                     break
-                    
+            
+            prompt_end = "\n\nСейчас ты работаешь в авто-режиме, выполни шаг и выведи \"OK\" в качестве ответа (без лишнего текста)\n"
+            
             prompt = self.get_prompt('next')
-            self.chat.print(prompt)
-            self.chat.send(prompt)
+            self.chat.print(prompt + prompt_end)
+            self.chat.send(prompt + prompt_end)
             
             for _ in range(3):
-                self.chat.print(self.get_prompt('find_bug'))
-                self.chat.send(self.get_prompt('find_bug'))
+                self.chat.print(self.get_prompt('find_bug') + prompt_end)
+                self.chat.send(self.get_prompt('find_bug') + prompt_end)
                 has_bugs = self.chat.ai_get("ВНИМАНИЕ! Основываясь на твоем предыдущем ответе: были ли найдены реальные баги или критические ошибки (не считая намеренных заглушек)? Ответь строго 'True' если да, или 'False' если нет.", target_type=bool, clean_history=False)
                 if has_bugs:
-                    self.chat.print(self.get_prompt('fix'))
-                    self.chat.send(self.get_prompt('fix'))
+                    self.chat.print(self.get_prompt('fix') + prompt_end)
+                    self.chat.send(self.get_prompt('fix') + prompt_end)
                 else:
                     break
             
             is_refactor = False
             # 4. Цикл: Анализ -> Рефакторинг
-            self.chat.print(self.get_prompt('analyze'))
-            self.chat.send(self.get_prompt('analyze'))
+            self.chat.print(self.get_prompt('analyze') + prompt_end)
+            self.chat.send(self.get_prompt('analyze') + prompt_end)
             needs_refactor = self.chat.ai_get("ВНИМАНИЕ! Основываясь на твоем предыдущем ответе: есть ли критические проблемы архитектуры или стиля, требующие рефакторинга? Ответь строго 'True' или 'False'.", target_type=bool, clean_history=False)
             if needs_refactor:
-                self.chat.print(self.get_prompt('refactor'))
-                self.chat.send(self.get_prompt('refactor'))
+                self.chat.print(self.get_prompt('refactor') + prompt_end)
+                self.chat.send(self.get_prompt('refactor') + prompt_end)
             
             # 5. Повторный цикл: Поиск бага -> Багфикс (финальная проверка после рефакторинга
             if is_refactor:
-                self.chat.print(self.get_prompt('find_bug'))
-                self.chat.send(self.get_prompt('find_bug'))
+                self.chat.print(self.get_prompt('find_bug') + prompt_end)
+                self.chat.send(self.get_prompt('find_bug') + prompt_end)
                 has_bugs = self.chat.ai_get("ВНИМАНИЕ! Остались ли баги после рефакторинга? Ответь строго 'True' или 'False'.", target_type=bool, clean_history=False)
                 if has_bugs:
-                    self.chat.print(self.get_prompt('fix'))
-                    self.chat.send(self.get_prompt('fix'))
+                    self.chat.print(self.get_prompt('fix') + prompt_end)
+                    self.chat.send(self.get_prompt('fix') + prompt_end)
         
             return "✅ Автоматическое выполнение всего проекта успешно завершено!\nВыход из авто-режима, давай нормальные ответы\nДай финальный отчёт."
         except Exception as e:

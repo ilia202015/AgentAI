@@ -298,5 +298,5 @@ def main(root_chat, settings):
     server_thread = threading.Thread(target=server.run_server, args=(root_chat,), daemon=True)
     server_thread.start()
     print("✅ Web Server thread started.")
-    time.sleep(10) # Костыль чтобы при запуске внутри песочницы сервер успел загрузиться
+    # time.sleep(10) # Removed sleep чтобы при запуске внутри песочницы сервер успел загрузиться
     return root_chat

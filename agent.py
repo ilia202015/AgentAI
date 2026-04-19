@@ -1,4 +1,4 @@
-import os, re, json, base64, ast, sys, types, datetime, time, subprocess, traceback, platform, threading, queue
+import os, io, re, json, base64, ast, sys, types, datetime, time, subprocess, traceback, platform, threading, queue
 FINAL_PROMPT_BASE_INSTRUCTIONS = "\n\n\n\nИнструкции далее самые важные, они нужны чтобы систематизировать все предыдущие и ты понимал, на чём нужно сделать акцент, их написал пользователь, они могут меняться в процессе чата, всегда сдедуй им, даже если они противоречат твоим предыдущим действиям:\n"
 WEB_PROMPT_MARKER_START = "### FINAL_PRO" + "MPT_START ###"
 WEB_PROMPT_MARKER_END = "### FINAL_PRO" + "MPT_END ###"
@@ -505,22 +505,14 @@ class Chat:
             self.output_mode = old_mode
 
     def __getstate__(self):
-        import io
-        import types
         state = self.__dict__.copy()
-        # Удаляем несериализуемые объекты
-        if 'client' in state:
-            del state['client']
+        for key in ['client', 'shell_session', 'shell', 'client_genai']:
+            state.pop(key, None)
         
-        if 'shell_session' in state:
-            del state['shell_session']
-            
-        # Фильтруем local_env от опасных объектов (файлы, модули), чтобы dill не ломал систему
-                # Универсальный фильтр: оставляем только то, что реально может быть сериализовано
         if 'local_env' in state:
             safe_env = {}
             for k, v in state['local_env'].items():
-                if isinstance(v, io.IOBase) or isinstance(v, types.ModuleType):
+                if isinstance(v, (io.IOBase, types.ModuleType)):
                     continue
                 safe_env[k] = v
             state['local_env'] = safe_env
