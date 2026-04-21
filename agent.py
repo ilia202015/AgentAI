@@ -256,7 +256,8 @@ class Chat:
             ("gemini-3-pro-preview", 25),
             ("gemini-3-flash-preview", 1000),
             ("gemini-3.1-flash-lite-preview", 1000),
-            ("gemini-3.1-pro-preview", 25)
+            ("gemini-3.1-pro-preview", 25),
+            ("gemini-2.5-pro", 150)
         ]
         self.model, self.model_rpm = self.models[1]
 
@@ -1314,8 +1315,8 @@ class Chat:
                             continue
                             
                         # Используем структуру для мультимодальных ответов инструментов
-                        fr_parts.append(genai_genai_types.FunctionResponsePart(
-                            inline_data=genai_genai_types.FunctionResponseBlob(
+                        fr_parts.append(genai_types.FunctionResponsePart(
+                            inline_data=genai_types.FunctionResponseBlob(
                                 mime_type=mime,
                                 data=data
                             )
