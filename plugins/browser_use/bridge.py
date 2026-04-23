@@ -8,8 +8,6 @@ import queue
 import time
 import uuid
 
-logging.basicConfig(level=logging.INFO, format='[BrowserBridge] %(message)s')
-
 # Потокобезопасные структуры
 command_queue = queue.Queue()
 # Теперь ответы хранятся в словаре с привязкой к message_id
