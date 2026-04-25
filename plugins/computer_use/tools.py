@@ -122,7 +122,7 @@ class ActivityMonitor:
     def check(self):
         current_pos = pyautogui.position()
         lx, ly = (self.last_pos[0], self.last_pos[1]) if isinstance(self.last_pos, (list, tuple)) else (self.last_pos.x, self.last_pos.y)
-        if abs(current_pos.x - lx) > 15 or abs(current_pos.y - ly) > 15:
+        if abs(current_pos.x - lx) > 30 or abs(current_pos.y - ly) > 30:
             return True
         return False
 

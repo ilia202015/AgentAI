@@ -17,6 +17,7 @@ import pyautogui
 
 def computer_actions_tool(self, actions):
     try:
+        tools.monitor.update_last_pos() # Сброс монитора перед началом
         acts = json.loads(actions)
         results = []
         sw, sh = pyautogui.size()
