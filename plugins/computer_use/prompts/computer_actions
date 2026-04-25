@@ -1,0 +1,13 @@
+Выполняет последовательность действий на компьютере.
+Принимает массив `actions` в формате JSON. Все координаты должны передаваться в АБСОЛЮТНЫХ пикселях экрана.
+Доступные действия (action):
+- click_at: клик мыши. Параметры: x, y
+- hover_at: наведение мыши. Параметры: x, y
+- drag_and_drop: перетаскивание. Параметры: x, y, destination_x, destination_y
+- type_text_at: клик и ввод текста. Параметры: x, y, text, press_enter (bool), clear_before_typing (bool)
+- key_combination: нажатие системных клавиш. Параметры: keys (строка, например "ctrl+c" или "enter")
+- scroll_at: скролл. Параметры: x, y, direction ("up"/"down"), magnitude (число)
+- wait_5_seconds: ожидание 5 секунд
+
+Пример использования: 
+[{"action": "click_at", "x": 500, "y": 300}, {"action": "type_text_at", "x": 500, "y": 300, "text": "Привет", "press_enter": true}]

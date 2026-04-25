@@ -2,6 +2,7 @@
   "settings": {},
   "list": [
     "web_interface",
-    "browser_use"
+    "browser_use",
+    "computer_use"
   ]
 }
