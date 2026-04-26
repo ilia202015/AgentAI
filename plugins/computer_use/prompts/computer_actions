@@ -7,7 +7,7 @@
 - type_text_at: клик и ввод текста. Параметры: x, y, text, press_enter (bool), clear_before_typing (bool)
 - key_combination: нажатие системных клавиш. Параметры: keys (строка, например "ctrl+c" или "enter")
 - scroll_at: скролл. Параметры: x, y, direction ("up"/"down"), magnitude (число)
-- wait_5_seconds: ожидание 5 секунд
+- wait: ожидание. Параметры: seconds (число секунд)
 
 Пример использования: 
 [{"action": "click_at", "x": 500, "y": 300}, {"action": "type_text_at", "x": 500, "y": 300, "text": "Привет", "press_enter": true}]

@@ -16,7 +16,7 @@ import tkinter as tk
 
 # Настройка pyautogui
 pyautogui.FAILSAFE = True 
-pyautogui.PAUSE = 0.3 
+pyautogui.PAUSE = 0.3
 
 # VK коды для Windows (раскладка-независимые)
 VK_CODES = {
@@ -24,15 +24,13 @@ VK_CODES = {
     'alt': 0x12,
     'shift': 0x10,
     'win': 0x5B,
-    'a': 0x41,
-    'c': 0x43,
-    'v': 0x56,
-    'x': 0x58,
-    'z': 0x5A,
     'backspace': 0x08,
     'enter': 0x0D,
     'delete': 0x2E
 }
+
+for i in range(26):
+    VK_CODES[chr(ord('a') + i)] = 0x41 + i
 
 # --- НОВЫЙ ФУНКЦИОНАЛ: ИНДИКАЦИЯ И МОНИТОРИНГ ---
 
@@ -180,6 +178,14 @@ def denormalize(x, y):
     w, h = pyautogui.size()
     return int(float(x) / 1000 * w), int(float(y) / 1000 * h)
 
+def stable_click(x, y, button='left'):
+    """Выполняет стабильный клик: перемещение -> пауза -> зажатие -> пауза -> отпускание."""
+    pyautogui.moveTo(x, y, duration=0.15)
+    time.sleep(0.1)
+    pyautogui.mouseDown(button=button)
+    time.sleep(0.1)
+    pyautogui.mouseUp(button=button)
+
 def execute_action(action_name, args):
     if monitor.check():
          return {"error": "Interrupted by user"}
@@ -193,7 +199,7 @@ def execute_action(action_name, args):
 
     elif action_name == "click_at":
         x, y = denormalize(args.get("x"), args.get("y"))
-        pyautogui.click(x, y)
+        stable_click(x, y)
         monitor.update_last_pos()
         return {"output": f"Clicked at {x}, {y}"}
 
@@ -206,8 +212,8 @@ def execute_action(action_name, args):
     elif action_name == "drag_and_drop":
         x, y = denormalize(args.get("x"), args.get("y"))
         dx, dy = denormalize(args.get("destination_x"), args.get("destination_y"))
-        pyautogui.moveTo(x, y)
-        time.sleep(0.2)
+        pyautogui.moveTo(x, y, duration=0.2)
+        time.sleep(0.1)
         pyautogui.dragTo(dx, dy, button='left', duration=0.5)
         monitor.update_last_pos()
         return {"output": f"Dragged from {x},{y} to {dx},{dy}"}
@@ -217,25 +223,34 @@ def execute_action(action_name, args):
         text = args.get("text", "")
         press_enter = args.get("press_enter", True)
         clear = args.get("clear_before_typing", True)
-        pyautogui.click(x, y)
+        
+        # Сначала кликаем стабильно, чтобы получить фокус
+        stable_click(x, y)
         time.sleep(0.5)
+        
         if clear:
             mod = 'ctrl'
             if platform.system() == 'Darwin': mod = 'command'
             win_hotkey(mod, 'a')
+            time.sleep(0.1)
             pyautogui.press('backspace')
             time.sleep(0.2)
+            
         if text:
             try:
                 pyperclip.copy(text)
+                time.sleep(0.1)
                 mod = 'ctrl'
                 if platform.system() == 'Darwin': mod = 'command'
                 win_hotkey(mod, 'v')
+                time.sleep(0.2)
             except:
-                pyautogui.write(text, interval=0.02)
+                pyautogui.write(text, interval=0.05) # Чуть медленнее ввод
+                
         if press_enter:
             time.sleep(0.2)
             pyautogui.press('enter')
+            
         monitor.update_last_pos()
         return {"output": f"Typed text at {x}, {y}"}
 
@@ -262,16 +277,21 @@ def execute_action(action_name, args):
         x, y = denormalize(args.get("x"), args.get("y"))
         direction = args.get("direction", "down")
         magnitude = args.get("magnitude", 500)
-        pyautogui.moveTo(x, y)
+        pyautogui.moveTo(x, y, duration=0.2)
         amount = magnitude if direction == "up" else -magnitude
         pyautogui.scroll(amount)
         monitor.update_last_pos()
         return {"output": f"Scrolled {direction} at {x}, {y}"}
 
-    elif action_name == "wait_5_seconds":
-        time.sleep(5)
+    elif action_name == "wait":
+        seconds = args.get("seconds", 1)
+        try:
+            seconds = float(seconds)
+        except:
+            seconds = 1
+        time.sleep(seconds)
         monitor.update_last_pos()
-        return {"output": "Waited 5 seconds"}
+        return {"output": f"Waited {seconds} seconds"}
 
     elif action_name == "go_back":
         pyautogui.hotkey('alt', 'left')
