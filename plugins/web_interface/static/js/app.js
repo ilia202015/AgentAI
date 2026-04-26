@@ -46,7 +46,7 @@ const App = {
                 api.sendMessage(store.currentChatId, text);
                 // Прокрутка вниз
                 setTimeout(() => {
-                    const container = document.querySelector('.overflow-y-auto');
+                    const container = document.getElementById('chat-messages-container');
                     if (container) container.scrollTop = container.scrollHeight;
                 }, 100);
             }

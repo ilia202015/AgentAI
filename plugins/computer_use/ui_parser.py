@@ -4,7 +4,7 @@
 
 Стек:
 1. RapidOCR (ONNX) - Быстрая детекция рамок текста.
-2. EasyOCR (PyTorch) - Точное распознавание текста (кириллицы) в найденных рамках.
+2. EasyOCR (PyTorch) - Точное распознавание скрытого текста в найденных рамках.
 3. OpenCV (Canny) - Изоляция интерактивных элементов UI через маскирование текста.
 4. MobileCLIP (Apple FastViT) - Сверхбыстрая Zero-Shot классификация иконок.
 """
@@ -13,6 +13,7 @@ import os
 import base64
 from collections import defaultdict
 import urllib.request
+import time
 
 import cv2
 import numpy as np
@@ -23,7 +24,6 @@ import torch.nn.functional as F
 import easyocr
 from rapidocr_onnxruntime import RapidOCR
 import mobileclip
-
 
 # Контейнер для моделей с поддержкой корректного пиклинга (для Autosave)
 class UIModelContainer:
@@ -36,21 +36,16 @@ class UIModelContainer:
         self.text_features = None
 
     def __getstate__(self):
-        # При попытке сохранить состояние (pickle/dill), мы возвращаем пустой словарь.
-        # Это заставляет пиклер игнорировать тяжелые и непиклируемые объекты (ONNX/Torch).
         return {}
 
     def __setstate__(self, state):
-        # При восстановлении из сейва обнуляем ссылки, чтобы они переинициализировались лениво.
         self.__init__()
 
 _MODELS = UIModelContainer()
 
-
 # Флаг для отладки: сохранение размеченного скриншота в логах
 DEBUG_SAVE_PARSED_IMAGE = True
 
-# Расширенный словарь визуальных описаний UI-элементов для MobileCLIP
 _CANDIDATE_LABELS = [
     "google chrome browser logo", "file explorer yellow folder", 
     "windows 11 start button blue window", "telegram paper plane app icon", 
@@ -71,35 +66,26 @@ _CANDIDATE_LABELS = [
 ]
 
 def _init_models():
-    """
-    Инициализирует модели ИИ при первом вызове функции.
-    Загружает веса MobileCLIP с серверов Apple, если они отсутствуют локально.
-    """
+    """Инициализирует модели ИИ при первом вызове функции."""
     global _MODELS
     if _MODELS.rapid is None:
-        # Инициализация OCR движков
         _MODELS.rapid = RapidOCR()
         _MODELS.easy = easyocr.Reader(['ru', 'en'], gpu=False, verbose=False)
         
-        # Загрузка весов MobileCLIP
         ckpt_path = os.path.join(os.path.dirname(__file__), "mobileclip_s0.pt")
         if not os.path.exists(ckpt_path):
             url = "https://docs-assets.developer.apple.com/ml-research/datasets/mobileclip/mobileclip_s0.pt"
             urllib.request.urlretrieve(url, ckpt_path)
             
-        # Инициализация VLM
         _MODELS.mc_model, _, _MODELS.mc_preprocess = mobileclip.create_model_and_transforms('mobileclip_s0', pretrained=ckpt_path)
         _MODELS.mc_tokenizer = mobileclip.get_tokenizer('mobileclip_s0')
         _MODELS.mc_model.eval()
         
-        # Предвычисление текстовых признаков
         with torch.no_grad():
             _MODELS.text_features = _MODELS.mc_model.encode_text(_MODELS.mc_tokenizer(_CANDIDATE_LABELS))
             _MODELS.text_features = F.normalize(_MODELS.text_features, dim=-1)
 
-
 def get_iou(boxA, boxB):
-    """Вычисляет Intersection over Union (IoU) для фильтрации пересекающихся рамок."""
     xA = max(boxA[0], boxB[0])
     yA = max(boxA[1], boxB[1])
     xB = min(boxA[2], boxB[2])
@@ -110,7 +96,6 @@ def get_iou(boxA, boxB):
     return interArea / float(boxAArea)
 
 def contains(box_outer, box_inner):
-    """Проверяет, находится ли box_inner внутри box_outer (с небольшим допуском)."""
     return (box_inner[0] >= box_outer[0] - 2 and 
             box_inner[1] >= box_outer[1] - 2 and 
             box_inner[2] <= box_outer[2] + 2 and 
@@ -134,146 +119,184 @@ def ui_parser(base64_image: str) -> str:
     
     _init_models()
     
-    # === ЭТАП 1: OCR Детектор (RapidOCR) ===
+    # === 1. RapidOCR ===
     rapid_res, _ = _MODELS.rapid(img_bgr)
-    raw_text_boxes = []
-    
+    rapid_boxes_with_text = []
     if rapid_res:
         for item in rapid_res:
-            box_pts = item[0]
-            xs = [pt[0] for pt in box_pts]
-            ys = [pt[1] for pt in box_pts]
-            raw_text_boxes.append([int(min(xs)), int(min(ys)), int(max(xs)), int(max(ys))])
+            xs, ys = [pt[0] for pt in item[0]], [pt[1] for pt in item[0]]
+            txt = item[1]
+            rapid_boxes_with_text.append([[int(min(xs)), int(min(ys)), int(max(xs)), int(max(ys))], txt])
             
-    # === ЭТАП 2: Умная склейка текста (ТОЛЬКО для результатов OCR) ===
-    raw_text_boxes.sort(key=lambda b: (b[1], b[0]))
-    
-    merged_boxes = []
-    for box in raw_text_boxes:
+    # Склейка RapidOCR
+    rapid_boxes_with_text.sort(key=lambda b: (b[0][1], b[0][0]))
+    merged_rapid = []
+    for box, txt in rapid_boxes_with_text:
         x1, y1, x2, y2 = box
-        h = y2 - y1
         placed = False
-        for m_box in merged_boxes:
+        for m in merged_rapid:
+            m_box, m_txt = m[0], m[1]
             mx1, my1, mx2, my2 = m_box
-            mh = my2 - my1
+            min_h = min(y2 - y1, my2 - my1)
             y_overlap = max(0, min(y2, my2) - max(y1, my1))
-            min_h = min(h, mh)
             if min_h > 0 and (y_overlap / min_h) > 0.4:
-                threshold = max(h, mh) * 2.5
-                if (x1 <= mx2 + threshold) and (x2 >= mx1 - threshold):
-                    m_box[0] = min(mx1, x1)
-                    m_box[1] = min(my1, y1)
-                    m_box[2] = max(mx2, x2)
-                    m_box[3] = max(my2, y2)
-                    placed = True
-                    break
-        if not placed:
-            merged_boxes.append([x1, y1, x2, y2])
-            
-    final_merged = []
-    for box in merged_boxes:
-        x1, y1, x2, y2 = box
-        h = y2 - y1
-        placed = False
-        for m_box in final_merged:
-            mx1, my1, mx2, my2 = m_box
-            mh = my2 - my1
-            y_overlap = max(0, min(y2, my2) - max(y1, my1))
-            min_h = min(h, mh)
-            if min_h > 0 and (y_overlap / min_h) > 0.4:
-                threshold = max(h, mh) * 2.5
-                if (x1 <= mx2 + threshold) and (x2 >= mx1 - threshold):
-                    m_box[0] = min(mx1, x1)
-                    m_box[1] = min(my1, y1)
-                    m_box[2] = max(mx2, x2)
-                    m_box[3] = max(my2, y2)
-                    placed = True
-                    break
-        if not placed:
-            final_merged.append(box)
+                thresh = max(y2 - y1, my2 - my1) * 3.0 
+                if (x1 <= mx2 + thresh) and (x1 >= mx1):
+                    m[0][0], m[0][1] = min(mx1, x1), min(my1, y1)
+                    m[0][2], m[0][3] = max(mx2, x2), max(my2, y2)
+                    m[1] = m_txt + " " + txt
+                    placed = True; break
+                elif (x2 >= mx1 - thresh) and (x2 <= mx2):
+                    m[0][0], m[0][1] = min(mx1, x1), min(my1, y1)
+                    m[0][2], m[0][3] = max(mx2, x2), max(my2, y2)
+                    m[1] = txt + " " + m_txt
+                    placed = True; break
+        if not placed: merged_rapid.append([[x1, y1, x2, y2], txt])
 
-    # === ЭТАП 3: Распознавание склеенного текста (EasyOCR) ===
-    text_results = []
-    valid_text_boxes = []
-    for box in final_merged:
-        x1, y1, x2, y2 = box
-        pad = 6
-        cx1, cy1 = max(0, x1-pad), max(0, y1-pad)
-        cx2, cy2 = min(width, x2+pad), min(height, y2+pad)
-        crop = img_gray[cy1:cy2, cx1:cx2]
-        if crop.size > 0:
-            easy_res = _MODELS.easy.readtext(crop, detail=0, paragraph=True)
-            if easy_res:
-                txt = " ".join(easy_res).strip()
-                if txt:
-                    text_results.append((x1, y1, x2, y2, txt))
-                    valid_text_boxes.append(box)
+    # Фильтр вложенностей RapidOCR
+    final_rapid = []
+    for i, m1 in enumerate(merged_rapid):
+        is_inside = False
+        for j, m2 in enumerate(merged_rapid):
+            if i != j and contains(m2[0], m1[0]):
+                is_inside = True; break
+        if not is_inside: final_rapid.append(m1)
+    merged_rapid = final_rapid
 
-    # === ЭТАП 4: OpenCV Детекция иконок ===
+    # === 2. OpenCV (НЕ АГРЕССИВНЫЙ) ===
     edges = cv2.Canny(img_gray, 20, 60)
-    
-    # Маскируем только подтвержденный текст
-    for (x1, y1, x2, y2) in valid_text_boxes:
-        cv2.rectangle(edges, (x1, y1), (x2, y2), 0, -1)
+    for m in merged_rapid: 
+        x1, y1, x2, y2 = m[0]
+        cv2.rectangle(edges, (max(0, x1-2), max(0, y1-2)), (min(width, x2+2), min(height, y2+2)), 0, -1)
         
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3))
-    closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+    closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
     contours, _ = cv2.findContours(closed, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
     
-    raw_ui_boxes = []
-    for cnt in contours:
-        x, y, w, h = cv2.boundingRect(cnt)
-        if 10 < w < 120 and 10 < h < 120:
-            raw_ui_boxes.append([x, y, x+w, y+h])
+    raw_ui_boxes = [cv2.boundingRect(c) for c in contours]
+    raw_ui_boxes = [[x, y, x+w, y+h] for x, y, w, h in raw_ui_boxes if 8 < w < 250 and 8 < h < 250]
             
-    icons_boxes = []
-    raw_ui_boxes.sort(key=lambda b: (b[2]-b[0])*(b[3]-b[1]), reverse=True)
+    valid_ui_boxes = []
     for b in raw_ui_boxes:
-        is_inside = False
-        for pb in icons_boxes:
-            if contains(pb, b):
-                is_inside = True
-                break
-        if not is_inside:
-            overlap = False
-            for kb in icons_boxes:
-                if get_iou(b, kb) > 0.6:
-                    overlap = True
-                    break
-            if not overlap:
-                icons_boxes.append(b)
+        if not any(contains(b, tb[0]) for tb in merged_rapid):
+            valid_ui_boxes.append(b)
 
-    # === ЭТАП 5: Классификация иконок (MobileCLIP) ===
+    valid_ui_boxes.sort(key=lambda b: (b[2]-b[0])*(b[3]-b[1]))
+    icons_boxes = []
+    for b in valid_ui_boxes:
+        is_container = any(contains(b, accepted) for accepted in icons_boxes)
+        is_inside = any(contains(accepted, b) for accepted in icons_boxes)
+        high_iou = any(get_iou(b, accepted) > 0.5 for accepted in icons_boxes)
+        if not is_container and not is_inside and not high_iou:
+            icons_boxes.append(b)
+
+    # === 3. Классификация EasyOCR / CLIP ===
+    yellow_boxes_with_text = []
+    pure_icons = []
+    
+    _MODELS.easy.text_threshold = 0.7 
+    _MODELS.easy.low_text = 0.4
+    
+    for box in icons_boxes:
+        x1, y1, x2, y2 = box
+        crop = img_gray[max(0, y1-6):min(height, y2+6), max(0, x1-6):min(width, x2+6)]
+        if crop.size == 0: continue
+        txt = " ".join(_MODELS.easy.readtext(crop, detail=0, paragraph=True)).strip()
+        if txt and sum(c.isalnum() for c in txt) >= 1 and len(txt) > 1:
+            yellow_boxes_with_text.append([list(box), txt])
+        else:
+            pure_icons.append(list(box))
+
+    # Склейка иконок
+    merged_icons = []
+    while pure_icons:
+        base = pure_icons.pop(0)
+        changed = True
+        while changed:
+            changed = False
+            for i in range(len(pure_icons) - 1, -1, -1):
+                b2 = pure_icons[i]
+                dx = max(0, max(base[0], b2[0]) - min(base[2], b2[2]))
+                dy = max(0, max(base[1], b2[1]) - min(base[3], b2[3]))
+                if dx <= 6 and dy <= 6:
+                    base[0] = min(base[0], b2[0])
+                    base[1] = min(base[1], b2[1])
+                    base[2] = max(base[2], b2[2])
+                    base[3] = max(base[3], b2[3])
+                    pure_icons.pop(i)
+                    changed = True
+        merged_icons.append(base)
+    pure_icons = merged_icons
+
+    # Склейка желтых
+    yellow_boxes_with_text.sort(key=lambda b: (b[0][1], b[0][0]))
+    merged_yellow = []
+    for box, txt in yellow_boxes_with_text:
+        x1, y1, x2, y2 = box
+        placed = False
+        for m in merged_yellow:
+            m_box, m_txt = m[0], m[1]
+            mx1, my1, mx2, my2 = m_box
+            min_h = min(y2 - y1, my2 - my1)
+            y_overlap = max(0, min(y2, my2) - max(y1, my1))
+            if min_h > 0 and (y_overlap / min_h) > 0.4:
+                thresh = max(y2 - y1, my2 - my1) * 3.5
+                if (x1 <= mx2 + thresh) and (x1 >= mx1):
+                    m[0][0], m[0][1] = min(mx1, x1), min(my1, y1)
+                    m[0][2], m[0][3] = max(mx2, x2), max(my2, y2)
+                    m[1] = m_txt + " " + txt
+                    placed = True; break
+                elif (x2 >= mx1 - thresh) and (x2 <= mx2):
+                    m[0][0], m[0][1] = min(mx1, x1), min(my1, y1)
+                    m[0][2], m[0][3] = max(mx2, x2), max(my2, y2)
+                    m[1] = txt + " " + m_txt
+                    placed = True; break
+        if not placed: merged_yellow.append([[x1, y1, x2, y2], txt])
+
+    # Склейка желтых с зелеными
+    final_text_results = []
+    for y_m in merged_yellow:
+        y_box, y_txt = y_m[0], y_m[1]
+        yx1, yy1, yx2, yy2 = y_box
+        placed = False
+        for r_m in merged_rapid:
+            r_box, r_txt = r_m[0], r_m[1]
+            rx1, ry1, rx2, ry2 = r_box
+            min_h = min(yy2 - yy1, ry2 - ry1)
+            y_overlap = max(0, min(yy2, ry2) - max(yy1, ry1))
+            if min_h > 0 and (y_overlap / min_h) > 0.4:
+                thresh = max(yy2 - yy1, ry2 - ry1) * 3.5
+                if (yx1 <= rx2 + thresh) and (yx1 >= rx1 - min_h):
+                    r_m[0][0], r_m[0][1] = min(rx1, yx1), min(ry1, yy1)
+                    r_m[0][2], r_m[0][3] = max(rx2, yx2), max(ry2, yy2)
+                    r_m[1] = r_txt + " " + y_txt
+                    placed = True; break
+                elif (yx2 >= rx1 - thresh) and (yx2 <= rx2 + min_h):
+                    r_m[0][0], r_m[0][1] = min(rx1, yx1), min(ry1, yy1)
+                    r_m[0][2], r_m[0][3] = max(rx2, yx2), max(ry2, yy2)
+                    r_m[1] = y_txt + " " + r_txt
+                    placed = True; break
+        if not placed:
+            final_text_results.append((y_box[0], y_box[1], y_box[2], y_box[3], y_txt, "opencv"))
+
+    for r_m in merged_rapid:
+        r_box, r_txt = r_m[0], r_m[1]
+        final_text_results.append((r_box[0], r_box[1], r_box[2], r_box[3], r_txt, "rapid"))
+
     ui_results = defaultdict(list)
     with torch.no_grad():
-        for (x1, y1, x2, y2) in icons_boxes:
-            pad = 8
-            cx1, cy1 = max(0, x1-pad), max(0, y1-pad)
-            cx2, cy2 = min(width, x2+pad), min(height, y2+pad)
-            crop = img_bgr[cy1:cy2, cx1:cx2]
-            if crop.size == 0: continue
-            
-            crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-            img_pil = Image.fromarray(crop_rgb)
-            
-            image_tensor = _MODELS.mc_preprocess(img_pil).unsqueeze(0)
-            image_features = _MODELS.mc_model.encode_image(image_tensor)
-            image_features = F.normalize(image_features, dim=-1)
-            
-            similarity = (100.0 * image_features @ _MODELS.text_features.T).softmax(dim=-1)
-            best_idx = similarity.argmax().item()
-            conf = similarity[0, best_idx].item() * 100
-            
-            if conf >= 70.0:
-                label = _CANDIDATE_LABELS[best_idx]
-            else:
-                label = "неопознано"
-                
+        for box in pure_icons:
+            x1, y1, x2, y2 = box
+            cy1, cy2 = max(0, y1-6), min(height, y2+6)
+            cx1, cx2 = max(0, x1-6), min(width, x2+6)
+            img_pil = Image.fromarray(cv2.cvtColor(img_bgr[cy1:cy2, cx1:cx2], cv2.COLOR_BGR2RGB))
+            sim = (100.0 * F.normalize(_MODELS.mc_model.encode_image(_MODELS.mc_preprocess(img_pil).unsqueeze(0)), dim=-1) @ _MODELS.text_features.T).softmax(dim=-1)
+            best_idx = sim.argmax().item()
+            label = _CANDIDATE_LABELS[best_idx] if sim[0, best_idx].item() * 100 >= 70.0 else "неопознано"
             ui_results[label].append((x1, y1, x2, y2))
-
-    # === ЭТАП 6: Форматирование результата ===
+                
+    # === 4. Форматирование результата ===
     output_lines = ["текст"]
-    for (x1, y1, x2, y2, txt) in text_results:
+    for (x1, y1, x2, y2, txt, src) in final_text_results:
         output_lines.append(f"{x1};{y1};{x2};{y2};{txt}")
         
     for label in sorted(ui_results.keys()):
@@ -287,42 +310,28 @@ def ui_parser(base64_image: str) -> str:
         for (x1, y1, x2, y2) in ui_results["неопознано"]:
             output_lines.append(f"{x1};{y1};{x2};{y2}")
 
-    # === ЭТАП 7: Отладка (Сохранение картинки) ===
+    # === 5. Отладка (Сохранение картинки) ===
     if DEBUG_SAVE_PARSED_IMAGE:
         try:
             import datetime
-            from PIL import ImageDraw, ImageFont
-            img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-            pil_img = Image.fromarray(img_rgb)
+            pil_img = Image.fromarray(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB))
             draw = ImageDraw.Draw(pil_img)
             
-            try:
-                font_paths = [
-                    "C:/Windows/Fonts/arial.ttf",
-                    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                    "/System/Library/Fonts/Cache/Arial.ttf"
-                ]
-                font = None
-                for p in font_paths:
-                    if os.path.exists(p):
-                        font = ImageFont.truetype(p, 14)
-                        break
-                if not font:
-                    font = ImageFont.load_default()
-            except:
-                font = ImageFont.load_default()
+            try: font = ImageFont.truetype("C:/Windows/Fonts/arial.ttf", 14)
+            except: font = ImageFont.load_default()
 
-            for (x1, y1, x2, y2, txt) in text_results:
-                draw.rectangle([x1, y1, x2, y2], outline=(0, 255, 0), width=2)
-                draw.text((x1, y1 - 18), txt[:20], fill=(0, 255, 0), font=font)
+            for (x1, y1, x2, y2, txt, src) in final_text_results:
+                c = (0, 255, 0) if src == "rapid" else (255, 255, 0)
+                draw.rectangle([x1, y1, x2, y2], outline=c, width=2)
+                draw.text((x1, max(0, y1 - 18)), txt[:40], fill=c, font=font)
                 
             for label, boxes in ui_results.items():
-                color = (0, 0, 255) if label != "неопознано" else (255, 0, 0)
+                c = (255, 0, 0) if label != "неопознано" else (255, 100, 100)
                 for (x1, y1, x2, y2) in boxes:
-                    draw.rectangle([x1, y1, x2, y2], outline=color, width=2)
+                    draw.rectangle([x1, y1, x2, y2], outline=c, width=2)
                     if label != "неопознано":
-                        short_label = label.split()[-1]
-                        draw.text((x1, y2 + 5), short_label, fill=color, font=font)
+                        lbl = label.split()[-1]
+                        draw.text((x1, y2 + 2), lbl, fill=c, font=font)
 
             logs_dir = os.path.join(os.path.dirname(__file__), "logs")
             os.makedirs(logs_dir, exist_ok=True)

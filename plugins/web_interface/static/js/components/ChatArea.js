@@ -384,6 +384,7 @@ export default {
             </div>
 
             <div class="flex-1 overflow-y-auto px-2 md:px-0 pt-16 md:pt-6 pb-48 space-y-8 scroll-smooth custom-scrollbar" 
+                 id="chat-messages-container"
                  ref="messagesContainer" @scroll="handleScroll">
 
                 <!-- Дашборд статистики сессии -->
