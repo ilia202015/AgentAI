@@ -101,33 +101,6 @@ class StatusOverlay:
     def stop(self):
         self._stop_event.set()
 
-class ActivityMonitor:
-    """Мониторинг вмешательства пользователя."""
-    def __init__(self):
-        self.last_pos = pyautogui.position()
-        self.is_interrupted = False
-
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        # Point объект из pyautogui обычно пиклится, но на всякий случай переведем в кортеж
-        state['last_pos'] = (self.last_pos.x, self.last_pos.y) if hasattr(self.last_pos, 'x') else self.last_pos
-        return state
-
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        # Восстанавливаем как Point если нужно, или оставляем кортежем
-
-    def check(self):
-        current_pos = pyautogui.position()
-        lx, ly = (self.last_pos[0], self.last_pos[1]) if isinstance(self.last_pos, (list, tuple)) else (self.last_pos.x, self.last_pos.y)
-        if abs(current_pos.x - lx) > 30 or abs(current_pos.y - ly) > 30:
-            return True
-        return False
-
-    def update_last_pos(self):
-        time.sleep(0.1)
-        self.last_pos = pyautogui.position()
-
 def show_completion_notification(title="Задача выполнена", message="Агент завершил работу. Нажмите, чтобы вернуться."):
     if platform.system() != "Windows":
         return
@@ -142,7 +115,6 @@ def show_completion_notification(title="Задача выполнена", messag
 
 # Глобальные объекты
 overlay = StatusOverlay()
-monitor = ActivityMonitor()
 
 # --- КОНЕЦ НОВОГО ФУНКЦИОНАЛА ---
 
@@ -187,26 +159,21 @@ def stable_click(x, y, button='left'):
     pyautogui.mouseUp(button=button)
 
 def execute_action(action_name, args):
-    if monitor.check():
-         return {"error": "Interrupted by user"}
 
     if action_name == "open_web_browser": #EXCLUDED
         url = args.get("url", "https://google.com")
         webbrowser.open(url)
         time.sleep(2)
-        monitor.update_last_pos()
         return {"output": f"Browser opened: {url}"}
 
     elif action_name == "click_at":
         x, y = denormalize(args.get("x"), args.get("y"))
         stable_click(x, y)
-        monitor.update_last_pos()
         return {"output": f"Clicked at {x}, {y}"}
 
     elif action_name == "hover_at":
         x, y = denormalize(args.get("x"), args.get("y"))
         pyautogui.moveTo(x, y, duration=0.2)
-        monitor.update_last_pos()
         return {"output": f"Hovered at {x}, {y}"}
 
     elif action_name == "drag_and_drop":
@@ -215,7 +182,6 @@ def execute_action(action_name, args):
         pyautogui.moveTo(x, y, duration=0.2)
         time.sleep(0.1)
         pyautogui.dragTo(dx, dy, button='left', duration=0.5)
-        monitor.update_last_pos()
         return {"output": f"Dragged from {x},{y} to {dx},{dy}"}
 
     elif action_name == "type_text_at":
@@ -251,7 +217,6 @@ def execute_action(action_name, args):
             time.sleep(0.2)
             pyautogui.press('enter')
             
-        monitor.update_last_pos()
         return {"output": f"Typed text at {x}, {y}"}
 
     elif action_name == "key_combination":
@@ -261,7 +226,6 @@ def execute_action(action_name, args):
         mod_map = {'control': 'ctrl', 'command': 'win', 'meta': 'win'}
         clean_keys = [mod_map.get(k, k) for k in keys]
         win_hotkey(*clean_keys)
-        monitor.update_last_pos()
         return {"output": f"Pressed keys: {keys_str}"}
 
     elif action_name == "scroll_document":
@@ -270,7 +234,6 @@ def execute_action(action_name, args):
         elif direction == "up": pyautogui.press('pageup')
         elif direction == "left": pyautogui.press('left')
         elif direction == "right": pyautogui.press('right')
-        monitor.update_last_pos()
         return {"output": f"Scrolled document {direction}"}
 
     elif action_name == "scroll_at":
@@ -280,7 +243,6 @@ def execute_action(action_name, args):
         pyautogui.moveTo(x, y, duration=0.2)
         amount = magnitude if direction == "up" else -magnitude
         pyautogui.scroll(amount)
-        monitor.update_last_pos()
         return {"output": f"Scrolled {direction} at {x}, {y}"}
 
     elif action_name == "wait":
@@ -290,22 +252,18 @@ def execute_action(action_name, args):
         except:
             seconds = 1
         time.sleep(seconds)
-        monitor.update_last_pos()
         return {"output": f"Waited {seconds} seconds"}
 
     elif action_name == "go_back":
         pyautogui.hotkey('alt', 'left')
-        monitor.update_last_pos()
         return {"output": "Navigated back"}
 
     elif action_name == "go_forward":
         pyautogui.hotkey('alt', 'right')
-        monitor.update_last_pos()
         return {"output": "Navigated forward"}
 
     elif action_name == "search":
         webbrowser.open("https://www.google.com")
-        monitor.update_last_pos()
         return {"output": "Search engine opened"}
 
     elif action_name == "navigate":
@@ -314,7 +272,6 @@ def execute_action(action_name, args):
             if not url.startswith(('http://', 'https://')):
                 url = 'https://' + url
             webbrowser.open(url)
-            monitor.update_last_pos()
             return {"output": f"Navigated to {url}"}
         return {"error": "URL is missing"}
 

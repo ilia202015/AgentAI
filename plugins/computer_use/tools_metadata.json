@@ -1,0 +1,85 @@
+[
+  {
+    "function": {
+      "name": "take_screenshot",
+      "description": "Снимает текущее изображение экрана и возвращает его. Обязательно используй этот инструмент каждый раз, когда тебе нужно увидеть экран перед выполнением действий.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {},
+        "required": []
+      }
+    }
+  },
+  {
+    "function": {
+      "name": "computer_use_actions",
+      "description": "Выполняет действия на компьютере.",
+      "parameters": {
+        "type": "OBJECT",
+        "properties": {
+          "actions": {
+            "type": "ARRAY",
+            "description": "Список действий для выполнения.",
+            "items": {
+              "type": "OBJECT",
+              "properties": {
+                "action": {
+                  "type": "STRING"
+                },
+                "x": {
+                  "type": "INTEGER"
+                },
+                "y": {
+                  "type": "INTEGER"
+                },
+                "text": {
+                  "type": "STRING"
+                },
+                "keys": {
+                  "type": "STRING"
+                },
+                "press_enter": {
+                  "type": "BOOLEAN"
+                },
+                "clear_before_typing": {
+                  "type": "BOOLEAN"
+                },
+                "direction": {
+                  "type": "STRING",
+                  "enum": [
+                    "up",
+                    "down",
+                    "left",
+                    "right"
+                  ]
+                },
+                "magnitude": {
+                  "type": "INTEGER"
+                },
+                "seconds": {
+                  "type": "NUMBER"
+                },
+                "destination_x": {
+                  "type": "INTEGER"
+                },
+                "destination_y": {
+                  "type": "INTEGER"
+                }
+              },
+              "required": [
+                "action"
+              ]
+            }
+          },
+          "delay_before_screenshot": {
+            "type": "NUMBER",
+            "description": "Задержка в секундах перед созданием итогового скриншота после выполнения всех actions. По умолчанию 1. Если передать -1, скриншот делаться не будет."
+          }
+        },
+        "required": [
+          "actions"
+        ]
+      }
+    }
+  }
+]

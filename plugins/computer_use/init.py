@@ -1,76 +1,91 @@
-import traceback
-import types
-import json
+
 import os
-import importlib.util
 import sys
+import types
+import base64
+import json
+import time
 
-# Импорт computer_chat
 current_dir = os.path.dirname(os.path.abspath(__file__))
-
-# ВАЖНО: Добавляем текущую директорию в sys.path, чтобы pickle мог найти модуль
 if current_dir not in sys.path:
     sys.path.append(current_dir)
 
 try:
-    # Сначала пробуем импортировать через sys.path
-    import computer_chat
+    import tools
 except ImportError:
-    # Фолбэк на ручную загрузку
-    spec = importlib.util.spec_from_file_location("computer_chat", os.path.join(current_dir, "computer_chat.py"))
-    computer_chat = importlib.util.module_from_spec(spec)
-    # Регистрируем модуль в sys.modules, чтобы pickle мог его найти по имени 'computer_chat'
-    sys.modules["computer_chat"] = computer_chat 
-    spec.loader.exec_module(computer_chat)
-
-ComputerUseChat = computer_chat.ComputerUseChat
+    from . import tools
 
 def main(chat, settings):
-    # Добавляем инструмент computer_use_tool в основной чат
-    
-    tool_def = {
-        "function": {
-            "name": "start_computer_session",
-            "description": chat.prompts["start_computer_session"],
-            "parameters": {
-                "type": "OBJECT",
-                "properties": {
-                    "task": {
-                        "type": "STRING",
-                        "description": "Подробное описание задачи, которую нужно выполнить на компьютере."
-                    }
-                },
-                "required": ["task"]
-            }
-        }
-    }
-    
-    if not hasattr(chat, 'tools'):
-        chat.tools = []
-    
-    exists = False
-    for t in chat.tools:
-        if t['function']['name'] == 'start_computer_session':
-            exists = True
-            break
-            
-    if not exists:
-        chat.tools.append(tool_def)
-        print("🔌 Computer Use tool registered.")
-    
-    def start_computer_session_tool(self, task):
-        try:
-            # Создаем дочерний чат для Computer Use
-            computer_agent = ComputerUseChat(print_to_console=True, count_tab=self.count_tab + 1)
-            # Передаем текущий клиент (с учетом патчей и настроек)
-            computer_agent.client = self.client
-            
-            result = computer_agent.run_task(task)
-            return result
-        except Exception as e:
-            error_trace = traceback.format_exc()
-            return f"Критическая ошибка при запуске сессии Computer Use: {e}\n{error_trace}"""
+    try:
+        with open(os.path.join(current_dir, "tools_metadata.json"), "r", encoding="utf-8") as f:
+            plugin_tools = json.load(f)
+        for t in plugin_tools:
+            name = t["function"]["name"]
+            if name in chat.prompts:
+                t["function"]["description"] = chat.prompts[name]
+            if not any(exist['function']['name'] == name for exist in chat.tools):
+                chat.tools.append(t)
+    except Exception as e:
+        print(f"⚠️ Ошибка загрузки tools_metadata.json: {e}")
 
-    chat.start_computer_session_tool = types.MethodType(start_computer_session_tool, chat)
-    
+    def take_screenshot_tool(self):
+        try:
+            img_bytes = tools.take_screenshot()
+            if hasattr(self, 'web_emit'):
+                b64_img = base64.b64encode(img_bytes).decode('utf-8')
+                self.web_emit("computer_view", {"image": f"data:image/png;base64,{b64_img}"})
+            b64 = base64.b64encode(img_bytes).decode('utf-8')
+            return {"status": "success", "images": [b64]}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    chat.take_screenshot_tool = types.MethodType(take_screenshot_tool, chat)
+
+    def computer_use_actions_tool(self, actions, delay_before_screenshot=1.0):
+        if hasattr(tools, 'overlay'):
+            tools.overlay.start()
+        
+        results = []
+        for act in actions:
+            action_name = act.get("action")
+            if not action_name:
+                continue
+                
+            self.print(f"⚡ [Action] {action_name}({json.dumps(act, ensure_ascii=False)})")
+            try:
+                res = tools.execute_action(action_name, act)
+                results.append({"action": action_name, "result": res})
+            except Exception as e:
+                self.print(f"  ❌ Ошибка: {e}")
+                results.append({"action": action_name, "error": str(e)})
+
+        if hasattr(tools, 'overlay'):
+            tools.overlay.stop()
+            
+        final_response = {"status": "completed", "details": results}
+        
+        # Обработка итогового скриншота
+        try:
+            delay = float(delay_before_screenshot)
+            if delay >= 0:
+                self.print(f"📸 Ожидание {delay}с перед скриншотом...")
+                time.sleep(delay)
+                img_bytes = tools.take_screenshot()
+                
+                if hasattr(self, 'web_emit'):
+                    b64_img = base64.b64encode(img_bytes).decode('utf-8')
+                    self.web_emit("computer_view", {"image": f"data:image/png;base64,{b64_img}"})
+                
+                b64 = base64.b64encode(img_bytes).decode('utf-8')
+                final_response["images"] = [b64]
+                final_response["screenshot_status"] = "attached"
+        except Exception as e:
+            self.print(f"⚠️ Ошибка создания скриншота: {e}")
+            final_response["screenshot_status"] = f"error: {e}"
+            
+        return final_response
+
+    chat.computer_use_actions_tool = types.MethodType(computer_use_actions_tool, chat)
+
+    print("✅ Custom Computer Use (Batch Mode + Auto-Screenshot) интегрирован.")
     return chat
