@@ -1,17 +1,6 @@
 [
   {
     "function": {
-      "name": "take_screenshot",
-      "description": "Снимает текущее изображение экрана и возвращает его. Обязательно используй этот инструмент каждый раз, когда тебе нужно увидеть экран перед выполнением действий.",
-      "parameters": {
-        "type": "OBJECT",
-        "properties": {},
-        "required": []
-      }
-    }
-  },
-  {
-    "function": {
       "name": "computer_use_actions",
       "description": "Выполняет действия на компьютере.",
       "parameters": {
@@ -24,7 +13,17 @@
               "type": "OBJECT",
               "properties": {
                 "action": {
-                  "type": "STRING"
+                  "type": "STRING",
+                  "enum": [
+                    "screenshot",
+                    "click_at",
+                    "hover_at",
+                    "type_text_at",
+                    "scroll_at",
+                    "wait",
+                    "drag_and_drop",
+                    "key_combination"
+                  ]
                 },
                 "x": {
                   "type": "INTEGER"
@@ -70,10 +69,6 @@
                 "action"
               ]
             }
-          },
-          "delay_before_screenshot": {
-            "type": "NUMBER",
-            "description": "Задержка в секундах перед созданием итогового скриншота после выполнения всех actions. По умолчанию 1. Если передать -1, скриншот делаться не будет."
           }
         },
         "required": [
