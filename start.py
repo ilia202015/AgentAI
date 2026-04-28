@@ -137,10 +137,8 @@ def load_plugins():
                 
             # 3. Инициализация через init.py
             if os.path.exists(init_path):
-                spec = importlib.util.spec_from_file_location(f"plugins.{plugin_name}", init_path)
-                module = importlib.util.module_from_spec(spec)
-                sys.modules[f"plugins.{plugin_name}"] = module
-                spec.loader.exec_module(module)
+                # Используем стандартный импорт пакетов Python
+                module = importlib.import_module(f"plugins.{plugin_name}.init")
                 
                 if hasattr(module, 'main'):
                     settings = config.get("settings", {}).get(plugin_name, {})

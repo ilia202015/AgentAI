@@ -109,7 +109,7 @@ export default {
                     </div>
                     
                     <!-- Footer -->
-                    <div class="p-4 border-t border-white/5 bg-black/20 backdrop-blur-sm space-y-3 relative">
+                    <div class="p-4 border-t border-white/5 bg-black/20 backdrop-blur-sm space-y-3 relative z-[60]">
                         <div v-if="store.currentChatId" class="relative" ref="modelMenuRef">
                              <div class="flex items-center justify-between mb-1.5 px-1">
                                 <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Модель</label>
