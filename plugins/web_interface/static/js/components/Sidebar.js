@@ -109,7 +109,7 @@ export default {
                     </div>
                     
                     <!-- Footer -->
-                    <div class="p-4 border-t border-white/5 bg-black/20 backdrop-blur-sm space-y-3 relative z-[60]">
+                    <div class="p-4 border-t border-white/5 bg-black/20 space-y-3 relative z-[40]">
                         <div v-if="store.currentChatId" class="relative" ref="modelMenuRef">
                              <div class="flex items-center justify-between mb-1.5 px-1">
                                 <label class="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Модель</label>
@@ -126,14 +126,18 @@ export default {
                                 <i class="ph-bold ph-caret-down text-gray-500 group-hover:text-gray-300 transition-transform duration-200" :class="isModelMenuOpen ? 'rotate-180' : ''"></i>
                             </button>
                             
+                            
+                        
+                            <!-- Всплывающее меню моделей -->
                             <div v-if="isModelMenuOpen" 
-                                class="absolute bottom-full left-0 right-0 mb-2 bg-gray-900/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden z-[60] animate-fade-in-up origin-bottom">
+                                style="backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%);"
+                                class="absolute bottom-[calc(100%+8px)] left-0 right-0 bg-gray-900/60 border border-white/10 rounded-xl shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.5)] overflow-hidden z-[100] animate-fade-in-up origin-bottom">
                                 <div class="p-1 max-h-48 overflow-y-auto custom-scrollbar">
                                     <button v-for="m in store.models" :key="m[0]" @click="selectModel(m[0])"
                                         class="w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between group transition-all duration-150"
-                                        :class="selectedModel === m[0] ? 'bg-blue-600/10 text-blue-400' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'">
+                                        :class="selectedModel === m[0] ? 'bg-blue-600/20 text-blue-400' : 'text-gray-400 hover:bg-white/10 hover:text-gray-200'">
                                         <span class="font-medium truncate">{{ m[0] }}</span>
-                                        <i v-if="selectedModel === m[0]" class="ph-bold ph-check text-blue-500"></i>
+                                        <i v-if="selectedModel === m[0]" class="ph-bold ph-check text-blue-400"></i>
                                         <span v-else class="text-[9px] opacity-0 group-hover:opacity-50 bg-white/10 px-1.5 py-0.5 rounded transition-opacity">{{ m[1] }} RPM</span>
                                     </button>
                                 </div>
@@ -152,7 +156,7 @@ export default {
                             </div>
                             <div class="flex flex-col"><span class="text-xs font-medium text-gray-300">Агент онлайн</span><span class="text-[10px] text-gray-600">v1.6.5 • {{ store.chats.length }} чатов</span></div>
                         </div>
-                    </div>
+                </div>
                 </div>
             </div>
         </div>
