@@ -196,7 +196,7 @@ def web_handle_stream(self, stream):
         for chunk in gen:
             if getattr(self, 'stop_requested', False):
                 self.print("\n🛑 Force stopped.")
-                break
+                break   
             yield chunk
 
     try:

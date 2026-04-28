@@ -1065,13 +1065,13 @@ class Chat:
                 self._current_request_start_time = time.time()
 
                 stream = self.client.models.generate_content_stream(
-                    model=self.model,
+                    model=self.model,   
                     contents=self.messages,
                     config=config,
                 )
 
                 res = self._handle_stream(stream)
-                if res:
+                if res is not None:
                     return res
                 # Если res is None, значит _handle_stream попросил ретрай
                 continue

@@ -607,10 +607,6 @@ class WebRequestHandler(http.server.BaseHTTPRequestHandler):
                     pass
                 except Exception as e:
                     log_debug(f"SSE Connection error: {e}")
-                    # Stop all agents if the user closed the connection
-                    for c in current_chats:
-                        if hasattr(c, "stop_requested"):
-                            c.stop_requested = True
                     return
 
             if not got_event:
