@@ -15,6 +15,14 @@ export const store = reactive({
     isSidebarVisibleDesktop: true,
     isPromptPanelOpen: false,
     isBgEnabled: localStorage.getItem('agent_bg_enabled') === 'true',
+    isSettingsModalOpen: false,
+    bgType: localStorage.getItem('agent_bg_type') || (localStorage.getItem('agent_bg_enabled') === 'true' ? 'neon' : 'none'),
+    uiBlurLevel: localStorage.getItem('agent_ui_blur') || 'md',
+    uiDimmingPercent: localStorage.getItem('agent_ui_dimming') !== null ? parseInt(localStorage.getItem('agent_ui_dimming')) : 80,
+    get blurClass() { return this.uiBlurLevel === 'none' ? '' : `backdrop-blur-${this.uiBlurLevel}`; },
+    get dimmingBgColor() { return `rgba(17, 24, 39, ${this.uiDimmingPercent / 100})`; }, // gray-900 base
+    get dimmingBgColorDark() { return `rgba(3, 7, 18, ${this.uiDimmingPercent / 100})`; }, // gray-950 base
+    get dimmingBgColorLight() { return `rgba(31, 41, 55, ${this.uiDimmingPercent / 100})`; }, // gray-800 base
     presets: {}, 
     activePresetId: 'default', defaultPresetId: 'default',
     
@@ -201,6 +209,26 @@ export const store = reactive({
         }, 3000);
     },
     
+    
+    toggleSettingsModal() {
+        this.isSettingsModalOpen = !this.isSettingsModalOpen;
+    },
+    updateUISettings(updates) {
+        if (updates.bgType !== undefined) {
+            this.bgType = updates.bgType;
+            localStorage.setItem('agent_bg_type', this.bgType);
+            this.isBgEnabled = this.bgType !== 'none';
+            localStorage.setItem('agent_bg_enabled', this.isBgEnabled);
+        }
+        if (updates.uiBlurLevel !== undefined) {
+            this.uiBlurLevel = updates.uiBlurLevel;
+            localStorage.setItem('agent_ui_blur', this.uiBlurLevel);
+        }
+        if (updates.uiDimmingPercent !== undefined) {
+            this.uiDimmingPercent = updates.uiDimmingPercent;
+            localStorage.setItem('agent_ui_dimming', this.uiDimmingPercent);
+        }
+    },
     toggleBg() {
         this.isBgEnabled = !this.isBgEnabled;
         localStorage.setItem('agent_bg_enabled', this.isBgEnabled);

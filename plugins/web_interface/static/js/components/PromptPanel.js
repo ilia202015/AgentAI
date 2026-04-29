@@ -8,13 +8,13 @@ export default {
             <!-- Mobile Backdrop -->
             <Teleport to="body">
                 <div v-if="store.isPromptPanelOpen" 
-                     class="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] md:hidden transition-all duration-300"
+                     class="fixed inset-0 bg-black/60 z-[60] md:hidden transition-all duration-300" :class="store.blurClass"
                      @click="store.isPromptPanelOpen = false"></div>
             </Teleport>
 
             <!-- Panel Container -->
-            <div class="fixed md:relative inset-y-0 right-0 h-full bg-gray-900/40 backdrop-blur-xl border-l border-white/5 flex flex-col flex-shrink-0 z-[70] transition-all duration-300 ease-in-out shadow-2xl"
-                 :class="[
+            <div class="fixed md:relative inset-y-0 right-0 h-full border-l border-white/5 flex flex-col flex-shrink-0 z-[70] transition-all duration-300 ease-in-out shadow-2xl" :style="{ backgroundColor: store.dimmingBgColor }" 
+                 :class="[store.blurClass,
                     !store.isPromptPanelOpen ? 'w-0 translate-x-full opacity-0 border-none pointer-events-none' : 
                     (isExpanded ? 'w-full md:w-[700px] translate-x-0 opacity-100' : 'w-[360px] translate-x-0 opacity-100')
                  ]">
@@ -155,12 +155,12 @@ export default {
                                     <div class="p-4 bg-white/5 rounded-2xl border border-white/5 space-y-4">
                                         <div class="flex items-center justify-between gap-4">
                                             <span class="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Глобальные права:</span>
-                                            <input v-model="editPromptData.fs_permissions.global" class="w-24 bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-xs text-blue-400 font-mono text-center focus:border-blue-500/50 outline-none" placeholder="rwxld">
+                                            <input v-model="editPromptData.fs_permissions.global" class="w-24  border border-white/10 rounded-lg px-2 py-1 text-xs text-blue-400 font-mono text-center focus:border-blue-500/50 outline-none" placeholder="rwxld">
                                         </div>
                                         <div class="space-y-2">
                                             <div v-for="(perms, pth) in editPromptData.fs_permissions.paths" :key="pth" class="flex items-center gap-2 group animate-fade-in">
                                                 <div class="flex-1 bg-white/5 border border-white/5 rounded-lg px-3 py-1.5 text-[10px] text-gray-500 font-mono truncate">{{ pth }}</div>
-                                                <input v-model="editPromptData.fs_permissions.paths[pth]" class="w-16 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-indigo-400 font-mono text-center focus:border-indigo-500/50 outline-none">
+                                                <input v-model="editPromptData.fs_permissions.paths[pth]" class="w-16  border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-indigo-400 font-mono text-center focus:border-indigo-500/50 outline-none">
                                                 <button @click="delete editPromptData.fs_permissions.paths[pth]" class="p-1.5 text-red-500/40 hover:text-red-400 transition-colors"><i class="ph ph-trash"></i></button>
                                             </div>
                                             <div class="flex gap-2 pt-2">
@@ -268,12 +268,12 @@ export default {
                                     <div class="p-4 bg-white/5 rounded-2xl border border-white/5 space-y-4">
                                         <div class="flex items-center justify-between gap-4">
                                             <span class="text-[10px] text-gray-400 font-bold uppercase tracking-tight">Глобальные права:</span>
-                                            <input v-model="editPresetData.fs_permissions.global" class="w-24 bg-black/40 border border-white/10 rounded-lg px-2 py-1 text-xs text-blue-400 font-mono text-center focus:border-blue-500/50 outline-none" placeholder="rwxld">
+                                            <input v-model="editPresetData.fs_permissions.global" class="w-24  border border-white/10 rounded-lg px-2 py-1 text-xs text-blue-400 font-mono text-center focus:border-blue-500/50 outline-none" placeholder="rwxld">
                                         </div>
                                         <div class="space-y-2">
                                             <div v-for="(perms, pth) in editPresetData.fs_permissions.paths" :key="pth" class="flex items-center gap-2 group animate-fade-in">
                                                 <div class="flex-1 bg-white/5 border border-white/5 rounded-lg px-3 py-1.5 text-[10px] text-gray-500 font-mono truncate">{{ pth }}</div>
-                                                <input v-model="editPresetData.fs_permissions.paths[pth]" class="w-16 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-indigo-400 font-mono text-center focus:border-indigo-500/50 outline-none">
+                                                <input v-model="editPresetData.fs_permissions.paths[pth]" class="w-16  border border-white/10 rounded-lg px-2 py-1.5 text-[10px] text-indigo-400 font-mono text-center focus:border-indigo-500/50 outline-none">
                                                 <button @click="delete editPresetData.fs_permissions.paths[pth]" class="p-1.5 text-red-500/40 hover:text-red-400 transition-colors"><i class="ph ph-trash"></i></button>
                                             </div>
                                             <div class="flex gap-2 pt-2">

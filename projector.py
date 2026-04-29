@@ -77,6 +77,11 @@ class Projector:
             if prompt:
                 self.chat.print(prompt + prompt_end)
                 self.chat.send(prompt + prompt_end)
+            if self.is_final:
+                return self.get_prompt('next') + (prompt_end if auto_mode else "\n\nВыход из авто-режима, давай нормальные ответы\n")
+            block = self.blocks[self.b_idx]
+            steps = block.get('steps', [])
+        
         
         while self.s_idx < len(steps) - 1:
             prompt = self.get_prompt('next')
@@ -101,16 +106,14 @@ class Projector:
                     self.chat.print(self.get_prompt('fix'))
                     self.chat.send(self.get_prompt('fix'))
             
+                self.chat.print("\nБлок завершён!\n\n")
+
                 if self.b_idx >= len(self.blocks):
                     break
             
             prompt_end = "\n\nСейчас ты работаешь в авто-режиме, выполни шаг и выведи \"OK\" в качестве ответа (без лишнего текста)\n"
             
-            prompt = self.get_prompt('next')
-            self.chat.print(prompt + prompt_end)
-            self.chat.send(prompt + prompt_end)
-            
-            for _ in range(3):
+            for _ in range(2):
                 self.chat.print(self.get_prompt('find_bug') + prompt_end)
                 self.chat.send(self.get_prompt('find_bug') + prompt_end)
                 has_bugs = self.chat.ai_get("ВНИМАНИЕ! Основываясь на твоем предыдущем ответе: были ли найдены реальные баги или критические ошибки (не считая намеренных заглушек)? Ответь строго 'True' если да, или 'False' если нет.", target_type=bool, clean_history=False)

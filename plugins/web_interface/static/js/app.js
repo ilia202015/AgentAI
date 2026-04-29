@@ -5,6 +5,7 @@ import { bgManager } from './bg_effect.js';
 import Sidebar from './components/Sidebar.js';
 import ChatArea from './components/ChatArea.js';
 import PromptPanel from './components/PromptPanel.js';
+import SettingsModal from './components/SettingsModal.js';
 
 // --- Toast Component (Global) ---
 const ToastContainer = defineComponent({
@@ -28,10 +29,11 @@ const ToastContainer = defineComponent({
 });
 
 const App = {
-    components: { Sidebar, ChatArea, PromptPanel, ToastContainer },
+    components: { Sidebar, ChatArea, PromptPanel, ToastContainer, SettingsModal },
     template: `
         <div class="flex w-full h-full font-sans antialiased bg-gray-950 text-gray-200 relative overflow-hidden">
             <ToastContainer />
+            <SettingsModal />
             <Sidebar />
             <ChatArea />
             <PromptPanel />
@@ -125,18 +127,12 @@ const App = {
         }
         
         // Background Effect Watcher
-        watch(() => store.isBgEnabled, (val) => {
-            if (val) bgManager.init();
-            else bgManager.stop();
+        watch(() => store.bgType, (val) => {
+            bgManager.init(val);
         });
         
-        // Init Bg if enabled
-        if (store.isBgEnabled) {
-            bgManager.init();
-        } else {
-            // Ensure clean state
-            bgManager.stop();
-        }
+        // Init Bg
+        bgManager.init(store.bgType);
         
         setTimeout(() => store.addToast('Агент готов к работе', 'success'), 1000);
 
