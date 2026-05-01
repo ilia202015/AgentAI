@@ -88,22 +88,21 @@ export default {
                 <button @click.stop="clearContext(chat.id)" class="p-1.5 hover:text-amber-400 hover:bg-white/10 rounded-md transition-colors" title="Очистить контекст (удалить PKL)"><i class="ph ph-eraser"></i></button>
                 <button @click.stop="startRename(chat)" class="p-1.5 hover:text-blue-400 hover:bg-white/10 rounded-md transition-colors" title="Переименовать"><i class="ph ph-pencil-simple"></i></button>
                 <button @click.stop="deleteChat(chat.id)" class="p-1.5 hover:text-red-400 hover:bg-white/10 rounded-md transition-colors" title="Удалить"><i class="ph ph-trash"></i></button>
+              </div>
 
-                <!-- Меню пресетов -->
-                <div v-if="activePresetMenuId === chat.id" 
-                   class="absolute right-0 w-48 border border-white/10 rounded-xl shadow-2xl z-[100] p-1 animate-fade-in origin-top-right"
-                   style="backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);"
-                   :style="{ backgroundColor: store.dimmingBgColorDark }"
-                   :class="index < 3 ? 'top-full mt-2' : 'bottom-full mb-2'">
-                  <div class="text-[9px] font-bold text-gray-500 uppercase p-2 tracking-widest border-b border-white/5 mb-1">Выбор пресета</div>
-                  <div class="max-h-48 overflow-y-auto custom-scrollbar">
-                    <button v-for="(p, pid) in store.presets" :key="pid" @click.stop="selectPreset(chat.id, pid)"
-                        class="w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between group transition-all"
-                        :class="((chat.id === store.currentChatId && store.activePresetId === pid) || (chat.id !== store.currentChatId && chat.active_preset_id === pid)) ? 'bg-indigo-600/40 text-indigo-400' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'">
-                      <span class="truncate">{{ p.name }}</span>
-                      <i v-if="(chat.id === store.currentChatId && store.activePresetId === pid) || (chat.id !== store.currentChatId && chat.active_preset_id === pid)" class="ph-bold ph-check"></i>
-                    </button>
-                  </div>
+              <!-- Меню пресетов -->
+              <div v-if="activePresetMenuId === chat.id" 
+                 class="preset-menu-dropdown absolute right-2 w-48 border border-white/10 rounded-xl shadow-2xl z-[100] p-1 animate-fade-in origin-top-right"
+                 :style="{ backgroundColor: store.dimmingBgColorDark }"
+                 :class="[store.blurClass, index < 3 ? 'top-[90%] mt-2' : 'bottom-[90%] mb-2']">
+                <div class="text-[9px] font-bold text-gray-500 uppercase p-2 tracking-widest border-b border-white/5 mb-1">Выбор пресета</div>
+                <div class="max-h-48 overflow-y-auto custom-scrollbar">
+                  <button v-for="(p, pid) in store.presets" :key="pid" @click.stop="selectPreset(chat.id, pid)"
+                      class="w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between group transition-all"
+                      :class="((chat.id === store.currentChatId && store.activePresetId === pid) || (chat.id !== store.currentChatId && chat.active_preset_id === pid)) ? 'bg-indigo-600/40 text-indigo-400' : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'">
+                    <span class="truncate">{{ p.name }}</span>
+                    <i v-if="(chat.id === store.currentChatId && store.activePresetId === pid) || (chat.id !== store.currentChatId && chat.active_preset_id === pid)" class="ph-bold ph-check"></i>
+                  </button>
                 </div>
               </div>
             </div>
@@ -131,8 +130,7 @@ export default {
             
               <!-- Всплывающее меню моделей -->
               <div v-if="isModelMenuOpen" 
-                style="backdrop-filter: blur(8px) saturate(180%); -webkit-backdrop-filter: blur(8px) saturate(180%);"
-                class="absolute bottom-[calc(100%+8px)] left-0 right-0 border border-white/10 rounded-xl shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.5)] overflow-hidden z-[100] animate-fade-in-up origin-bottom" :style="{ backgroundColor: store.dimmingBgColorDark }">
+                class="absolute bottom-[calc(100%+8px)] left-0 right-0 border border-white/10 rounded-xl shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.5)] overflow-hidden z-[100] animate-fade-in-up origin-bottom" :style="{ backgroundColor: store.dimmingBgColorDark }" :class="store.blurClass">
                 <div class="p-1 max-h-48 overflow-y-auto custom-scrollbar">
                   <button v-for="m in store.models" :key="m[0]" @click="selectModel(m[0])"
                     class="w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between group transition-all duration-150"
@@ -198,7 +196,7 @@ export default {
       }
       if (activePresetMenuId.value) {
          const isBtn = event.target.closest('button[title="Сменить пресет"]');
-         const isMenu = event.target.closest('.absolute.bottom-full.right-0');
+         const isMenu = event.target.closest('.preset-menu-dropdown');
          if (!isBtn && !isMenu) activePresetMenuId.value = null;
       }
     };
