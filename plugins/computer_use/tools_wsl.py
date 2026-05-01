@@ -5,6 +5,33 @@ import json
 import base64
 import time
 
+import threading
+
+def _ensure_vnc_running():
+    try:
+        res = subprocess.run(['wsl', '-e', 'bash', '-c', 'pgrep Xvfb'], capture_output=True, text=True)
+        if not res.stdout.strip():
+            print("⚙️ [computer_use] WSL GUI не запущен. Выполняю автозапуск...")
+            script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "start_vnc.sh")
+            if os.path.exists(script_path):
+                wsl_path = subprocess.run(["wsl", "-e", "wslpath", "-a", script_path], capture_output=True, text=True).stdout.strip()
+                subprocess.run(["wsl", "-e", "bash", "-c", f"chmod +x '{wsl_path}'"])
+                
+                CREATE_NO_WINDOW = 0x08000000
+                subprocess.Popen(["wsl", "-e", "bash", "-c", f"'{wsl_path}'"], 
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL, 
+                                 creationflags=CREATE_NO_WINDOW)
+                print("⚙️ [computer_use] Скрипт VNC запущен в фоне.")
+            else:
+                print(f"⚙️ [computer_use] Ошибка: Скрипт {script_path} не найден!")
+        else:
+            print("⚙️ [computer_use] WSL GUI уже запущен.")
+    except Exception as e:
+        print(f"⚙️ [computer_use] Ошибка при проверке VNC: {e}")
+
+threading.Thread(target=_ensure_vnc_running, daemon=True).start()
+
+
 # Конфигурация WSL
 DISPLAY = ":99"
 
@@ -28,12 +55,9 @@ def run_wsl_command(command, decode=True):
 def take_screenshot():
     """Делает скриншот через scrot (Linux) и возвращает байты."""
     temp_file = "/tmp/agent_screenshot.png"
-    # scrot заменяет файл, если он существует
+
+    run_wsl_command(f"rm -f {temp_file}")
     run_wsl_command(f"scrot {temp_file}")
-    
-    # Читаем файл из Windows (обращаемся к файловой системе WSL)
-    wsl_temp_path = r"\\wsl$\Ubuntu\tmp\agent_screenshot.png"
-    # Если дистрибутив называется иначе, лучше читать содержимое через stdout
     
     # Надежный способ: прочитать файл в base64 внутри WSL и декодировать в Windows
     b64_output = run_wsl_command(f"base64 -w 0 {temp_file}")
@@ -87,9 +111,13 @@ def execute_action(action_name, args):
             time.sleep(0.1)
             
         if text:
-            # xdotool type иногда работает нестабильно с русским языком. 
-            # Лучше использовать буфер обмена (xclip), но пока оставим базовый type
-            run_wsl_command(f"xdotool type '{text}'")
+            import base64
+            # Безопасная передача текста через base64 во временный файл
+            b64_text = base64.b64encode(text.encode('utf-8')).decode('utf-8')
+            run_wsl_command(f"echo '{b64_text}' | base64 -d > /tmp/agent_type.txt")
+            time.sleep(0.1)
+            # Посимвольный ввод из файла с задержкой, чтобы браузер успевал реагировать
+            run_wsl_command("xdotool type --clearmodifiers --delay 50 --file /tmp/agent_type.txt")
             
         if press_enter:
             time.sleep(0.1)
