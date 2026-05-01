@@ -33,7 +33,7 @@ style.textContent = `
   
   @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
   @keyframes zoomIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-  .animate-fade-in { animation: fadeIn 0.2s ease-out forwards; }
+  .msg-animate-appear { animation: fadeIn 0.2s ease-out forwards; }
   .animate-zoom-in { animation: zoomIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
   .markdown-content h1 { font-size: 1.6em; font-weight: 700; margin-top: 0.8em; margin-bottom: 0.4em; line-height: 1.3; color: #f3f4f6; }
@@ -61,7 +61,7 @@ style.textContent = `
   .code-block-wrapper { margin: 0.6em 0 !important; }
 
   @keyframes fadeInUp { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-  .animate-fade-in-up { animation: fadeInUp 0.2s ease-out forwards; }
+  .msg-animate-appear { animation: fadeInUp 0.2s ease-out forwards; }
   
   .tooltip-arrow {
     width: 0; height: 0;
@@ -229,7 +229,7 @@ const MessageBubble = defineComponent({
   props: ['msg', 'index'],
   emits: ['edit', 'zoom'],
   template: `
-    <div class="group flex flex-col w-[95%] mx-auto animate-fade-in-up" :class="msg.role === 'user' ? 'items-end' : 'items-start'">
+    <div class="group flex flex-col w-[95%] mx-auto" :class="[msg.role === 'user' ? 'items-end' : 'items-start', { 'msg-animate-appear': isAnimating }]">
       <div class="flex items-center gap-2 mb-1 px-1 opacity-60 text-xs font-medium tracking-wide">
         <span v-if="msg.role === 'assistant' || msg.role === 'model'" class="flex items-center gap-1.5 text-blue-400"><i class="ph-fill ph-robot"></i> Агент<span class="ml-2 px-1.5 py-0.5 rounded-md bg-white/5 text-[9px] font-mono border border-white/5 opacity-50">{{ msg.model || store.currentModel }}</span></span>
         <span v-else class="text-gray-400 flex items-center gap-2"><span>Вы</span><button @click="startEdit" v-if="!isEditing" class="opacity-0 group-hover:opacity-100 transition-opacity hover:text-white" title="Редактировать"><i class="ph-bold ph-pencil-simple"></i></button></span>
@@ -263,6 +263,9 @@ const MessageBubble = defineComponent({
     </div>
   `,
   setup(props, { emit }) {
+    const isAnimating = ref(true);
+    onMounted(() => { setTimeout(() => { isAnimating.value = false; }, 400); });
+
     const isEditing = ref(false);
     const editContent = ref('');
     const getFullText = () => {
@@ -346,7 +349,7 @@ const MessageBubble = defineComponent({
       return '';
     };
 
-    return { store, processedTimeline, isEditing, editContent, startEdit, cancelEdit, saveEdit, copyToClipboard, formatToolMetrics };
+    return { isAnimating, store, processedTimeline, isEditing, editContent, startEdit, cancelEdit, saveEdit, copyToClipboard, formatToolMetrics };
   }
 });
 
@@ -437,7 +440,7 @@ export default {
           </div>
         </div>
         
-        <div v-if="filteredMessages.length === 0" class="h-full flex flex-col items-center justify-center text-center opacity-0 animate-fade-in-up" style="animation-delay: 0.1s; opacity: 1">
+        <div v-if="filteredMessages.length === 0" class="h-full flex flex-col items-center justify-center text-center opacity-0 msg-animate-appear" style="animation-delay: 0.1s; opacity: 1">
           <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-gray-800 to-gray-700 flex items-center justify-center mb-6 shadow-2xl border border-white/5">
             <i class="ph-duotone ph-sparkle text-3xl text-blue-400"></i>
           </div>
@@ -498,7 +501,7 @@ export default {
                   :class="store.active_parameters.includes(p.id) ? 'text-blue-400 bg-blue-500/20 shadow-inner' : 'text-gray-500 hover:text-gray-300 hover:bg-white/5'">
                   <i class="ph-bold" :class="p.icon || 'ph-gear'"></i>
                   <div class="absolute bottom-full mb-3 hidden group-hover:block pointer-events-none z-[100]">
-                    <div class="bg-gray-900 text-white text-[10px] px-3 py-1.5 rounded-lg border border-white/20 shadow-2xl whitespace-nowrap animate-fade-in-up uppercase font-bold tracking-widest">{{ p.name }}<div class="tooltip-arrow"></div></div>
+                    <div class="bg-gray-900 text-white text-[10px] px-3 py-1.5 rounded-lg border border-white/20 shadow-2xl whitespace-nowrap msg-animate-appear uppercase font-bold tracking-widest">{{ p.name }}<div class="tooltip-arrow"></div></div>
                     
                   </div>
                 </button>
@@ -544,7 +547,7 @@ export default {
       </div>
 
       <Teleport to="body">
-        <div v-if="zoomedImage" class="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4 animate-fade-in" :class="store.blurClass" @click="closeZoom">
+        <div v-if="zoomedImage" class="fixed inset-0 z-[9999] bg-black/90 flex items-center justify-center p-4 msg-animate-appear" :class="store.blurClass" @click="closeZoom">
           <button @click="closeZoom" class="absolute top-4 right-4 text-white/70 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10">
             <i class="ph-bold ph-x text-xl"></i>
           </button>
