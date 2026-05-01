@@ -24,7 +24,10 @@ def main(chat, settings):
             name = t["function"]["name"]
             # Подхватываем промпт из chat.prompts
             if name in chat.prompts:
-                t["function"]["description"] = chat.prompts[name]
+                desc = chat.prompts[name]
+                if name == "computer_use_actions" and hasattr(tools, "TOOLS_PROMPT"):
+                    desc += "\n\n" + tools.TOOLS_PROMPT
+                t["function"]["description"] = desc
             
             # Удаляем старые версии инструмента, чтобы обновить
             chat.tools = [existing for existing in chat.tools if existing['function']['name'] != name]

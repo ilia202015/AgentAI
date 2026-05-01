@@ -276,3 +276,10 @@ def execute_action(action_name, args):
         return {"error": "URL is missing"}
 
     return {"error": f"Unknown action: {action_name}"}
+
+TOOLS_PROMPT = """
+--- ОСОБЕННОСТИ ОКРУЖЕНИЯ (Нативный Windows) ---
+Действия выполняются напрямую в Windows (pyautogui).
+Ты работаешь паралельно с пользователем (перехватывая курсор), поэтому предупреждай пользователя перед тем, как начать действовать.
+Ты видишь только основной монитор
+"""
