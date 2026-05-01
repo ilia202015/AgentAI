@@ -667,7 +667,18 @@ export default {
       const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value;
       showScrollButton.value = (scrollHeight - scrollTop - clientHeight) > 300;
     };
-    watch(() => store.messages.length, async () => { await scrollToBottom(true); });
+    watch(() => store.messages, async () => {
+      let shouldScroll = true;
+      if (messagesContainer.value) {
+        const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value;
+        // Проверяем, был ли пользователь у нижнего края ДО того, как DOM обновится
+        shouldScroll = (scrollHeight - scrollTop - clientHeight) < 350;
+      }
+      await nextTick();
+      if (messagesContainer.value && shouldScroll) {
+        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+      }
+    }, { deep: true });
     
     const handleEdit = async (index, newText) => {
       store.isThinking = true;
