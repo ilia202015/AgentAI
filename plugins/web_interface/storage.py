@@ -218,6 +218,9 @@ def save_chat_state(chat):
         'updated_at': chat.updated_at,
         'messages': messages_json,
         'active_preset_id': getattr(chat, 'active_preset_id', 'default'),
+        'active_modes': getattr(chat, 'active_modes', []),
+        'model': getattr(chat, 'model', None),
+        'model_rpm': getattr(chat, 'model_rpm', None),
         'plugin_config': get_current_config()
     }
 

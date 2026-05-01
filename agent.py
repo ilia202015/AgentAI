@@ -513,7 +513,7 @@ class Chat:
         if 'local_env' in state:
             safe_env = {}
             for k, v in state['local_env'].items():
-                if isinstance(v, (io.IOBase, types.ModuleType)):
+                if isinstance(v, (io.IOBase, types.ModuleType, re.Match)):
                     continue
                 safe_env[k] = v
             state['local_env'] = safe_env
