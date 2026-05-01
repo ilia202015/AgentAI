@@ -460,7 +460,7 @@ export default {
       <div class="absolute bottom-0 left-0 w-full pb-6 pt-12 z-20 pointer-events-none" style="background: linear-gradient(to top, rgba(3,7,18,0.8) 0%, transparent 100%);">
         <div class="w-[95%] mx-auto relative group/msgbox pointer-events-auto">
           <div class="absolute inset-0 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl blur-lg opacity-0 group-focus-within/msgbox:opacity-100 transition-opacity duration-500"></div>
-          <div class="relative border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col transition-all group-focus-within/msgbox:border-blue-500/40 group-focus-within/msgbox:bg-gray-900/90 group-focus-within/msgbox:shadow-blue-500/10" :class="store.blurClass">
+          <div class="relative border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col transition-all group-focus-within/msgbox:border-blue-500/40 group-focus-within/msgbox:shadow-blue-500/10" :class="store.blurClass" :style="{ backgroundColor: store.dimmingBgColor }">
             <div v-if="editingIndex !== null" class="bg-blue-500/10 border-b border-white/5 px-4 py-1.5 text-[10px] text-blue-300 flex justify-between items-center uppercase font-bold tracking-wider">
               <span>Режим редактирования</span>
               <button @click="cancelEdit" class="hover:text-white"><i class="ph-bold ph-x"></i></button>
