@@ -26,6 +26,7 @@ def _ensure_vnc_running():
                 print(f"⚙️ [computer_use] Ошибка: Скрипт {script_path} не найден!")
         else:
             print("⚙️ [computer_use] WSL GUI уже запущен.")
+        print("⚙️ [computer_use] Подключиться к VNC: http://127.0.0.1:6080/vnc.html")
     except Exception as e:
         print(f"⚙️ [computer_use] Ошибка при проверке VNC: {e}")
 

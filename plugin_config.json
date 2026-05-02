@@ -1,5 +1,9 @@
 {
-  "settings": {},
+  "settings": {
+    "computer_use": {
+      "backend": "wsl"
+    }
+  },
   "list": [
     "web_interface",
     "computer_use"

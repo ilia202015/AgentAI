@@ -1,4 +1,3 @@
-
 import os
 import sys
 import types
@@ -10,12 +9,18 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.append(current_dir)
 
-try:
-    import tools
-except ImportError:
-    from . import tools
-
 def main(chat, settings):
+    # Определение бэкенда из настроек плагина
+    backend = settings.get("backend", "wsl")
+    
+    if backend == "windows_base":
+        from . import tools_windows_base as tools
+    elif backend == "wsl":
+        from . import tools_wsl as tools
+    else:
+        print(f"❌ Unknown computer_use backend: {backend}, falling back to wsl")
+        from . import tools_wsl as tools
+
     # 1. Загрузка метаданных инструментов
     try:
         with open(os.path.join(current_dir, "tools_metadata.json"), "r", encoding="utf-8") as f:
@@ -87,7 +92,7 @@ def main(chat, settings):
             
         final_response = {"status": "completed", "details": results}
         
-        # Прикрепляем все собранные картинки. agent.py автоматически развернет их в FunctionResponsePart
+        # Прикрепляем все собранные картинки
         if images_b64:
             final_response["images"] = images_b64
             
@@ -95,5 +100,5 @@ def main(chat, settings):
 
     chat.computer_use_actions_tool = types.MethodType(computer_use_actions_tool, chat)
 
-    print("✅ Custom Computer Use (Action: screenshot) интегрирован.")
+    print(f"✅ Computer Use (backend: {backend}) интегрирован.")
     return chat
