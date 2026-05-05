@@ -1,0 +1,135 @@
+<div class="slide-page" id="slide-6">
+    <!-- Меш-градиент (Строгие цвета: фиолетовый, индиго, синий для ассоциации с безопасностью и управлением) -->
+    <div class="absolute top-[-20%] left-[20%] w-[800px] h-[800px] bg-indigo-600/15 rounded-full blur-[150px]"></div>
+    <div class="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-purple-600/15 rounded-full blur-[150px]"></div>
+    <div class="absolute top-[30%] left-[-10%] w-[500px] h-[500px] bg-blue-600/10 rounded-full blur-[150px]"></div>
+    <div class="texture-overlay"></div>
+
+    <div class="relative z-10 w-full h-full flex flex-col p-8">
+        
+        <!-- Заголовок -->
+        <div class="mb-5 border-b border-white/10 pb-4">
+            <h2 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">Система Пресетов, Промптов и ACL</h2>
+        </div>
+
+        <div class="grid grid-cols-12 gap-8 flex-1 min-h-0">
+            
+            <!-- ЛЕВАЯ КОЛОНКА (Теория: Как это работает) - 5 колонок -->
+            <div class="col-span-5 flex flex-col gap-5 justify-between h-full">
+                
+                <div class="glass-card p-6 rounded-3xl border-indigo-500/20 flex flex-col relative overflow-hidden group h-full">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-bl-full transition-transform group-hover:scale-110"></div>
+                    <h3 class="text-xs font-bold text-indigo-400 uppercase tracking-widest mb-4 relative z-10">Динамическое Управление</h3>
+                    
+                    <p class="text-[1.15rem] text-gray-300 leading-snug font-medium mb-5 relative z-10">
+                        Система пресетов позволяет <strong class="text-indigo-300">мгновенно перенастраивать агента</strong> под задачу. При смене пресета меняются:
+                    </p>
+
+                    <div class="flex flex-col gap-3 relative z-10 mt-auto">
+                        <!-- Пункт 1: Промпты -->
+                        <div class="flex items-start gap-4">
+                            <div class="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center shrink-0 border border-purple-500/30">
+                                <i class="ph-fill ph-brain text-xl text-purple-400"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-md font-bold text-white mb-0.5">Системные промпты</h4>
+                                <p class="text-[0.8rem] text-gray-400 leading-snug">Глобальные текстовые инструкции, задающие общую "личность", правила поведения и контекст (например, "Ты - Архитектор, планируй...").</p>
+                            </div>
+                        </div>
+
+                        <!-- Пункт 2: Режимы -->
+                        <div class="flex items-start gap-4">
+                            <div class="w-10 h-10 rounded-xl bg-pink-500/20 flex items-center justify-center shrink-0 border border-pink-500/30">
+                                <i class="ph-fill ph-sliders text-xl text-pink-400"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-md font-bold text-white mb-0.5">Режимы</h4>
+                                <p class="text-[0.8rem] text-gray-400 leading-snug">Добавляют свой промпт при включении, так же позволяют настроить ACL и запустить скрипт сбора данных.</p>
+                            </div>
+                        </div>
+
+                        <!-- Пункт 3: Команды -->
+                        <div class="flex items-start gap-4">
+                            <div class="w-10 h-10 rounded-xl bg-orange-500/20 flex items-center justify-center shrink-0 border border-orange-500/30">
+                                <i class="ph-fill ph-terminal-window text-xl text-orange-400"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-md font-bold text-white mb-0.5">Команды</h4>
+                                <p class="text-[0.8rem] text-gray-400 leading-snug">Отправляют свой промпт при нажатии, так же позволяют запустить скрипт.</p>
+                            </div>
+                        </div>
+
+                        <!-- Пункт 4: Инструменты -->
+                        <div class="flex items-start gap-4">
+                            <div class="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center shrink-0 border border-blue-500/30">
+                                <i class="ph-fill ph-toolbox text-xl text-blue-400"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-md font-bold text-white mb-0.5">Доступ к инструментам</h4>
+                                <p class="text-[0.8rem] text-gray-400 leading-snug">Например: можно заблокировать python.</p>
+                            </div>
+                        </div>
+
+                        <!-- Пункт 5: ACL -->
+                        <div class="flex items-start gap-4">
+                            <div class="w-10 h-10 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                                <i class="ph-fill ph-shield-check text-xl text-emerald-400"></i>
+                            </div>
+                            <div>
+                                <h4 class="text-md font-bold text-white mb-0.5">Списки контроля доступа (ACL)</h4>
+                                <p class="text-[0.8rem] text-gray-400 leading-snug">Жесткий перехват файловых операций на уровне Python (sys.addaudithook) для защиты проекта от разрушительных действий ИИ.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ПРАВАЯ КОЛОНКА (Примеры пресетов) - 7 колонок -->
+            <div class="col-span-7 flex flex-col gap-5 justify-between h-full">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Примеры встроенных пресетов</h3>
+                
+                <!-- Пресет: Безопасный -->
+                <div class="glass-card p-5 rounded-2xl border-emerald-500/30 bg-gradient-to-r from-emerald-900/10 to-transparent flex items-center gap-5 relative overflow-hidden">
+                    <div class="w-16 h-16 rounded-2xl bg-emerald-500/20 flex items-center justify-center shrink-0 border border-emerald-500/40 shadow-[0_0_15px_rgba(16,185,129,0.2)] relative z-10">
+                        <i class="ph-fill ph-shield-star text-4xl text-emerald-400"></i>
+                    </div>
+                    <div class="relative z-10 flex-1">
+                        <h4 class="text-2xl font-bold text-white mb-1">«Безопасный»</h4>
+                        <p class="text-[1.1rem] text-gray-300 leading-snug font-medium">
+                            Максимальная защита системы. Агенту <strong class="text-emerald-400">запрещено изменять любые файлы проекта</strong> (ACL: только чтение). Запись разрешена исключительно в изолированные директории <code>temp/</code> и <code>sandbox/</code>.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Пресет: Разработчик -->
+                <div class="glass-card p-5 rounded-2xl border-blue-500/30 bg-gradient-to-r from-blue-900/10 to-transparent flex items-center gap-5 relative overflow-hidden">
+                    <div class="w-16 h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center shrink-0 border border-blue-500/40 shadow-[0_0_15px_rgba(59,130,246,0.2)] relative z-10">
+                        <i class="ph-fill ph-code text-4xl text-blue-400"></i>
+                    </div>
+                    <div class="relative z-10 flex-1">
+                        <h4 class="text-2xl font-bold text-white mb-1">«Разработчик»</h4>
+                        <p class="text-[1.1rem] text-gray-300 leading-snug font-medium">
+                            Полный доступ к коду. Через <i>режимы</i> можно динамически включать исходники файлов в контекст по разделам (frontend, backend, plugins), чтобы агент <strong class="text-blue-400">знал содержимое файлов, а не угадывал</strong>.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Пресет: Ревьюер -->
+                <div class="glass-card p-5 rounded-2xl border-purple-500/30 bg-gradient-to-r from-purple-900/10 to-transparent flex items-center gap-5 relative overflow-hidden">
+                    <div class="w-16 h-16 rounded-2xl bg-purple-500/20 flex items-center justify-center shrink-0 border border-purple-500/40 shadow-[0_0_15px_rgba(168,85,247,0.2)] relative z-10">
+                        <i class="ph-fill ph-magnifying-glass text-4xl text-purple-400"></i>
+                    </div>
+                    <div class="relative z-10 flex-1">
+                        <h4 class="text-2xl font-bold text-white mb-1">«Ревьюер»</h4>
+                        <p class="text-[1.1rem] text-gray-300 leading-snug font-medium">
+                            Жесткое ограничение на редактирование (ACL: Read-Only). Инициируется специальный промпт для <strong class="text-purple-400">глубокого статического анализа качества кода</strong>, поиска уязвимостей и архитектурных багов без риска поломки проекта.
+                        </p>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</div>

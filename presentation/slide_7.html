@@ -1,0 +1,129 @@
+<div class="slide-page" id="slide-7">
+    <!-- Меш-градиент (Уникальные цвета для 7 слайда: изумрудный, салатовый, синий, фиолетовый) -->
+    <div class="absolute top-[-10%] left-[-20%] w-[800px] h-[800px] bg-emerald-600/15 rounded-full blur-[150px]"></div>
+    <div class="absolute bottom-[-10%] right-[-10%] w-[700px] h-[700px] bg-blue-600/15 rounded-full blur-[150px]"></div>
+    <div class="absolute top-[10%] right-[20%] w-[500px] h-[500px] bg-fuchsia-600/15 rounded-full blur-[150px]"></div>
+    <div class="absolute bottom-[20%] left-[10%] w-[600px] h-[600px] bg-teal-600/10 rounded-full blur-[150px]"></div>
+    <div class="texture-overlay"></div>
+
+    <div class="relative z-10 w-full h-full flex flex-col p-8">
+        
+        <!-- Заголовок -->
+        <div class="mb-5 border-b border-white/10 pb-4">
+            <h2 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">Плагин web_interface</h2>
+        </div>
+
+        <div class="grid grid-cols-12 gap-8 flex-1 min-h-0 pb-4">
+            
+            <!-- ЛЕВАЯ КОЛОНКА (Основные функции GUI) - 6 колонок -->
+            <div class="col-span-6 flex flex-col justify-between h-full">
+                
+                <!-- Заголовок секции -->
+                <div class="glass-card px-6 py-4 rounded-2xl border-emerald-500/20 flex items-center gap-5 shrink-0 mb-6">
+                    <div class="w-14 h-14 rounded-xl bg-emerald-500/20 flex items-center justify-center shrink-0">
+                        <i class="ph-fill ph-browser text-3xl text-emerald-400"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-[11px] font-bold text-emerald-300 uppercase tracking-widest mb-1">Пользовательский опыт</h3>
+                        <p class="text-2xl text-white font-bold leading-tight">Полноценный Web-GUI</p>
+                    </div>
+                </div>
+
+                <!-- Функция 1: Интерфейс -->
+                <div class="glass-card p-6 rounded-3xl border-white/10 flex-1 relative overflow-hidden group mb-6">
+                    <div class="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-bl-full transition-transform group-hover:scale-110"></div>
+                    <div class="flex items-center gap-4 mb-3 relative z-10">
+                        <i class="ph-bold ph-layout text-3xl text-gray-300"></i>
+                        <h3 class="text-2xl font-bold text-white">Современный интерфейс</h3>
+                    </div>
+                    <p class="text-[1.1rem] text-gray-300 leading-snug font-medium relative z-10">
+                        Сервер (localhost) предоставляет адаптивный интерфейс на базе <strong class="text-white">Vue.js</strong> и <strong class="text-white">Tailwind CSS</strong>. Встроенные парсеры (Marked.js, Highlight.js, KaTeX) обеспечивают идеальное отображение кода, математики и markdown.
+                    </p>
+                </div>
+
+                <!-- Функция 2: Сохранение чатов -->
+                <div class="glass-card p-6 rounded-3xl border-teal-500/20 flex-1 relative overflow-hidden group">
+                    <div class="absolute bottom-0 right-0 w-24 h-24 bg-teal-500/10 rounded-tl-full transition-transform group-hover:scale-110"></div>
+                    <div class="flex items-center gap-4 mb-3 relative z-10">
+                        <i class="ph-bold ph-floppy-disk text-3xl text-teal-400"></i>
+                        <h3 class="text-2xl font-bold text-white">Сериализация сессий</h3>
+                    </div>
+                    <p class="text-[1.1rem] text-gray-300 leading-snug font-medium relative z-10">
+                        Чаты сохраняются не просто как текст, а <strong class="text-teal-300">сериализуются в бинарный формат (dill)</strong>. Это позволяет сохранять сгенерированные в рантайме методы, переменные окружения и текущее состояние агента.
+                    </p>
+                </div>
+
+            </div>
+
+            <!-- ПРАВАЯ КОЛОНКА (Управление) - 6 колонок -->
+            <div class="col-span-6 flex flex-col h-full">
+                
+                <div class="glass-card p-8 rounded-3xl border-blue-500/20 bg-gradient-to-bl from-blue-900/10 to-transparent flex flex-col flex-1 relative overflow-hidden shadow-[0_0_30px_rgba(59,130,246,0.1)]">
+                    <div class="absolute top-0 right-0 w-40 h-40 bg-blue-500/10 rounded-bl-full"></div>
+                    
+                    <div class="flex items-center gap-4 mb-6 relative z-10">
+                        <div class="w-16 h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center border border-blue-500/40 shrink-0">
+                            <i class="ph-fill ph-sliders-horizontal text-4xl text-blue-400"></i>
+                        </div>
+                        <h3 class="text-3xl font-bold text-white">Визуальное управление</h3>
+                    </div>
+
+                    <p class="text-[1.15rem] text-gray-300 leading-snug font-medium mb-8 relative z-10">
+                        Через боковую панель можно <strong class="text-blue-300">редактировать пресеты и промпты</strong>, а управлять <strong class="text-emerald-300">режимами</strong> и запускать <strong class="text-purple-300">команды</strong> прямо из панели ввода чата.
+                    </p>
+
+                    <!-- Имитация панели ввода -->
+                    <div class="relative z-10 mt-auto px-4">
+
+                        <!-- Сам Input Box -->
+                        <div class="rounded-2xl border border-white/10 shadow-2xl overflow-hidden flex flex-col backdrop-blur-md relative z-20" style="background-color: rgba(17, 24, 39, 0.35);">
+                            <textarea placeholder="Напишите что-нибудь..." rows="1" class="w-full bg-transparent text-gray-100 px-5 py-5 focus:outline-none resize-none text-sm leading-relaxed" style="height: 63px;" disabled></textarea>
+                            
+                            <div class="flex items-center justify-between px-3 pb-3 gap-2">
+                                <!-- Левый блок (режимы) -->
+                                <div class="flex items-center gap-1 bg-white/5 p-1 rounded-xl border border-white/5">
+                                    <button class="p-2 text-blue-400 rounded-lg bg-blue-500/20 border border-blue-500/30 cursor-default"><i class="ph-bold ph-strategy"></i></button>
+                                    <button class="p-2 text-gray-500 rounded-lg cursor-default"><i class="ph-bold ph-test-tube"></i></button>
+                                    <button class="p-2 text-gray-500 rounded-lg cursor-default"><i class="ph-bold ph-sparkle"></i></button>
+                                </div>
+                                
+                                <!-- Правый блок (команды + send) -->
+                                <div class="flex items-center gap-2">
+                                    <div class="flex items-center gap-1.5 px-2">
+                                        <!-- Кнопка Очистить профиль -->
+                                        <button class="px-3 py-2 rounded-xl text-gray-400 bg-white/5 border border-white/5 flex items-center gap-2 cursor-default">
+                                            <i class="ph-bold ph-magic-wand"></i>
+                                            <span class="text-[10px] font-bold uppercase tracking-wider">Очистить профиль</span>
+                                        </button>
+                                        <!-- Кнопка Коммит -->
+                                        <button class="px-3 py-2 rounded-xl text-gray-400 bg-white/5 border border-white/5 flex items-center gap-2 cursor-default">
+                                            <i class="ph-bold ph-terminal"></i>
+                                            <span class="text-[10px] font-bold uppercase tracking-wider">Коммит</span>
+                                        </button>
+                                    </div>
+                                    <!-- Send Button -->
+                                    <button class="w-11 h-11 rounded-xl bg-white/5 text-gray-700 shadow-xl flex items-center justify-center cursor-default border border-white/5">
+                                        <i class="ph-fill ph-paper-plane-right text-xl"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Декоративные подписи (СНИЗУ под полем ввода) -->
+                        <div class="flex justify-between px-10 pt-2 relative z-10">
+                            <div class="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex flex-col items-center">
+                                <i class="ph-bold ph-arrow-up text-gray-500 mb-0.5"></i> РЕЖИМЫ
+                            </div>
+                            <div class="text-[10px] text-gray-400 font-bold uppercase tracking-wider flex flex-col items-center pl-4 mr-20">
+                                <i class="ph-bold ph-arrow-up text-gray-500 mb-0.5"></i> КОМАНДЫ
+                            </div>
+                        </div>
+                        
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</div>
