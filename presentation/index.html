@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Презентация | Agent AI</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <style>
+        body { 
+            background-color: #111; 
+            margin: 0; padding: 20px; 
+            display: flex; flex-direction: column; align-items: center; gap: 40px;
+            font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            min-height: 100vh;
+        }
+        
+        .texture-overlay {
+            position: absolute; inset: 0;
+            background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+            background-size: 24px 24px;
+            z-index: 1; opacity: 0.5; pointer-events: none;
+        }
+
+        pre { width: 100%; margin: 0; background: transparent !important; }
+        pre code { padding: 1.5rem; font-size: 0.85rem; line-height: 1.5; background: transparent !important; border-radius: 12px; }
+
+        .slide-page {
+            width: 1280px; height: 720px;
+            background-color: #05050A; color: #f3f4f6;
+            position: relative; overflow: hidden;
+            box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.8);
+            flex-shrink: 0;
+            transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.5s ease;
+        }
+
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        /* ИДЕАЛЬНАЯ ПЕЧАТЬ В PDF */
+        @media print {
+            @page { size: 1280px 720px; margin: 0; }
+            body { 
+                margin: 0 !important; padding: 0 !important; 
+                background-color: #05050A !important; 
+                -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;
+                display: block;
+            }
+            .slide-page {
+                box-shadow: none !important;
+                page-break-after: always; page-break-inside: avoid;
+                transform: none !important; opacity: 1 !important; display: block !important;
+            }
+            #presentation-controls { display: none !important; }
+        }
+
+        /* РЕЖИМ ПРЕЗЕНТАЦИИ (Один слайд на экране) */
+        body.presentation-mode { padding: 0; justify-content: center; overflow: hidden; background-color: #000; }
+        body.presentation-mode .slide-page {
+            position: absolute; top: 50%; left: 50%;
+            margin-top: -360px; margin-left: -640px;
+            opacity: 0; pointer-events: none; transform: scale(0.95);
+        }
+        body.presentation-mode .slide-page.active {
+            opacity: 1; pointer-events: auto; transform: scale(1); z-index: 10;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="presentation-controls" class="fixed top-4 right-4 z-50 glass-card px-4 py-2 rounded-xl flex items-center gap-4">
+        <span class="text-xs text-gray-400 font-medium" id="slide-counter"></span>
+        <div class="h-4 w-px bg-white/20"></div>
+        <button onclick="togglePresentationMode()" class="text-gray-300 hover:text-white transition-colors" title="Режим выступления (F11)">
+            <i class="ph-bold ph-presentation-chart text-xl"></i>
+        </button>
+        <button onclick="window.print()" class="text-gray-300 hover:text-white transition-colors" title="Сохранить в PDF (Ctrl+P)">
+            <i class="ph-bold ph-printer text-xl"></i>
+        </button>
+    </div>
+
+    <div id="slides-container" class="flex flex-col gap-[40px] items-center w-full"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script>
+        // ИМЕНА ФАЙЛОВ ДЛЯ 15 СЛАЙДОВ
+        const slides = Array.from({length: 15}, (_, i) => `slide_${i + 1}.html`);
+        
+        let currentSlideIndex = 0;
+        let isPresentationMode = false;
+        let loadedSlidesCount = 0;
+
+        async function loadSlides() {
+            const container = document.getElementById('slides-container');
+            
+            for (let i = 0; i < slides.length; i++) {
+                try {
+                    const response = await fetch(slides[i]);
+                    if (!response.ok) {
+                        // Если файла пока нет (мы его еще не сгенерировали) - просто пропускаем, это норм
+                        continue; 
+                    }
+                    const html = await response.text();
+                    
+                    const temp = document.createElement('div');
+                    temp.innerHTML = html;
+                    const slideElement = temp.firstElementChild;
+                    
+                    if (loadedSlidesCount === 0) slideElement.classList.add('active');
+                    container.appendChild(slideElement);
+                    loadedSlidesCount++;
+                    
+                } catch (e) {
+                    console.error(`Ошибка загрузки ${slides[i]}:`, e);
+                    if (i === 0) {
+                        // Показываем ошибку CORS только если упал первый слайд
+                        container.innerHTML += `
+                            <div class="slide-page flex items-center justify-center p-12 text-center border border-red-500/30">
+                                <div class="glass-card p-8 rounded-3xl max-w-2xl">
+                                    <i class="ph-fill ph-warning-circle text-5xl text-red-500 mb-4"></i>
+                                    <h3 class="text-2xl font-bold text-white mb-2">Требуется локальный сервер</h3>
+                                    <p class="text-gray-400">Браузер блокирует загрузку локальных файлов (CORS).</p>
+                                    <p class="text-blue-400 mt-4 font-bold">В терминале: <code class="bg-black/50 px-2 py-1 rounded text-white">python -m http.server 8000</code></p>
+                                </div>
+                            </div>`;
+                    }
+                    break;
+                }
+            }
+            updateCounter();
+            hljs.highlightAll();
+        }
+
+        function togglePresentationMode() {
+            if (loadedSlidesCount === 0) return;
+            isPresentationMode = !isPresentationMode;
+            document.body.classList.toggle('presentation-mode', isPresentationMode);
+            
+            if (!isPresentationMode) {
+                document.querySelectorAll('.slide-page').forEach(el => el.classList.remove('active'));
+                document.querySelectorAll('.slide-page')[0].classList.add('active');
+                currentSlideIndex = 0;
+            }
+            updateCounter();
+        }
+
+        function updateCounter() {
+            document.getElementById('slide-counter').innerText = 
+                isPresentationMode ? `Слайд ${currentSlideIndex + 1} / ${loadedSlidesCount}` : `Слайдов: ${loadedSlidesCount}`;
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (!isPresentationMode) return;
+            const slideElements = document.querySelectorAll('.slide-page');
+            
+            if (e.key === 'ArrowRight' || e.key === 'Space') {
+                if (currentSlideIndex < slideElements.length - 1) {
+                    slideElements[currentSlideIndex].classList.remove('active');
+                    currentSlideIndex++;
+                    slideElements[currentSlideIndex].classList.add('active');
+                }
+            } else if (e.key === 'ArrowLeft') {
+                if (currentSlideIndex > 0) {
+                    slideElements[currentSlideIndex].classList.remove('active');
+                    currentSlideIndex--;
+                    slideElements[currentSlideIndex].classList.add('active');
+                }
+            } else if (e.key === 'Escape') {
+                togglePresentationMode();
+            }
+            updateCounter();
+        });
+
+        loadSlides();
+    </script>
+</body>
+</html>
