@@ -1,0 +1,100 @@
+<div class="slide-page" id="slide-13">
+    <!-- Меш-градиент (Тестирование и Качество: Зеленый, Синий, Фиолетовый) -->
+    <div class="absolute top-[-10%] left-[-10%] w-[800px] h-[800px] bg-emerald-600/15 rounded-full blur-[150px]"></div>
+    <div class="absolute bottom-[-15%] right-[-10%] w-[700px] h-[700px] bg-indigo-600/15 rounded-full blur-[150px]"></div>
+    <div class="absolute top-[20%] right-[20%] w-[500px] h-[500px] bg-purple-600/15 rounded-full blur-[150px]"></div>
+    <div class="absolute bottom-[20%] left-[20%] w-[600px] h-[600px] bg-cyan-600/10 rounded-full blur-[150px]"></div>
+    <div class="texture-overlay"></div>
+
+    <div class="relative z-10 w-full h-full flex flex-col p-8 pb-4">
+        
+        <!-- Заголовок -->
+        <div class="mb-5 border-b border-white/10 pb-4 shrink-0 flex justify-between items-end">
+            <h2 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">Тестирование Системы</h2>
+        </div>
+
+        <div class="grid grid-cols-12 gap-8 flex-1 min-h-0">
+            
+            <!-- ЛЕВАЯ КОЛОНКА (Инструменты и Архитектура) - 6 колонок -->
+            <div class="col-span-6 flex flex-col gap-6 h-full">
+                
+                <!-- Тест 1: Инструмент python и самомодификация -->
+                <div class="glass-card p-5 rounded-3xl border-indigo-500/20 relative overflow-hidden flex flex-col justify-center h-1/2">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-bl-full"></div>
+                    <div class="flex items-center gap-4 mb-3 relative z-10">
+                        <div class="w-12 h-12 rounded-2xl bg-indigo-500/20 flex items-center justify-center shrink-0 border border-indigo-500/30">
+                            <i class="ph-bold ph-code-block text-2xl text-indigo-400"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white">Ядро и Самомодификация</h3>
+                    </div>
+                    <ul class="text-[1.05rem] text-gray-300 leading-snug space-y-2 relative z-10">
+                        <li class="flex items-center gap-2"><i class="ph-bold ph-check text-emerald-400"></i> Создание инструмента "на лету"</li>
+                        <li class="flex items-center gap-2"><i class="ph-bold ph-check text-emerald-400"></i> Сериализация состояния</li>
+                        <li class="flex items-center gap-2"><i class="ph-bold ph-check text-emerald-400"></i> Защита ACL (перехват sys.addaudithook)</li>
+                    </ul>
+                </div>
+
+                <!-- Тест 2: Базовые инструменты -->
+                <div class="glass-card p-5 rounded-3xl border-cyan-500/20 relative overflow-hidden flex flex-col justify-center h-1/2">
+                    <div class="absolute bottom-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-tl-full"></div>
+                    <div class="flex items-center gap-4 mb-3 relative z-10">
+                        <div class="w-12 h-12 rounded-2xl bg-cyan-500/20 flex items-center justify-center shrink-0 border border-cyan-500/30">
+                            <i class="ph-bold ph-toolbox text-2xl text-cyan-400"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white">Базовые инструменты</h3>
+                    </div>
+                    <ul class="text-[1.05rem] text-gray-300 leading-snug space-y-2 relative z-10">
+                        <li class="flex items-center gap-2"><i class="ph-bold ph-check text-emerald-400"></i> Изолированная песочница (sandbox)</li>
+                        <li class="flex items-center gap-2"><i class="ph-bold ph-check text-emerald-400"></i> Интерактивный терминал (shell)</li>
+                        <li class="flex items-center gap-2"><i class="ph-bold ph-check text-emerald-400"></i> Поиск и парсинг Web (google, http)</li>
+                    </ul>
+                </div>
+
+            </div>
+
+            <!-- ПРАВАЯ КОЛОНКА (Качество кода и GUI) - 6 колонок -->
+            <div class="col-span-6 flex flex-col gap-6 h-full">
+                
+                <!-- Тест 3: Качество Кода -->
+                <div class="glass-card p-5 rounded-3xl border-purple-500/20 relative overflow-hidden flex flex-col justify-center h-1/2">
+                    <div class="absolute top-0 right-0 w-32 h-32 bg-purple-500/10 rounded-bl-full"></div>
+                    <div class="flex items-center gap-4 mb-3 relative z-10">
+                        <div class="w-12 h-12 rounded-2xl bg-purple-500/20 flex items-center justify-center shrink-0 border border-purple-500/30">
+                            <i class="ph-bold ph-projector-screen text-2xl text-purple-400"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white">Качество Кода</h3>
+                    </div>
+                    <div class="relative z-10 flex flex-col gap-2">
+                        <p class="text-[0.95rem] text-gray-400 mb-1">Задача: Добавить в web ui возможности персонализации</p>
+                        <div class="flex items-center justify-between bg-red-900/10 border border-red-500/20 rounded-xl p-2 px-3">
+                            <span class="text-[0.95rem] text-red-300">Обычный режим</span>
+                            <span class="text-xs font-bold bg-red-500/20 text-red-400 px-2 py-0.5 rounded">Провал (регрессия кода)</span>
+                        </div>
+                        <div class="flex items-center justify-between bg-emerald-900/10 border border-emerald-500/20 rounded-xl p-2 px-3">
+                            <span class="text-[0.95rem] text-emerald-300">Режим "Проектировщик"</span>
+                            <span class="text-xs font-bold bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">Успех (есть мелкие баги, но нет регрессии)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Тест 4: GUI -->
+                <div class="glass-card p-5 rounded-3xl border-emerald-500/20 relative overflow-hidden flex flex-col justify-center h-1/2">
+                    <div class="absolute bottom-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-tl-full"></div>
+                    <div class="flex items-center gap-4 mb-3 relative z-10">
+                        <div class="w-12 h-12 rounded-2xl bg-emerald-500/20 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                            <i class="ph-bold ph-mouse text-2xl text-emerald-400"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-white">Взаимодействие с GUI</h3>
+                    </div>
+                    <ul class="text-[1.05rem] text-gray-300 leading-snug space-y-2 relative z-10">
+                        <li class="flex items-center gap-2"><i class="ph-bold ph-check text-emerald-400"></i> <strong class="text-white font-medium">Простой Web:</strong> Browser Use ("РешуЕГЭ")</li>
+                        <li class="flex items-center gap-2"><i class="ph-bold ph-check text-emerald-400"></i> <strong class="text-white font-medium">Сложный Web:</strong> Computer Use WSL (React)</li>
+                        <li class="flex items-center gap-2"><i class="ph-bold ph-warning text-amber-500"></i> <strong class="text-white font-medium">Native ОС:</strong> Успешно, но требует описания интерфейса (Paint)</li>
+                    </ul>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</div>

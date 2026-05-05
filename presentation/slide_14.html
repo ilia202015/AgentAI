@@ -1,0 +1,85 @@
+<div class="slide-page" id="slide-14">
+    <!-- Меш-градиент (Сравнение: Синий, Индиго, Бирюзовый) -->
+    <div class="absolute top-[-10%] left-[-10%] w-[800px] h-[800px] bg-orange-600/15 rounded-full blur-[150px]"></div>
+    <div class="absolute bottom-[-15%] right-[10%] w-[800px] h-[800px] bg-purple-600/20 rounded-full blur-[150px]"></div>
+    <div class="absolute top-[30%] right-[-10%] w-[500px] h-[500px] bg-emerald-600/15 rounded-full blur-[150px]"></div>
+    <div class="texture-overlay"></div>
+
+    <div class="relative z-10 w-full h-full flex flex-col p-8 pb-4">
+        
+        <!-- Заголовок -->
+        <div class="mb-5 border-b border-white/10 pb-4 shrink-0">
+            <h2 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">Сравнительный Анализ</h2>
+        </div>
+
+        <div class="flex-1 flex flex-col min-h-0">
+            
+            <div class="glass-card rounded-3xl border-white/10 overflow-hidden flex-1 flex flex-col bg-black/40 shadow-2xl relative">
+                <!-- Заголовок таблицы -->
+                <div class="flex items-center px-6 py-4 bg-white/5 border-b border-white/10 shrink-0">
+                    <i class="ph-bold ph-scales text-2xl text-orange-400 mr-3"></i>
+                    <h3 class="text-lg font-bold text-white uppercase tracking-wider">Существующие автономные AI-агенты</h3>
+                </div>
+
+                <!-- Таблица -->
+                <div class="flex-1 p-6 flex flex-col gap-4 overflow-hidden relative">
+                    
+                    <!-- Шапка таблицы -->
+                    <div class="grid grid-cols-5 gap-4 px-4 py-2 border-b border-white/10 shrink-0">
+                        <div class="col-span-1 text-[11px] font-bold text-gray-500 uppercase tracking-widest">Критерий</div>
+                        <div class="col-span-1 text-[11px] font-bold text-orange-400 uppercase tracking-widest text-center bg-orange-500/10 rounded px-2 py-1">Agent AI</div>
+                        <div class="col-span-1 text-[11px] font-bold text-gray-500 uppercase tracking-widest text-center">OpenHands</div>
+                        <div class="col-span-1 text-[11px] font-bold text-gray-500 uppercase tracking-widest text-center">Open Interpreter</div>
+                        <div class="col-span-1 text-[11px] font-bold text-gray-500 uppercase tracking-widest text-center">SWE-agent / Devin</div>
+                    </div>
+
+                    <!-- Строка 1 -->
+                    <div class="grid grid-cols-5 gap-4 px-4 py-3 bg-white/5 rounded-xl border border-white/5 items-center">
+                        <div class="col-span-1 text-[0.95rem] font-bold text-gray-300">Архитектура</div>
+                        <div class="col-span-1 text-center"><span class="bg-purple-500/20 text-purple-300 px-3 py-1 rounded-lg text-sm font-bold border border-purple-500/30">Самомодификация</span></div>
+                        <div class="col-span-1 text-center text-sm text-gray-400">Статичная (Скрипты)</div>
+                        <div class="col-span-1 text-center text-sm text-gray-400">Статичная (Ядро неизменно)</div>
+                        <div class="col-span-1 text-center text-sm text-gray-400">Жестко заданная</div>
+                    </div>
+
+                    <!-- Строка 2 -->
+                    <div class="grid grid-cols-5 gap-4 px-4 py-3 bg-white/5 rounded-xl border border-white/5 items-center">
+                        <div class="col-span-1 text-[0.95rem] font-bold text-gray-300">Окружение</div>
+                        <div class="col-span-1 text-center text-sm text-orange-200">Прямой доступ к ОС + ACL изоляция</div>
+                        <div class="col-span-1 text-center text-sm text-gray-400">Изолированный Docker</div>
+                        <div class="col-span-1 text-center text-sm text-gray-400">Прямой доступ к ОС (CLI)</div>
+                        <div class="col-span-1 text-center text-sm text-gray-400">Облачная / Изолированная</div>
+                    </div>
+
+                    <!-- Строка 3 -->
+                    <div class="grid grid-cols-5 gap-4 px-4 py-3 bg-white/5 rounded-xl border border-white/5 items-center">
+                        <div class="col-span-1 text-[0.95rem] font-bold text-gray-300">Пользовательский интерфейс</div>
+                        <div class="col-span-1 text-center"><span class="bg-purple-500/20 text-purple-300 px-3 py-1 rounded-lg text-sm font-bold border border-purple-500/30">Web UI с HTML-вставками</span></div>
+                        <div class="col-span-1 text-center text-sm text-gray-400">Статичный React-UI</div>
+                        <div class="col-span-1 text-center text-sm text-gray-400">Терминал</div>
+                        <div class="col-span-1 text-center text-sm text-gray-400">Web-UI / Терминал</div>
+                    </div>
+
+                    <!-- Строка 4 -->
+                    <div class="grid grid-cols-5 gap-4 px-4 py-3 bg-white/5 rounded-xl border border-white/5 items-center">
+                        <div class="col-span-1 text-[0.95rem] font-bold text-gray-300">Взаимодействие с GUI</div>
+                        <div class="col-span-1 text-center text-sm text-orange-200">Нативное (PyAutoGUI) + Изолированное (WSL) + Анализ DOM (Browser Use)</div>
+                        <div class="col-span-1 text-center text-sm text-gray-400">VNC внутри Docker</div>
+                        <div class="col-span-1 text-center text-sm text-gray-400">Нативное (PyAutoGUI)</div>
+                        <div class="col-span-1 text-center text-sm text-gray-400">Не поддерживается</div>
+                    </div>
+
+                    <!-- Итог -->
+                    <div class="absolute bottom-0 left-0 right-0 p-5 bg-gradient-to-t from-black via-black/80 to-transparent flex justify-center">
+                        <div class="glass-card px-6 py-3 rounded-full border-purple-500/30 bg-blue-900/20 flex items-center gap-3">
+                            <i class="ph-fill ph-check-circle text-orange-400 text-xl"></i>
+                            <span class="text-sm text-white font-bold tracking-wide">Главные преимущества: Самомодификация в Runtime, HTML-вставки и комплексность.</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>

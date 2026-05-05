@@ -81,12 +81,23 @@
         <button onclick="togglePresentationMode()" class="text-gray-300 hover:text-white transition-colors" title="Режим выступления (F11)">
             <i class="ph-bold ph-presentation-chart text-xl"></i>
         </button>
+        
+        <button onclick="saveToPdfAsImages()" class="text-gray-300 hover:text-white transition-colors flex items-center gap-2" title="Скачать PDF (Full HD картинки)">
+            <i class="ph-bold ph-download-simple text-xl"></i>
+            <span class="text-xs font-bold hidden group-hover:block" id="pdf-status">HD PDF</span>
+        </button>
+
         <button onclick="window.print()" class="text-gray-300 hover:text-white transition-colors" title="Сохранить в PDF (Ctrl+P)">
             <i class="ph-bold ph-printer text-xl"></i>
         </button>
     </div>
 
     <div id="slides-container" class="flex flex-col gap-[40px] items-center w-full"></div>
+
+    
+    <!-- Библиотеки для экспорта в PDF через изображения -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script>
@@ -177,6 +188,88 @@
             }
             updateCounter();
         });
+
+        
+        async function saveToPdfAsImages() {
+            if (loadedSlidesCount === 0) return;
+            
+            const btnStatus = document.getElementById('pdf-status');
+            const originalText = btnStatus.innerText;
+            btnStatus.innerText = "Подготовка...";
+            
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'px',
+                format: [1920, 1080]
+            });
+
+            const slideElements = document.querySelectorAll('.slide-page');
+            
+            const wasPresentationMode = isPresentationMode;
+            const savedIndex = currentSlideIndex;
+            
+            if (wasPresentationMode) {
+                document.body.classList.remove('presentation-mode');
+            }
+            
+            // 1. Ждем загрузки шрифтов (иконок Phosphor)
+            await document.fonts.ready;
+            
+            // 2. РАСТРОВЫЙ ДВИЖОК НЕ ПОДДЕРЖИВАЕТ БЛЮР
+            // html2canvas перерисовывает CSS на 2D-Canvas. Он физически не умеет применять backdrop-filter.
+            // Чтобы карточки не выглядели уродливо (просто прозрачными), мы временно делаем их фон темным и солидным.
+            const glassCards = document.querySelectorAll('.glass-card');
+            const originalCardsStyles = [];
+            glassCards.forEach(card => {
+                originalCardsStyles.push(card.style.background);
+                card.style.background = 'rgba(30, 30, 40, 0.95)'; // Темный "матовый" фон вместо блюра
+            });
+
+            await new Promise(r => setTimeout(r, 500));
+
+            for (let i = 0; i < slideElements.length; i++) {
+                btnStatus.innerText = `Слайд ${i+1}/${slideElements.length}`;
+                const slide = slideElements[i];
+                
+                try {
+                    // Используем html2canvas для ПРЯМОГО РАСТРОВОГО рендера (без SVG-посредников)
+                    const canvas = await html2canvas(slide, {
+                        scale: 1.5, // Full HD
+                        useCORS: true, // Включаем загрузку внешних картинок и шрифтов (иконок)
+                        allowTaint: true,
+                        backgroundColor: '#05050A',
+                        logging: false
+                    });
+
+                    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+                    if (i > 0) {
+                        pdf.addPage([1920, 1080], 'landscape');
+                    }
+                    
+                    pdf.addImage(imgData, 'JPEG', 0, 0, 1920, 1080);
+                } catch (err) {
+                    console.error("Ошибка рендера слайда " + (i+1), err);
+                }
+            }
+
+            // Восстанавливаем оригинальные стили со стеклом
+            glassCards.forEach((card, i) => {
+                card.style.background = originalCardsStyles[i];
+            });
+
+            if (wasPresentationMode) {
+                document.body.classList.add('presentation-mode');
+                slideElements.forEach(el => el.classList.remove('active'));
+                slideElements[savedIndex].classList.add('active');
+            }
+
+            btnStatus.innerText = "Сохранение...";
+            pdf.save('Presentation_FullHD.pdf');
+            btnStatus.innerText = originalText;
+        }
+
 
         loadSlides();
     </script>

@@ -1,0 +1,117 @@
+<div class="slide-page" id="slide-12">
+    <!-- Меш-градиент (ОС: Windows Blue, Linux Green, Purple) -->
+    <div class="absolute top-[-10%] left-[-10%] w-[800px] h-[800px] bg-blue-600/15 rounded-full blur-[150px]"></div>
+    <div class="absolute bottom-[-15%] right-[-10%] w-[700px] h-[700px] bg-emerald-600/15 rounded-full blur-[150px]"></div>
+    <div class="absolute top-[30%] left-[30%] w-[500px] h-[500px] bg-purple-600/15 rounded-full blur-[150px]"></div>
+    <div class="absolute bottom-[20%] right-[30%] w-[500px] h-[500px] bg-cyan-600/10 rounded-full blur-[150px]"></div>
+    <div class="texture-overlay"></div>
+
+    <div class="relative z-10 w-full h-full flex flex-col p-8 pb-4">
+        
+        <!-- Заголовок -->
+        <div class="mb-5 border-b border-white/10 pb-4 shrink-0">
+            <h2 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">Взаимодействие с GUI: Computer Use</h2>
+        </div>
+
+        <div class="grid grid-cols-12 gap-8 flex-1 min-h-0">
+            
+            <!-- ЛЕВАЯ КОЛОНКА (Windows Base) - 6 колонок -->
+            <div class="col-span-6 flex flex-col h-full">
+                
+                <div class="glass-card p-8 rounded-3xl border-blue-500/30 bg-gradient-to-bl from-blue-900/10 to-transparent flex flex-col flex-1 relative overflow-hidden shadow-[0_0_30px_rgba(59,130,246,0.1)]">
+                    <div class="absolute top-0 right-0 w-48 h-48 bg-blue-500/10 rounded-bl-full"></div>
+                    
+                    <div class="flex items-center gap-4 mb-6 relative z-10">
+                        <div class="w-16 h-16 rounded-2xl bg-blue-500/20 flex items-center justify-center border border-blue-500/40 shrink-0 shadow-[0_0_15px_rgba(59,130,246,0.3)]">
+                            <i class="ph-fill ph-windows-logo text-4xl text-blue-400"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-[11px] font-bold text-blue-300 uppercase tracking-widest mb-1">Режим Нативный</h3>
+                            <h4 class="text-3xl font-black text-white">Windows Base</h4>
+                        </div>
+                    </div>
+
+                    <p class="text-[1.15rem] text-gray-200 leading-relaxed font-medium mb-8 relative z-10">
+                        Агент управляет <strong class="text-blue-300">реальной хост-системой</strong> пользователя через эмуляцию ввода (<code class="text-blue-300 bg-white/10 px-1 rounded">pyautogui</code>, <code class="text-blue-300 bg-white/10 px-1 rounded">mss</code>).
+                    </p>
+
+                    <!-- Преимущества и недостатки -->
+                    <div class="flex flex-col gap-5 mt-auto relative z-10">
+                        <!-- Плюсы -->
+                        <div class="glass-card p-4 rounded-2xl border-emerald-500/20 bg-emerald-900/10 flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                                <i class="ph-bold ph-plus text-emerald-400"></i>
+                            </div>
+                            <ul class="text-[1.05rem] text-gray-300 leading-snug space-y-1.5 flex-1">
+                                <li>Не требует дополнительной настройки (работает "из коробки").</li>
+                                <li>Доступ ко всем локальным приложениям.</li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Минусы -->
+                        <div class="glass-card p-4 rounded-2xl border-red-500/20 bg-red-900/10 flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center shrink-0 border border-red-500/30">
+                                <i class="ph-bold ph-minus text-red-400"></i>
+                            </div>
+                            <ul class="text-[1.05rem] text-gray-300 leading-snug space-y-1.5 flex-1">
+                                <li>Во время работы <strong class="text-red-300">нельзя пользоваться ПК</strong> (движение мыши собьет скрипт).</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- ПРАВАЯ КОЛОНКА (WSL) - 6 колонок -->
+            <div class="col-span-6 flex flex-col h-full">
+                
+                <div class="glass-card p-8 rounded-3xl border-emerald-500/30 bg-gradient-to-br from-emerald-900/10 to-transparent flex flex-col flex-1 relative overflow-hidden shadow-[0_0_30px_rgba(16,185,129,0.1)]">
+                    <div class="absolute bottom-0 right-0 w-48 h-48 bg-emerald-500/10 rounded-tl-full"></div>
+                    
+                    <div class="flex items-center gap-4 mb-6 relative z-10">
+                        <div class="w-16 h-16 rounded-2xl bg-emerald-500/20 flex items-center justify-center border border-emerald-500/40 shrink-0 shadow-[0_0_15px_rgba(16,185,129,0.3)]">
+                            <i class="ph-fill ph-linux-logo text-4xl text-emerald-400"></i>
+                        </div>
+                        <div>
+                            <h3 class="text-[11px] font-bold text-emerald-300 uppercase tracking-widest mb-1">Режим Изолированный</h3>
+                            <h4 class="text-3xl font-black text-white">Виртуальный (WSL)</h4>
+                        </div>
+                    </div>
+
+                    <p class="text-[1.15rem] text-gray-200 leading-relaxed font-medium mb-8 relative z-10">
+                        Создается виртуальный дисплей (<code class="text-emerald-300 bg-white/10 px-1 rounded">Xvfb</code>) внутри подсистемы Linux. Управление через <code class="text-emerald-300 bg-white/10 px-1 rounded">xdotool</code>, трансляция VNC.
+                    </p>
+
+                    <!-- Преимущества и недостатки -->
+                    <div class="flex flex-col gap-5 mt-auto relative z-10">
+                        <!-- Плюсы -->
+                        <div class="glass-card p-4 rounded-2xl border-emerald-500/20 bg-emerald-900/10 flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                                <i class="ph-bold ph-plus text-emerald-400"></i>
+                            </div>
+                            <ul class="text-[1.05rem] text-gray-300 leading-snug space-y-1.5 flex-1">
+                                <li>Агент работает <strong class="text-emerald-300">в фоне</strong>, не перехватывая курсор.</li>
+                                <li>Полностью безопасная среда для тестирования кода ИИ.</li>
+                            </ul>
+                        </div>
+                        
+                        <!-- Минусы -->
+                        <div class="glass-card p-4 rounded-2xl border-orange-500/20 bg-orange-900/10 flex items-start gap-3">
+                            <div class="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center shrink-0 border border-orange-500/30">
+                                <i class="ph-bold ph-minus text-orange-400"></i>
+                            </div>
+                            <ul class="text-[1.05rem] text-gray-300 leading-snug space-y-1.5 flex-1">
+                                <li>Требуется предварительная настройка WSL и пакетов.</li>
+                                <li>Недоступны специфичные Windows-приложения.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</div>
