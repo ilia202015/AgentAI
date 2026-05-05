@@ -1,0 +1,120 @@
+<div class="slide-page" id="slide-9">
+    <!-- Меш-градиент -->
+    <div class="absolute top-[-10%] left-[-10%] w-[700px] h-[700px] bg-red-600/15 rounded-full blur-[150px]"></div>
+    <div class="absolute bottom-[-15%] right-[10%] w-[800px] h-[800px] bg-orange-600/15 rounded-full blur-[150px]"></div>
+    <div class="absolute top-[30%] right-[30%] w-[500px] h-[500px] bg-rose-600/15 rounded-full blur-[150px]"></div>
+    <div class="absolute bottom-[20%] left-[20%] w-[600px] h-[600px] bg-red-800/20 rounded-full blur-[150px]"></div>
+    <div class="texture-overlay"></div>
+
+    <div class="relative z-10 w-full h-full flex flex-col p-8 pb-4">
+        
+        <!-- Заголовок -->
+        <div class="mb-4 border-b border-white/10 pb-3 shrink-0">
+            <h2 class="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-gray-400">Качество Кода: Проблема Масштаба</h2>
+        </div>
+
+        <div class="flex-1 flex flex-col items-center justify-start relative w-full h-full pt-2">
+            
+            <!-- Описание проблемы -->
+            <div class="glass-card px-8 py-5 rounded-3xl border-red-500/30 mb-2 z-20 text-center max-w-4xl shrink-0">
+                <p class="text-[1.3rem] text-gray-200 leading-snug font-medium">
+                    ИИ отлично решает атомарные задачи. Но при попытке создать <strong class="text-red-400">объемный продукт за один подход</strong> (Single-shot), качество катастрофически падает из-за наложения следующих факторов:
+                </p>
+            </div>
+
+            <!-- ГРАФ (Контейнер) - Уменьшил h-[480px] до h-[460px] и убрал mt -->
+            <div class="relative w-[1200px] h-[460px] z-10 transform -translate-y-2">
+                
+                <!-- Линии графа (SVG) -->
+                <svg class="absolute inset-0 w-full h-full pointer-events-none" style="z-index: 1;">
+                    <defs>
+                        <linearGradient id="line-grad-1" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="rgba(248,113,113,0.6)" />
+                            <stop offset="100%" stop-color="rgba(248,113,113,0.1)" />
+                        </linearGradient>
+                        <linearGradient id="line-grad-2" x1="100%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="rgba(251,146,60,0.6)" />
+                            <stop offset="100%" stop-color="rgba(251,146,60,0.1)" />
+                        </linearGradient>
+                    </defs>
+                    <!-- Линии от центрального к левым -->
+                    <path d="M 600 230 L 360 110" stroke="url(#line-grad-1)" stroke-width="4" fill="none" />
+                    <!-- Линия к "Переполнение окна" вынесена еще левее: x=120 -->
+                    <path d="M 600 230 L 120 230" stroke="url(#line-grad-1)" stroke-width="4" stroke-dasharray="8,8" fill="none" class="animate-[pulse_3s_ease-in-out_infinite]" />
+                    <path d="M 600 230 L 360 350" stroke="url(#line-grad-1)" stroke-width="4" fill="none" />
+                    
+                    <!-- Линии от центрального к правым -->
+                    <path d="M 600 230 L 840 110" stroke="url(#line-grad-2)" stroke-width="4" fill="none" />
+                    <!-- Линия к "Эффект домино" вынесена еще правее: x=1080 -->
+                    <path d="M 600 230 L 1080 230" stroke="url(#line-grad-2)" stroke-width="4" stroke-dasharray="8,8" fill="none" class="animate-[pulse_3s_ease-in-out_infinite]" />
+                    <path d="M 600 230 L 840 350" stroke="url(#line-grad-2)" stroke-width="4" fill="none" />
+                </svg>
+
+                <!-- ЦЕНТРАЛЬНЫЙ УЗЕЛ (x=600, y=230) -->
+                <div class="absolute top-[230px] left-[600px] transform -translate-x-1/2 -translate-y-1/2 z-20">
+                    <div class="glass-card w-[240px] h-[240px] rounded-full border-red-500/50 flex flex-col items-center justify-center p-4 bg-gradient-to-br from-red-900/40 to-black shadow-[0_0_50px_rgba(220,38,38,0.4)] relative group cursor-default">
+                        <div class="absolute inset-0 rounded-full border border-red-400/30 animate-[ping_3s_cubic-bezier(0,0,0.2,1)_infinite]"></div>
+                        <i class="ph-fill ph-warning-octagon text-[5.5rem] text-red-500 mb-2 drop-shadow-[0_0_20px_rgba(239,68,68,0.8)]"></i>
+                        <h3 class="text-2xl font-black text-white text-center leading-tight">КРАХ<br>АРХИТЕКТУРЫ</h3>
+                    </div>
+                </div>
+
+                <!-- УЗЕЛ: Заглушки (Левый верхний, x=360) -->
+                <div class="absolute top-[110px] left-[360px] transform -translate-x-1/2 -translate-y-1/2 z-20">
+                    <div class="glass-card w-[230px] min-h-[160px] p-5 rounded-3xl border-orange-500/30 flex flex-col items-center justify-center text-center shadow-2xl bg-black/80 backdrop-blur-xl">
+                        <i class="ph-fill ph-puzzle-piece text-5xl text-orange-400 mb-3 drop-shadow-md"></i>
+                        <h4 class="text-[13px] font-bold text-white uppercase mb-2">Генерация Заглушек</h4>
+                        <p class="text-[0.9rem] text-gray-300 leading-snug">Модель оставляет пустые методы ("# TODO: логика") вместо кода.</p>
+                    </div>
+                </div>
+
+                <!-- УЗЕЛ: Потеря контекста (Дальний Левый, x=120) -->
+                <div class="absolute top-[230px] left-[120px] transform -translate-x-1/2 -translate-y-1/2 z-20">
+                    <div class="glass-card w-[230px] min-h-[160px] p-5 rounded-3xl border-rose-500/30 flex flex-col items-center justify-center text-center shadow-2xl bg-black/80 backdrop-blur-xl">
+                        <i class="ph-bold ph-brain text-5xl text-rose-400 mb-3 drop-shadow-md"></i>
+                        <h4 class="text-[13px] font-bold text-white uppercase mb-2">Переполнение Окна</h4>
+                        <p class="text-[0.9rem] text-gray-300 leading-snug">Контекст "забивает" память, заставляя ИИ забывать инструкции.</p>
+                    </div>
+                </div>
+
+                <!-- УЗЕЛ: Поломка старого кода (Левый нижний, x=360) -->
+                <div class="absolute top-[350px] left-[360px] transform -translate-x-1/2 -translate-y-1/2 z-20">
+                    <div class="glass-card w-[230px] min-h-[160px] p-5 rounded-3xl border-red-500/30 flex flex-col items-center justify-center text-center shadow-2xl bg-black/80 backdrop-blur-xl">
+                        <i class="ph-bold ph-file-dashed text-5xl text-red-400 mb-3 drop-shadow-md"></i>
+                        <h4 class="text-[13px] font-bold text-white uppercase mb-2">Деградация Кода</h4>
+                        <p class="text-[0.9rem] text-gray-300 leading-snug">ИИ может случайно стереть или сломать рабочие функции.</p>
+                    </div>
+                </div>
+
+                <!-- УЗЕЛ: Галлюцинации (Правый верхний, x=840) -->
+                <div class="absolute top-[110px] left-[840px] transform -translate-x-1/2 -translate-y-1/2 z-20">
+                    <div class="glass-card w-[230px] min-h-[160px] p-5 rounded-3xl border-pink-500/30 flex flex-col items-center justify-center text-center shadow-2xl bg-black/80 backdrop-blur-xl">
+                        <i class="ph-bold ph-ghost text-5xl text-pink-400 mb-3 drop-shadow-md"></i>
+                        <h4 class="text-[13px] font-bold text-white uppercase mb-2">Галлюцинации</h4>
+                        <p class="text-[0.9rem] text-gray-300 leading-snug">Выдумывание несуществующих библиотек или решений.</p>
+                    </div>
+                </div>
+
+                <!-- УЗЕЛ: Эффект домино (Дальний Правый, x=1080) -->
+                <div class="absolute top-[230px] left-[1080px] transform -translate-x-1/2 -translate-y-1/2 z-20">
+                    <div class="glass-card w-[230px] min-h-[160px] p-5 rounded-3xl border-amber-500/30 flex flex-col items-center justify-center text-center shadow-2xl bg-black/80 backdrop-blur-xl">
+                        <i class="ph-bold ph-cards text-5xl text-amber-400 mb-3 drop-shadow-md"></i>
+                        <h4 class="text-[13px] font-bold text-white uppercase mb-2">Эффект Домино</h4>
+                        <p class="text-[0.9rem] text-gray-300 leading-snug">Ошибки в одной подзадаче ломают дальнейшую реализацию.</p>
+                    </div>
+                </div>
+
+                <!-- УЗЕЛ: Неравномерность (Правый нижний, x=840) -->
+                <div class="absolute top-[350px] left-[840px] transform -translate-x-1/2 -translate-y-1/2 z-20">
+                    <div class="glass-card w-[230px] min-h-[160px] p-5 rounded-3xl border-yellow-500/30 flex flex-col items-center justify-center text-center shadow-2xl bg-black/80 backdrop-blur-xl">
+                        <i class="ph-bold ph-chart-line-down text-5xl text-yellow-400 mb-3 drop-shadow-md"></i>
+                        <h4 class="text-[13px] font-bold text-white uppercase mb-2">Неравномерность</h4>
+                        <p class="text-[0.9rem] text-gray-300 leading-snug">Одни модули пишутся идеально, другие на уровне новичка.</p>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</div>
