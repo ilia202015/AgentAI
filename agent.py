@@ -252,14 +252,19 @@ class Chat:
         self.settings_tools = {}
         self.active_modes = self._load_config_json("final_prompts.json", {}).get("active_parameters", [])
         
-        self.models = [ #(name, rpm)
-            ("gemini-3-pro-preview", 25),
-            ("gemini-3-flash-preview", 1000),
-            ("gemini-3.1-flash-lite-preview", 1000),
+        self.models = [
+            ("gemini-3.7-flash", 1000),
+            ("gemini-3.6-flash", 1000),
+            ("gemini-3.5-flash", 1000),
+            ("gemini-3.5-flash-lite", 1000),
+            ("gemini-3.1-flash-lite", 1000),
             ("gemini-3.1-pro-preview", 25),
-            ("gemini-2.5-pro", 150)
+            ("gemini-3-flash-preview", 1000),
+            ("gemini-2.5-pro", 50),
+            ("gemini-2.5-flash", 1000),
+            ("gemini-2.5-flash-lite", 1000),
         ]
-        self.model, self.model_rpm = self.models[1]
+        self.model, self.model_rpm = ("gemini-3.5-flash-lite", 1000)
 
         self._setup_client()
 
