@@ -1353,8 +1353,8 @@ class Chat:
         self.print(f"🔑 Превышен лимит запросов. Переключаюсь на следующий ключ ({self.current_key_index + 1}/{len(self.gemini_keys)}).")
 
 def main():
-    print("🚀 AI-агент запущен (Gemini Native Mode). Введите ваш запрос.")
     chat_agent = Chat(print_to_console=True)
+    print(f"🚀 AI-агент запущен (Gemini Native Mode, модель: {chat_agent.model}). Введите ваш запрос.")
     try:
         while True:
             user_input = input("\n👤 Вы: ")
